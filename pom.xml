@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2024 OceanBase.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.oceanbase</groupId>
+    <artifactId>spark-connector-oceanbase-parent</artifactId>
+    <version>${rversion}</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>spark-connector-oceanbase</module>
+        <module>spark-connector-oceanbase-common</module>
+    </modules>
+
+    <properties>
+        <rversion>1.0-SNAPSHOT</rversion>
+        <scala.version>2.12.15</scala.version>
+        <scala.binary.version>2.12</scala.binary.version>
+        <slf4j.version>1.7.32</slf4j.version>
+        <log4j.version>2.17.1</log4j.version>
+        <junit4.version>4.13.2</junit4.version>
+        <junit5.version>5.8.1</junit5.version>
+        <spotless.version>2.27.1</spotless.version>
+        <target.java.version>1.8</target.java.version>
+        <assertj.version>3.23.1</assertj.version>
+        <testcontainers.version>1.20.1</testcontainers.version>
+        <scala-maven-plugin.version>3.2.2</scala-maven-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit5.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>${junit4.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Root dependencies for all projects -->
+        <!-- Logging API -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
+        <!-- test dependencies -->
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-bom</artifactId>
+            <version>${testcontainers.version}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>oceanbase</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>1.7</version>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.8.0</version>
+                    <configuration>
+                        <source>${target.java.version}</source>
+                        <target>${target.java.version}</target>
+                        <!-- The semantics of this option are reversed, see MCOMPILER-209. -->
+                        <useIncrementalCompilation>false</useIncrementalCompilation>
+                        <compilerArgs>
+                            <!-- Prevents recompilation due to missing package-info.class, see MCOMPILER-205 -->
+                            <arg>-Xpkginfo:always</arg>
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+
+                <plugin>
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>${spotless.version}</version>
+                    <configuration>
+                        <java>
+                            <googleJavaFormat>
+                                <version>1.7</version>
+                                <style>AOSP</style>
+                            </googleJavaFormat>
+
+                            <!-- \# refers to the static imports -->
+                            <importOrder>
+                                <order>com.oceanbase,javax,java,scala,\#</order>
+                            </importOrder>
+
+                            <removeUnusedImports />
+                        </java>
+                        <scala>
+                            <scalafmt />
+                        </scala>
+                        <pom>
+                            <sortPom>
+                                <encoding>UTF-8</encoding>
+                                <nrOfIndentSpace>4</nrOfIndentSpace>
+                                <keepBlankLines>true</keepBlankLines>
+                                <indentBlankLines>false</indentBlankLines>
+                                <indentSchemaLocation>false</indentSchemaLocation>
+                                <spaceBeforeCloseEmptyElement>true</spaceBeforeCloseEmptyElement>
+                                <sortModules>false</sortModules>
+                                <sortExecutions>false</sortExecutions>
+                                <predefinedSortOrder>custom_1</predefinedSortOrder>
+                                <expandEmptyElements>false</expandEmptyElements>
+                                <sortProperties>false</sortProperties>
+                            </sortPom>
+                            <replace>
+                                <name>Leading blank line</name>
+                                <search>project</search>
+                                <replacement>project</replacement>
+                            </replace>
+                        </pom>
+                        <markdown>
+                            <includes>
+                                <include>*.md</include>
+                                <include>docs/**/*.md</include>
+                            </includes>
+                            <flexmark />
+                        </markdown>
+                        <upToDateChecking>
+                            <enabled>true</enabled>
+                        </upToDateChecking>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>spotless-check</id>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                            <phase>validate</phase>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>2.9.1</version>
+                    <!--$NO-MVN-MAN-VER$-->
+                    <configuration>
+                        <quiet>true</quiet>
+                        <detectOfflineLinks>false</detectOfflineLinks>
+                        <additionalJOptions combine.children="append">
+                            <additionalJOption>-Xdoclint:none</additionalJOption>
+                        </additionalJOptions>
+                    </configuration>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>3.0.0-M1</version>
+                </plugin>
+
+                <!-- Pin the version of the maven shade plugin -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>3.4.1</version>
+                </plugin>
+
+                <!-- configure scala style -->
+                <plugin>
+                    <groupId>org.scalastyle</groupId>
+                    <artifactId>scalastyle-maven-plugin</artifactId>
+                    <version>1.0.0</version>
+                    <configuration>
+                        <verbose>false</verbose>
+                        <failOnViolation>true</failOnViolation>
+                        <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                        <failOnWarning>false</failOnWarning>
+                        <sourceDirectory>${basedir}/src/main/scala</sourceDirectory>
+                        <testSourceDirectory>${basedir}/src/test/scala</testSourceDirectory>
+                        <outputFile>${project.basedir}/target/scalastyle-output.xml</outputFile>
+                        <inputEncoding>UTF-8</inputEncoding>
+                        <outputEncoding>UTF-8</outputEncoding>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <!--surefire for unit tests and integration tests-->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.0.0-M5</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <!-- for junit5 -->
+                            <junit.jupiter.extensions.autodetection.enabled>true</junit.jupiter.extensions.autodetection.enabled>
+                        </systemPropertyVariables>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>default-test</id>
+                            <goals>
+                                <goal>test</goal>
+                            </goals>
+                            <phase>test</phase>
+                            <configuration>
+                                <includes>
+                                    <include>**/*.*</include>
+                                    <include>**/*Test.*</include>
+                                </includes>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <quiet>true</quiet>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.4</version>
+                <!--$NO-MVN-MAN-VER$-->
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                            <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>test-jar</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.15</version>
+                <inherited>false</inherited>
+                <configuration>
+                    <excludeSubProjects>false</excludeSubProjects>
+                    <numUnapprovedLicenses>0</numUnapprovedLicenses>
+                    <licenses>
+                        <license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+                            <licenseFamilyCategory>AL2</licenseFamilyCategory>
+                            <licenseFamilyName>Apache License 2.0</licenseFamilyName>
+                            <notes />
+                            <patterns>
+                                <pattern>Licensed to the Apache Software Foundation (ASF) under one</pattern>
+                            </patterns>
+                        </license>
+                    </licenses>
+                    <licenseFamilies>
+                        <licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+                            <familyName>Apache License 2.0</familyName>
+                        </licenseFamily>
+                    </licenseFamilies>
+                    <excludes>
+                        <!-- Additional files like .gitignore etc.-->
+                        <exclude>**/.*/**</exclude>
+                        <exclude>**/*.prefs</exclude>
+                        <exclude>**/*.log</exclude>
+                        <!-- Administrative files in the main trunk. -->
+                        <exclude>**/*.md</exclude>
+                        <exclude>.github/**</exclude>
+                        <!-- IDE files. -->
+                        <exclude>**/*.iml</exclude>
+                        <exclude>**/.idea/**</exclude>
+                        <!-- Generated content -->
+                        <exclude>**/target/**</exclude>
+                        <exclude>**/scalastyle-output.xml</exclude>
+                        <exclude>**/*.svg</exclude>
+                        <!-- Bundled license files -->
+                        <exclude>**/LICENSE*</exclude>
+                        <!-- artifacts created during release process -->
+                        <exclude>release/**</exclude>
+                        <exclude>**/dependency-reduced-pom.xml</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>compile</phase>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <configuration>
+                    <filesets>
+                        <fileset>
+                            <directory>${project.basedir}</directory>
+                            <includes>
+                                <include>dependency-reduced-pom.xml</include>
+                            </includes>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.5.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                        <phase>process-resources</phase>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <phase>clean</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <inceptionYear>2024</inceptionYear>
+
+    <organization>
+        <name>OceanBase</name>
+        <url>https://open.oceanbase.com</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>Apache-2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>oceanbase</id>
+            <name>OceanBase Developers</name>
+            <email>open_contact@oceanbase.com</email>
+            <roles>
+                <role>Developer</role>
+            </roles>
+            <timezone>+8</timezone>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/oceanbase/spark-connector-oceanbase.git</connection>
+        <developerConnection>scm:git:https://github.com/oceanbase/spark-connector-oceanbase.git</developerConnection>
+        <url>https://github.com/oceanbase/spark-connector-oceanbase</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <repositories>
+        <repository>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <id>sonatype-snapshots</id>
+            <name>Sonatype Snapshot Repository</name>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+        </repository>
+    </repositories>
+
+    <distributionManagement>
+        <repository>
+            <id>sonatype-nexus-staging</id>
+            <name>Nexus Release Repository</name>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+        <snapshotRepository>
+            <id>sonatype-nexus-snapshots</id>
+            <name>Sonatype Nexus Snapshots</name>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project>

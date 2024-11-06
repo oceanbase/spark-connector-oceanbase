@@ -1,0 +1,38 @@
+name: build
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.*'
+  push:
+    branches:
+      - main
+      - 'release-*'
+
+env:
+  JDK_VERSION: 8
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JDK_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JDK_VERSION }}
+          distribution: 'adopt'
+          cache: 'maven'
+
+      - name: Build and Test
+        timeout-minutes: 60
+        run: mvn clean package
