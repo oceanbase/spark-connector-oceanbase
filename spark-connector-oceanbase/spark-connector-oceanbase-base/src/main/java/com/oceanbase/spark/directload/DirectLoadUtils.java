@@ -17,7 +17,7 @@
 package com.oceanbase.spark.directload;
 
 import com.oceanbase.spark.cfg.ConnectionOptions;
-import com.oceanbase.spark.cfg.SettingUtils;
+import com.oceanbase.spark.cfg.OceanBaseUserInfo;
 import com.oceanbase.spark.cfg.SparkSettings;
 
 /** The utils of {@link DirectLoader} */
@@ -25,12 +25,13 @@ public class DirectLoadUtils {
 
     public static DirectLoader buildDirectLoaderFromSetting(SparkSettings settings) {
         try {
+            OceanBaseUserInfo userInfo = OceanBaseUserInfo.parse(settings);
             return new DirectLoaderBuilder()
                     .host(settings.getProperty(ConnectionOptions.HOST))
                     .port(settings.getIntegerProperty(ConnectionOptions.RPC_PORT))
-                    .user(SettingUtils.getDirectLoadUserName(settings))
+                    .user(userInfo.getUser())
                     .password(settings.getProperty(ConnectionOptions.PASSWORD))
-                    .tenant(SettingUtils.getTenantName(settings))
+                    .tenant(userInfo.getTenant())
                     .schema(settings.getProperty(ConnectionOptions.SCHEMA_NAME))
                     .table(settings.getProperty(ConnectionOptions.TABLE_NAME))
                     .executionId(settings.getProperty(ConnectionOptions.EXECUTION_ID))

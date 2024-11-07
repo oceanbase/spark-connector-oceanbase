@@ -36,7 +36,7 @@ class OceanBaseJDBCRelation(
         .toBoolean
     ) {
       data.write
-        .format(OceanBaseJdbcSparkSource.SHORT_NAME)
+        .format(OceanBaseSparkDataSource.SHORT_NAME)
         .options(jdbcOptions.parameters)
         .mode(if (overwrite) sql.SaveMode.Overwrite else sql.SaveMode.Append)
         .save()

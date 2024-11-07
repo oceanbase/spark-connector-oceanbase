@@ -16,7 +16,7 @@
 
 package com.oceanbase.spark.jdbc
 
-import com.oceanbase.spark.cfg.{ConnectionOptions, SettingUtils, SparkSettings}
+import com.oceanbase.spark.cfg.{ConnectionOptions, SparkSettings}
 
 import org.apache.spark.sql.jdbc.JdbcDialects
 

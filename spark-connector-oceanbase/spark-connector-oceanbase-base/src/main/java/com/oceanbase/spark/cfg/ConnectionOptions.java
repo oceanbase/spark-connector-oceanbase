@@ -30,7 +30,7 @@ public interface ConnectionOptions {
     boolean ENABLE_DIRECT_LOAD_WRITE_DEFAULT = false;
     String RPC_PORT = "direct-load.rpc-port";
     String PARALLEL = "direct-load.parallel";
-    String EXECUTION_ID = "execution-id";
+    String EXECUTION_ID = "direct-load.execution-id";
     String DUP_ACTION = "direct-load.dup-action";
     String HEARTBEAT_TIMEOUT = "direct-load.heartbeat-timeout";
     String HEARTBEAT_INTERVAL = "direct-load.heartbeat-interval";

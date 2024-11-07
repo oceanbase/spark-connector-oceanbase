@@ -19,13 +19,13 @@ import com.oceanbase.spark.cfg.{ConnectionOptions, SparkSettings}
 import com.oceanbase.spark.jdbc.OBJdbcUtils.{getCompatibleMode, getJdbcUrl, OB_MYSQL_URL}
 import com.oceanbase.spark.sql.OceanBaseSparkSource
 
-import OceanBaseJdbcSparkSource.SHORT_NAME
+import OceanBaseSparkDataSource.SHORT_NAME
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
 import org.apache.spark.sql.sources._
 
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
-class OceanBaseJdbcSparkSource extends JdbcRelationProvider {
+class OceanBaseSparkDataSource extends JdbcRelationProvider {
 
   override def shortName(): String = SHORT_NAME
 
@@ -76,6 +76,6 @@ class OceanBaseJdbcSparkSource extends JdbcRelationProvider {
   }
 }
 
-object OceanBaseJdbcSparkSource {
+object OceanBaseSparkDataSource {
   val SHORT_NAME: String = "oceanbase"
 }
