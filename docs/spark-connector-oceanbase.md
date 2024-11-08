@@ -11,9 +11,33 @@ Spark OceanBase Connector can support reading data stored in OceanBase through S
 
 ## Version compatibility
 
-| Connector |     Spark      | OceanBase | Java | scala |
-|-----------|----------------|-----------|------|-------|
-| 1.0       | 3.4 ~ 3.1, 2.4 | 4.x       | 8    | 2.12  |
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 10%">Connector</th>
+                <th class="text-left" style="width: 10%">Spark</th>
+                <th class="text-left" style="width: 15%">OceanBase</th>
+                <th class="text-left" style="width: 10%">Java</th>
+                <th class="text-left" style="width: 10%">Scala</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1.0</td>
+                <td style="word-wrap: break-word;">2.4, 3.1 ~ 3.4</td>
+                <td>
+                  <ul>
+                    <li>JDBC: 3.x, 4.x or all versions</li>
+                    <li>Direct Load: 4.2.x or later versions</li>
+                  </ul>
+                </td>
+                <td>8</td>
+                <td>2.12</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
 - Note: If you need a package built based on other Scala versions, you can get the package by building it from source code.
 
@@ -381,6 +405,6 @@ df.write
 - This Connector is implemented based on [JDBC To Other Databases](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html).
   - For more configuration items, see: [JDBC To Other Databases#Data Source Option](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option)
 - Support OceanBase MySQL and Oracle modes:
-  - For NySQL mode, you need to add the `MySQL Connector/J` driver to Spark's CLASSPATH
+  - For MySQL mode, you need to add the `MySQL Connector/J` driver to Spark's CLASSPATH
   - For Oracle mode, you need to add the `OceanBase Connector/J` driver to Spark's CLASSPATH
 
