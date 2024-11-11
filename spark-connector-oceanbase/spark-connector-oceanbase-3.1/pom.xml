@@ -19,7 +19,7 @@ under the License.
     <parent>
         <groupId>com.oceanbase</groupId>
         <artifactId>spark-connector-oceanbase</artifactId>
-        <version>${rversion}</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>spark-connector-oceanbase-3.1_${scala.binary.version}</artifactId>
@@ -33,7 +33,7 @@ under the License.
         <dependency>
             <groupId>com.oceanbase</groupId>
             <artifactId>spark-connector-oceanbase-base</artifactId>
-            <version>${rversion}</version>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>
