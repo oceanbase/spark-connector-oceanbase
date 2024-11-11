@@ -28,7 +28,7 @@ Spark OceanBase Connector can support reading data stored in OceanBase through S
                 <td style="word-wrap: break-word;">2.4, 3.1 ~ 3.4</td>
                 <td>
                   <ul>
-                    <li>JDBC: 3.x, 4.x or all versions</li>
+                    <li>JDBC: 3.x, 4.x</li>
                     <li>Direct Load: 4.2.x or later versions</li>
                   </ul>
                 </td>

@@ -28,8 +28,8 @@ Spark OceanBase Connector 可以支持通过 Spark 读取 OceanBase 中存储的
                 <td style="word-wrap: break-word;">2.4, 3.1 ~ 3.4</td>
                 <td>
                   <ul>
-                    <li>JDBC: 3.x, 4.x or all versions</li>
-                    <li>Direct Load: 4.2.x or later versions</li>
+                    <li>JDBC: 3.x, 4.x</li>
+                    <li>旁路导入: 4.2.x及以后的版本</li>
                   </ul>
                 </td>
                 <td>8</td>
