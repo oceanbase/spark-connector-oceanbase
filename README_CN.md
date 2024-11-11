@@ -6,7 +6,11 @@
 
 ## 功能
 
-即将推出...
+本仓库提供了如下 Connector：
+
+|         Connector          |                                                             描述                                                              |                     使用文档                     |
+|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------|
+| Spark Connector: OceanBase | 该Connector可以通过JDBC驱动或[旁路导入](https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000001428636)API将数据写入OceanBase。 | [Sink](docs/spark-connector-oceanbase_cn.md) |
 
 ## 社区
 

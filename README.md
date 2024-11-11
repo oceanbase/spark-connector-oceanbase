@@ -6,7 +6,11 @@ English | [简体中文](README_CN.md)
 
 ## Features
 
-Coming soon...
+This repository contains connectors as following:
+
+|         Connector          |                                                                             Description                                                                             |                 Document                  |
+|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| Spark Connector: OceanBase | This Connector uses the JDBC driver or the [direct load](https://en.oceanbase.com/docs/common-oceanbase-database-10000000001375568) API to write data to OceanBase. | [Sink](docs/spark-connector-oceanbase.md) |
 
 ## Community
 
