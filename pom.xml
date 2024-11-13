@@ -24,6 +24,7 @@ under the License.
     <modules>
         <module>spark-connector-oceanbase</module>
         <module>spark-connector-oceanbase-common</module>
+        <module>spark-connector-oceanbase-e2e-tests</module>
     </modules>
 
     <properties>
@@ -66,6 +67,24 @@ under the License.
                 <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>mysql</groupId>
+                <artifactId>mysql-connector-java</artifactId>
+                <version>8.0.28</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.google.protobuf</groupId>
+                        <artifactId>protobuf-java</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oceanbase</groupId>
+                <artifactId>oceanbase-client</artifactId>
+                <version>2.4.12</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
