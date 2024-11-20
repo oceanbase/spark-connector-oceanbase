@@ -1,0 +1,42 @@
+name: Test Module
+
+on:
+  workflow_call:
+    inputs:
+      module:
+        required: true
+        type: string
+      maven_opts:
+        required: false
+        type: string
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space on Ubuntu runner
+        uses: kfir4444/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'zulu'
+          cache: 'maven'
+
+      - name: Maven build
+        run: mvn clean install -D scala.version=2.11.12 -D scala.binary.version=2.11 -D skipTests=true
+
+      - name: Maven test
+        run: mvn verify -pl ${{ inputs.module }} -am ${{ inputs.maven_opts }} -D scala.binary.version=2.11

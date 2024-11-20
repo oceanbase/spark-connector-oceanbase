@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".*"
+  push:
+    branches:
+      - main
+      - 'release-*'
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spark-connector-oceanbase:
+    uses: ./.github/workflows/test.yml
+    with:
+      module: spark-connector-oceanbase/spark-connector-oceanbase-base
+
+  e2e-tests:
+    strategy:
+      matrix:
+        spark_version: ["3.1","3.2","3.3","3.4"]
+    uses: ./.github/workflows/test.yml
+    with:
+      module: spark-connector-oceanbase-e2e-tests
+      maven_opts: "-D spark_version=${{ matrix.spark_version }}"
+
+  e2e-tests-scala-2_11:
+    strategy:
+      matrix:
+        spark_version: ["2.4.6"]
+    uses: ./.github/workflows/test_scala2_11.yml
+    with:
+      module: spark-connector-oceanbase-e2e-tests
+      maven_opts: "-D spark_version=${{ matrix.spark_version }}"
