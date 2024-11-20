@@ -76,13 +76,20 @@ under the License.
                                     <include>com.lmax:disruptor</include>
                                 </includes>
                             </artifactSet>
-                            <relocations>
-                                <relocation>
-                                    <!-- Resolve dependency conflicts in direct-load API. -->
-                                    <pattern>org.apache.logging</pattern>
-                                    <shadedPattern>shade.org.apache.logging</shadedPattern>
-                                </relocation>
-                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>com.oceanbase:obkv-table-client</artifact>
+                                    <excludes>
+                                        <exclude>**/log4j/log-conf.xml</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>**/Log4j2Plugins.dat</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>

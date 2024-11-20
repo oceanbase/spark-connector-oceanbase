@@ -47,7 +47,7 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
     private static final String SYS_PASSWORD = "123456";
     private static final String TEST_PASSWORD = "654321";
 
-    private static final Network NETWORK = Network.newNetwork();
+    public static final Network NETWORK = Network.newNetwork();
 
     @SuppressWarnings("resource")
     public static final GenericContainer<?> CONFIG_SERVER =
@@ -131,6 +131,24 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
             statement.execute("CREATE USER '" + user + "' IDENTIFIED BY '" + password + "'");
             statement.execute("GRANT ALL PRIVILEGES ON *.* TO '" + user + "'@'%'");
         }
+    }
+
+    private static String configServerAddress;
+    private static String obServerIP;
+
+    public static String getConfigServerAddress() {
+        if (configServerAddress == null) {
+            String ip = getContainerIP(CONFIG_SERVER);
+            configServerAddress = "http://" + ip + ":" + CONFIG_SERVER_PORT;
+        }
+        return configServerAddress;
+    }
+
+    public static String getOBServerIP() {
+        if (obServerIP == null) {
+            obServerIP = getContainerIP(CONTAINER);
+        }
+        return obServerIP;
     }
 
     @Override
