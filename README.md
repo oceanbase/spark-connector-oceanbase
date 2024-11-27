@@ -11,7 +11,7 @@ This repository contains connectors as following:
 |          Connector          |                                                                             Description                                                                             |                     Document                      |
 |-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
 | Spark Connector: OceanBase  | This Connector uses the JDBC driver or the [direct load](https://en.oceanbase.com/docs/common-oceanbase-database-10000000001375568) API to write data to OceanBase. | [Read & Write](docs/spark-connector-oceanbase.md) |
-| Spark Connector: OBKV HBase | This Connector uses the [OBKV HBase API](https://github.com/oceanbase/obkv-hbase-client-java) to write data to OceanBase.                                           | [Write](docs/sink/flink-connector-obkv-hbase.md)  |
+| Spark Connector: OBKV HBase | This Connector uses the [OBKV HBase API](https://github.com/oceanbase/obkv-hbase-client-java) to write data to OceanBase.                                           | [Write](docs/spark-connector-obkv-hbase.md)       |
 
 ## Community
 
