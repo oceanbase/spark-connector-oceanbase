@@ -22,6 +22,7 @@ under the License.
     <packaging>pom</packaging>
 
     <modules>
+        <module>spark-connector-obkv-hbase</module>
         <module>spark-connector-oceanbase</module>
         <module>spark-connector-oceanbase-common</module>
         <module>spark-connector-oceanbase-e2e-tests</module>

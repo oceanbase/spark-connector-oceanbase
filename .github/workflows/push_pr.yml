@@ -21,6 +21,11 @@ jobs:
     with:
       module: spark-connector-oceanbase/spark-connector-oceanbase-base
 
+  spark-connector-obkv-hbase:
+    uses: ./.github/workflows/test.yml
+    with:
+      module: spark-connector-obkv-hbase/spark-connector-obkv-hbase-base
+
   e2e-tests:
     strategy:
       matrix:
