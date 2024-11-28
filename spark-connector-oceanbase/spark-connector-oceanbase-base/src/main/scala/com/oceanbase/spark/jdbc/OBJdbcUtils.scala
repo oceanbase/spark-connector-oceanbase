@@ -25,6 +25,10 @@ import java.sql.{Connection, DriverManager}
 object OBJdbcUtils {
   val OB_MYSQL_URL = s"jdbc:mysql://%s:%d/%s"
   private val OB_ORACLE_URL = s"jdbc:oceanbase://%s:%d/%s"
+  private val MYSQL_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver"
+  private val MYSQL_LEGACY_JDBC_DRIVER = "com.mysql.jdbc.Driver"
+  private val OB_JDBC_DRIVER = "com.oceanbase.jdbc.Driver"
+  private val OB_LEGACY_JDBC_DRIVER = "com.alipay.oceanbase.jdbc.Driver"
 
   def getConnection(sparkSettings: SparkSettings): Connection = {
     val connection = DriverManager.getConnection(
@@ -41,19 +45,28 @@ object OBJdbcUtils {
 
   def getJdbcUrl(sparkSettings: SparkSettings): String = {
     var url: String = null
-    if ("MYSQL".equalsIgnoreCase(getCompatibleMode(sparkSettings))) {
+    val driver =
+      sparkSettings.getProperty(ConnectionOptions.DRIVER, ConnectionOptions.DRIVER_DEFAULT)
+    if (
+      driver.equalsIgnoreCase(MYSQL_JDBC_DRIVER) || driver.equalsIgnoreCase(
+        MYSQL_LEGACY_JDBC_DRIVER)
+    ) {
       url = OBJdbcUtils.OB_MYSQL_URL.format(
         sparkSettings.getProperty(ConnectionOptions.HOST),
         sparkSettings.getIntegerProperty(ConnectionOptions.SQL_PORT),
         sparkSettings.getProperty(ConnectionOptions.SCHEMA_NAME)
       )
-    } else {
+    } else if (
+      driver.equalsIgnoreCase(OB_JDBC_DRIVER) || driver.equalsIgnoreCase(OB_LEGACY_JDBC_DRIVER)
+    ) {
       JdbcDialects.registerDialect(OceanBaseOracleDialect)
       url = OBJdbcUtils.OB_ORACLE_URL.format(
         sparkSettings.getProperty(ConnectionOptions.HOST),
         sparkSettings.getIntegerProperty(ConnectionOptions.SQL_PORT),
         sparkSettings.getProperty(ConnectionOptions.SCHEMA_NAME)
       )
+    } else {
+      throw new RuntimeException(String.format("Unsupported driver name: %s", driver))
     }
     url
   }

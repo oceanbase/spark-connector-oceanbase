@@ -310,6 +310,12 @@ df.write
                 <td>String</td>
                 <td>表名。</td>
             </tr>
+            <tr>
+                <td>driver</td>
+                <td style="word-wrap: break-word;">com.mysql.cj.jdbc.Driver</td>
+                <td>String</td>
+                <td>JDBC 驱动程序的类名。默认支持连接MySQL租户。如果需要连接到Oracle租户，请修改为 <code>com.oceanbase.jdbc.Driver</code></td>
+            </tr>
         </tbody>
     </table>
 </div>

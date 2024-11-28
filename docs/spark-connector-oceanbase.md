@@ -279,7 +279,7 @@ df.write
             </tr>
             <tr>
                 <td>sql-port</td>
-                <td style="word-wrap: break-word;"></td>
+                <td style="word-wrap: break-word;">2881</td>
                 <td>Integer</td>
                 <td>The SQL port.</td>
             </tr>
@@ -312,6 +312,12 @@ df.write
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
                 <td>The table name.</td>
+            </tr>
+            <tr>
+                <td>driver</td>
+                <td style="word-wrap: break-word;">com.mysql.cj.jdbc.Driver</td>
+                <td>String</td>
+                <td>The class name of the JDBC driver. By default, it connects to the MySQL tenant. If you need to connect to Oracle tenant, the name needs to be <code>com.oceanbase.jdbc.Driver</code></td>
             </tr>
         </tbody>
     </table>

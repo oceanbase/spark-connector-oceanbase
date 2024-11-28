@@ -24,6 +24,8 @@ public interface ConnectionOptions {
     String PASSWORD = "password";
     String SCHEMA_NAME = "schema-name";
     String TABLE_NAME = "table-name";
+    String DRIVER = "driver";
+    String DRIVER_DEFAULT = "com.mysql.cj.jdbc.Driver";
 
     /* Direct-load config */
     String ENABLE_DIRECT_LOAD_WRITE = "direct-load.enabled";
