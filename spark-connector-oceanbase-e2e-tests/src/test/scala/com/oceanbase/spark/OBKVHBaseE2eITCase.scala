@@ -47,10 +47,8 @@ class OBKVHBaseE2eITCase extends SparkContainerTestEnvironment {
   @Test
   @DisabledIfSystemProperty(
     named = "spark_version",
-    matches = "^2\\.4\\.[0-9]$|^3\\.[2-9]$",
-    disabledReason = "The spark 2.x docker image fails to execute the spark-sql command. \n" +
-      "The obkv-hbase library does not support java11 and later versions: Unexpected version format: 11.0.22. \n" +
-      "The Spark 3.2 and later versions of docker images do not support jdk8."
+    matches = "^2\\.4\\.[0-9]$",
+    disabledReason = "The spark 2.x docker image fails to execute the spark-sql command."
   )
   def testInsertValues(): Unit = {
     val sqlLines: util.List[String] = new util.ArrayList[String]

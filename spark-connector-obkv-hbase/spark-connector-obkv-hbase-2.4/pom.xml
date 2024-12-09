@@ -88,24 +88,16 @@ under the License.
                         <phase>package</phase>
                         <configuration>
                             <artifactSet>
+                                <!-- Spark 2.4 should not shade include org.apache.hadoop*:* -->
                                 <includes combine.children="append">
-                                    <include>com.alibaba:*</include>
                                     <include>com.oceanbase:*</include>
-                                    <include>com.alipay.sofa:bolt</include>
-                                    <include>com.alipay.sofa.common:sofa-common-tools</include>
+                                    <include>com.alibaba:*</include>
+                                    <include>com.alipay.*:*</include>
+                                    <include>com.google.*:*</include>
+                                    <include>org.apache.hbase*:*</include>
                                     <include>mysql:mysql-connector-java</include>
-                                    <include>org.apache.hbase:*</include>
                                 </includes>
                             </artifactSet>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <filters>
-                                <filter>
-                                    <artifact>com.oceanbase:obkv-table-client</artifact>
-                                    <excludes>
-                                        <exclude>**/log4j/log-conf.xml</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
                         </configuration>
                     </execution>
                 </executions>
