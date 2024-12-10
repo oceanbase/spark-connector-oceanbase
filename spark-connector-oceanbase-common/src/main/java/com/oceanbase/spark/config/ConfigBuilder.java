@@ -15,6 +15,7 @@
  */
 package com.oceanbase.spark.config;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -186,6 +187,31 @@ public class ConfigBuilder {
         conf.setValueConverter(func);
 
         Function<Boolean, String> stringFunc =
+                t -> Optional.ofNullable(t).map(String::valueOf).orElse(null);
+        conf.setStringConverter(stringFunc);
+
+        return conf;
+    }
+
+    /**
+     * Creates a configuration entry for Duration data type.
+     *
+     * @return The created ConfigEntry instance for Boolean data type.
+     */
+    public ConfigEntry<Duration> durationConf() {
+        ConfigEntry<Duration> conf =
+                new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
+        Function<String, Duration> func =
+                s -> {
+                    if (s == null || s.isEmpty()) {
+                        return null;
+                    } else {
+                        return Duration.parse(s);
+                    }
+                };
+        conf.setValueConverter(func);
+
+        Function<Duration, String> stringFunc =
                 t -> Optional.ofNullable(t).map(String::valueOf).orElse(null);
         conf.setStringConverter(stringFunc);
 

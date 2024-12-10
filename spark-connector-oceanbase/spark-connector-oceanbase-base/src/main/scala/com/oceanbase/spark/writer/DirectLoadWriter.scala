@@ -15,7 +15,7 @@
  */
 package com.oceanbase.spark.writer
 
-import com.oceanbase.spark.cfg.{ConnectionOptions, SparkSettings}
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.directload.{DirectLoader, DirectLoadUtils}
 
 import com.alipay.oceanbase.rpc.direct_load.ObDirectLoadBucket
@@ -27,20 +27,14 @@ import java.util.Objects
 
 import scala.collection.mutable.ArrayBuffer
 
-class DirectLoadWriter(settings: SparkSettings) extends Serializable {
+class DirectLoadWriter(oceanBaseConfig: OceanBaseConfig) extends Serializable {
 
-  private val bufferSize =
-    settings.getIntegerProperty(ConnectionOptions.BATCH_SIZE, ConnectionOptions.BATCH_SIZE_DEFAULT)
-  private val sinkTaskPartitionSize: Integer =
-    settings.getIntegerProperty(ConnectionOptions.SINK_TASK_PARTITION_SIZE)
-  private val sinkTaskUseRepartition: Boolean = settings
-    .getProperty(
-      ConnectionOptions.SINK_TASK_USE_REPARTITION,
-      ConnectionOptions.SINK_TASK_USE_REPARTITION_DEFAULT.toString)
-    .toBoolean
+  private val bufferSize = oceanBaseConfig.getBatchSize
+  private val sinkTaskPartitionSize = oceanBaseConfig.getDirectLoadTaskPartitionSize
+  private val sinkTaskUseRepartition: Boolean = oceanBaseConfig.getDirectLoadUseRepartition
 
   def write(dataFrame: DataFrame): Unit = {
-    assert(StringUtils.isNotBlank(settings.getProperty(ConnectionOptions.EXECUTION_ID)))
+    assert(StringUtils.isNotBlank(oceanBaseConfig.getDirectLoadExecutionId))
 
     var resultDataFrame = dataFrame
     if (Objects.nonNull(sinkTaskPartitionSize)) {
@@ -51,7 +45,8 @@ class DirectLoadWriter(settings: SparkSettings) extends Serializable {
 
     resultDataFrame.foreachPartition(
       (partition: Iterator[Row]) => {
-        val directLoader: DirectLoader = DirectLoadUtils.buildDirectLoaderFromSetting(settings)
+        val directLoader: DirectLoader =
+          DirectLoadUtils.buildDirectLoaderFromSetting(oceanBaseConfig)
         directLoader.begin()
         val buffer = ArrayBuffer[Row]()
         partition.foreach(

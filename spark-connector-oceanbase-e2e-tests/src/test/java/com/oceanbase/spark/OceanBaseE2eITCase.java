@@ -80,20 +80,20 @@ public class OceanBaseE2eITCase extends SparkContainerTestEnvironment {
                         "CREATE TEMPORARY VIEW test_sink "
                                 + "USING oceanbase "
                                 + "OPTIONS( "
-                                + "  \"host\"= \"%s\","
-                                + "  \"sql-port\" = \"%s\","
+                                + "  \"url\"= \"%s\","
                                 + "  \"schema-name\"=\"%s\","
                                 + "  \"table-name\"=\"products\","
                                 + "  \"username\"=\"%s\","
                                 + "  \"password\"=\"%s\","
                                 + "  \"direct-load.enabled\" = \"true\","
+                                + "  \"direct-load.host\" = \"%s\","
                                 + "  \"direct-load.rpc-port\" = \"%s\" "
                                 + ");",
-                        getHostInContainer(),
-                        getPortInContainer(),
+                        getJdbcUrlInContainer(),
                         getSchemaName(),
                         getUsername(),
                         getPassword(),
+                        getHostInContainer(),
                         getRpcPortInContainer()));
 
         sqlLines.add(
@@ -163,20 +163,20 @@ public class OceanBaseE2eITCase extends SparkContainerTestEnvironment {
                                 + "df.write\n"
                                 + "  .format(\"oceanbase\")\n"
                                 + "  .mode(saveMode = SaveMode.Append)\n"
-                                + "  .option(\"host\", \"%s\")\n"
-                                + "  .option(\"sql-port\", \"%s\")\n"
+                                + "  .option(\"url\", \"%s\")\n"
                                 + "  .option(\"username\", \"%s\")\n"
                                 + "  .option(\"password\", \"%s\")\n"
                                 + "  .option(\"table-name\", \"products\")\n"
                                 + "  .option(\"schema-name\", \"%s\")\n"
                                 + "  .option(\"direct-load.enabled\", value = true)\n"
+                                + "  .option(\"direct-load.host\", value = \"%s\")\n"
                                 + "  .option(\"direct-load.rpc-port\", value = \"%s\")\n"
                                 + "  .save()",
-                        getHostInContainer(),
-                        getPortInContainer(),
+                        getJdbcUrlInContainer(),
                         getUsername(),
                         getPassword(),
                         getSchemaName(),
+                        getHostInContainer(),
                         getRpcPortInContainer()));
 
         submitSparkShellJob(
