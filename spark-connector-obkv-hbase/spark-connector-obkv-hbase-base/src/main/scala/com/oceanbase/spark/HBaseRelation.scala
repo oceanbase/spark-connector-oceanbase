@@ -15,12 +15,12 @@
  */
 package com.oceanbase.spark
 
-import com.oceanbase.spark.HBaseRelation.{columnFamilyMap, convertToBytes, parseCatalog}
+import com.oceanbase.spark.HBaseRelation.{convertToBytes, parseCatalog}
 import com.oceanbase.spark.config.OBKVHbaseConfig
 import com.oceanbase.spark.obkv.HTableClientUtils
 
 import com.fasterxml.jackson.core.JsonParser.Feature
-import org.apache.hadoop.hbase.client.{HTableInterface, Put}
+import org.apache.hadoop.hbase.client.{Put, Table}
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -61,7 +61,7 @@ case class HBaseRelation(
   override def insert(dataFrame: DataFrame, overwrite: Boolean): Unit = {
     dataFrame.foreachPartition(
       (rows: Iterator[Row]) => {
-        val hTableClient: HTableInterface = HTableClientUtils.getHTableClient(config)
+        val hTableClient: Table = HTableClientUtils.getHTableClient(config)
         val buffer = ArrayBuffer[Row]()
         rows.foreach(
           row => {
@@ -75,7 +75,7 @@ case class HBaseRelation(
       })
   }
 
-  private def flush(buffer: ArrayBuffer[Row], hTableClient: HTableInterface): Unit = {
+  private def flush(buffer: ArrayBuffer[Row], hTableClient: Table): Unit = {
     val putList = new util.ArrayList[Put]()
     buffer.foreach(
       row => {
@@ -95,7 +95,7 @@ case class HBaseRelation(
               val cfName = HBaseRelation.columnFamilyMap(rowFieldName)._2
               val familyName: Array[Byte] = Bytes.toBytes(cfName)
               val columnValue = convertToBytes(row.get(i))
-              put.add(familyName, Bytes.toBytes(userFieldName), columnValue)
+              put.addColumn(familyName, Bytes.toBytes(userFieldName), columnValue)
             }
           }
         }

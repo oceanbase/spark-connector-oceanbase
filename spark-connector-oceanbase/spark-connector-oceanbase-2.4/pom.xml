@@ -94,23 +94,8 @@ under the License.
                                     <include>com.oceanbase:obkv-table-client</include>
                                     <include>com.alipay.sofa:bolt</include>
                                     <include>com.alipay.sofa.common:sofa-common-tools</include>
-                                    <include>com.lmax:disruptor</include>
                                 </includes>
                             </artifactSet>
-                            <filters>
-                                <filter>
-                                    <artifact>com.oceanbase:obkv-table-client</artifact>
-                                    <excludes>
-                                        <exclude>**/log4j/log-conf.xml</exclude>
-                                    </excludes>
-                                </filter>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>**/Log4j2Plugins.dat</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
                         </configuration>
                     </execution>
                 </executions>

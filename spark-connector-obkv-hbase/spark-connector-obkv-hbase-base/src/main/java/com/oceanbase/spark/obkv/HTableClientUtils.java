@@ -24,14 +24,14 @@ import java.util.Properties;
 import com.alipay.oceanbase.hbase.OHTableClient;
 import com.alipay.oceanbase.hbase.constants.OHConstants;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HTableClientUtils {
     private static final Logger LOG = LoggerFactory.getLogger(HTableClientUtils.class);
 
-    public static HTableInterface getHTableClient(OBKVHbaseConfig config) {
+    public static Table getHTableClient(OBKVHbaseConfig config) {
         try {
             OHTableClient tableClient = new OHTableClient(config.getTableName(), getConfig(config));
             tableClient.init();
