@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.oceanbase.spark.cfg;
+package com.oceanbase.spark.config;
 
 import java.io.Serializable;
 
@@ -55,8 +55,8 @@ public class OceanBaseUserInfo implements Serializable {
         this.tenant = tenant;
     }
 
-    public static OceanBaseUserInfo parse(SparkSettings settings) {
-        final String username = settings.getProperty(ConnectionOptions.USERNAME);
+    public static OceanBaseUserInfo parse(OceanBaseConfig oceanBaseConfig) {
+        final String username = oceanBaseConfig.getUsername();
         final String sepUserAtTenant = "@";
         final String sepTenantAtCluster = "#";
         final String sep = ":";

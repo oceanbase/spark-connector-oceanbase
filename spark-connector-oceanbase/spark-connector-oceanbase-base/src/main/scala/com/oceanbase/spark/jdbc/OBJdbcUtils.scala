@@ -16,63 +16,23 @@
 
 package com.oceanbase.spark.jdbc
 
-import com.oceanbase.spark.cfg.{ConnectionOptions, SparkSettings}
-
-import org.apache.spark.sql.jdbc.JdbcDialects
+import com.oceanbase.spark.config.OceanBaseConfig
 
 import java.sql.{Connection, DriverManager}
 
 object OBJdbcUtils {
-  val OB_MYSQL_URL = s"jdbc:mysql://%s:%d/%s"
-  private val OB_ORACLE_URL = s"jdbc:oceanbase://%s:%d/%s"
-  private val MYSQL_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver"
-  private val MYSQL_LEGACY_JDBC_DRIVER = "com.mysql.jdbc.Driver"
-  private val OB_JDBC_DRIVER = "com.oceanbase.jdbc.Driver"
-  private val OB_LEGACY_JDBC_DRIVER = "com.alipay.oceanbase.jdbc.Driver"
 
-  def getConnection(sparkSettings: SparkSettings): Connection = {
+  def getConnection(oceanBaseConfig: OceanBaseConfig): Connection = {
     val connection = DriverManager.getConnection(
-      OB_MYSQL_URL.format(
-        sparkSettings.getProperty(ConnectionOptions.HOST),
-        sparkSettings.getIntegerProperty(ConnectionOptions.SQL_PORT),
-        sparkSettings.getProperty(ConnectionOptions.SCHEMA_NAME)
-      ),
-      s"${sparkSettings.getProperty(ConnectionOptions.USERNAME)}",
-      sparkSettings.getProperty(ConnectionOptions.PASSWORD)
+      oceanBaseConfig.getURL,
+      oceanBaseConfig.getUsername,
+      oceanBaseConfig.getPassword
     )
     connection
   }
 
-  def getJdbcUrl(sparkSettings: SparkSettings): String = {
-    var url: String = null
-    val driver =
-      sparkSettings.getProperty(ConnectionOptions.DRIVER, ConnectionOptions.DRIVER_DEFAULT)
-    if (
-      driver.equalsIgnoreCase(MYSQL_JDBC_DRIVER) || driver.equalsIgnoreCase(
-        MYSQL_LEGACY_JDBC_DRIVER)
-    ) {
-      url = OBJdbcUtils.OB_MYSQL_URL.format(
-        sparkSettings.getProperty(ConnectionOptions.HOST),
-        sparkSettings.getIntegerProperty(ConnectionOptions.SQL_PORT),
-        sparkSettings.getProperty(ConnectionOptions.SCHEMA_NAME)
-      )
-    } else if (
-      driver.equalsIgnoreCase(OB_JDBC_DRIVER) || driver.equalsIgnoreCase(OB_LEGACY_JDBC_DRIVER)
-    ) {
-      JdbcDialects.registerDialect(OceanBaseOracleDialect)
-      url = OBJdbcUtils.OB_ORACLE_URL.format(
-        sparkSettings.getProperty(ConnectionOptions.HOST),
-        sparkSettings.getIntegerProperty(ConnectionOptions.SQL_PORT),
-        sparkSettings.getProperty(ConnectionOptions.SCHEMA_NAME)
-      )
-    } else {
-      throw new RuntimeException(String.format("Unsupported driver name: %s", driver))
-    }
-    url
-  }
-
-  def getCompatibleMode(sparkSettings: SparkSettings): String = {
-    val conn = getConnection(sparkSettings)
+  def getCompatibleMode(oceanBaseConfig: OceanBaseConfig): String = {
+    val conn = getConnection(oceanBaseConfig)
     val statement = conn.createStatement
     try {
       val rs = statement.executeQuery("SHOW VARIABLES LIKE 'ob_compatibility_mode'")
@@ -83,13 +43,12 @@ object OBJdbcUtils {
     }
   }
 
-  def truncateTable(sparkSettings: SparkSettings): Unit = {
-    val conn = getConnection(sparkSettings)
+  def truncateTable(oceanBaseConfig: OceanBaseConfig): Unit = {
+    val conn = getConnection(oceanBaseConfig)
     val statement = conn.createStatement
     try {
       statement.executeUpdate(
-        s"truncate table ${sparkSettings.getProperty(ConnectionOptions.SCHEMA_NAME)}.${sparkSettings
-            .getProperty(ConnectionOptions.TABLE_NAME)}")
+        s"truncate table ${oceanBaseConfig.getSchemaName}.${oceanBaseConfig.getTableName}")
     } finally {
       statement.close()
       conn.close()
