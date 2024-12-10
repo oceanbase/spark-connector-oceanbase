@@ -82,6 +82,16 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         }
     }
 
+    public String getJdbcUrlInContainer() {
+        return "jdbc:mysql://"
+                + getHostInContainer()
+                + ":"
+                + getPortInContainer()
+                + "/"
+                + getSchemaName()
+                + "?useUnicode=true&characterEncoding=UTF-8&useSSL=false";
+    }
+
     public String getHostInContainer() {
         return getOBServerIP();
     }

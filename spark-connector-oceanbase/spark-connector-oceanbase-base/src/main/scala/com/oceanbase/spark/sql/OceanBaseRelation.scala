@@ -15,7 +15,7 @@
  */
 package com.oceanbase.spark.sql
 
-import com.oceanbase.spark.cfg.{ConnectionOptions, SparkSettings}
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.jdbc.OBJdbcUtils
 
 import org.apache.spark.sql
@@ -34,16 +34,13 @@ private[sql] class OceanBaseRelation(
   with InsertableRelation {
 
   private lazy val cfg = {
-    val conf = new SparkSettings(sqlContext.sparkContext.getConf)
-    conf.merge(parameters.asJava)
-    conf
+    new OceanBaseConfig(parameters.asJava)
   }
 
   private lazy val lazySchema = {
     val conn = OBJdbcUtils.getConnection(cfg)
     try {
-      val statement = conn.prepareStatement(
-        s"select * from ${cfg.getProperty(ConnectionOptions.TABLE_NAME)} where 1 = 0")
+      val statement = conn.prepareStatement(s"select * from ${cfg.getTableName} where 1 = 0")
       try {
         val rs = statement.executeQuery()
         try {

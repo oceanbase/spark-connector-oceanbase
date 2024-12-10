@@ -34,8 +34,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
                    |OPTIONS(
-                   |  "host"= "$getHost",
-                   |  "sql-port" = "$getPort",
+                   |  "url"= "$getJdbcUrl",
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
@@ -90,14 +89,14 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
                    |OPTIONS(
-                   |  "host"= "$getHost",
-                   |  "sql-port" = "$getPort",
+                   |  "url"= "$getJdbcUrl",
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
                    |  "username"="$getUsername",
                    |  "password"="$getPassword",
                    |  "direct-load.enabled"=true,
+                   |  "direct-load.host"="$getHost",
                    |  "direct-load.rpc-port"=$getRpcPort
                    |);
                    |""".stripMargin)
@@ -165,13 +164,13 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     df.write
       .format("oceanbase")
       .mode(saveMode = SaveMode.Append)
-      .option("host", getHost)
-      .option("sql-port", getPort)
+      .option("url", getJdbcUrl)
       .option("username", getUsername)
       .option("password", getPassword)
       .option("table-name", "products")
       .option("schema-name", getSchemaName)
       .option("direct-load.enabled", value = true)
+      .option("direct-load.host", getHost)
       .option("direct-load.rpc-port", value = getRpcPort)
       .save()
     session.stop()
@@ -207,8 +206,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
                    |OPTIONS(
-                   |  "host"= "$getHost",
-                   |  "sql-port" = "$getPort",
+                   |  "url"= "$getJdbcUrl",
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
@@ -259,6 +257,150 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testSqlReadWithQuery(): Unit = {
+    initialize("sql/mysql/products.sql")
+
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "$getJdbcUrl",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="products",
+                   |  "direct-load.enabled" ="false",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+
+    session.sql(
+      """
+        |INSERT INTO test_sink VALUES
+        |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
+        |(102, 'car battery', '12V car battery', 8.1),
+        |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
+        |(104, 'hammer', '12oz carpenter\'s hammer', 0.75),
+        |(105, 'hammer', '14oz carpenter\'s hammer', 0.875),
+        |(106, 'hammer', '16oz carpenter\'s hammer', 1.0),
+        |(107, 'rocks', 'box of assorted rocks', 5.3),
+        |(108, 'jacket', 'water resistent black wind breaker', 0.1),
+        |(109, 'spare tire', '24 inch spare tire', 22.2);
+        |""".stripMargin)
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_read_query
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "$getJdbcUrl",
+                   |  "schema-name"="$getSchemaName",
+                   |  "query" = "select id, name from products",
+                   |  "direct-load.enabled" ="false",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "101,scooter",
+      "102,car battery",
+      "103,12-pack drill bits",
+      "104,hammer",
+      "105,hammer",
+      "106,hammer",
+      "107,rocks",
+      "108,jacket",
+      "109,spare tire"
+    )
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql("select * from test_read_query")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+    dropTables("products")
+  }
+
+  @Test
+  def testSqlReadWithOceanBaseDriver(): Unit = {
+    initialize("sql/mysql/products.sql")
+
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "${getJdbcUrl.replace("mysql", "oceanbase")}",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="products",
+                   |  "direct-load.enabled" ="false",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+
+    session.sql(
+      """
+        |INSERT INTO test_sink VALUES
+        |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
+        |(102, 'car battery', '12V car battery', 8.1),
+        |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
+        |(104, 'hammer', '12oz carpenter\'s hammer', 0.75),
+        |(105, 'hammer', '14oz carpenter\'s hammer', 0.875),
+        |(106, 'hammer', '16oz carpenter\'s hammer', 1.0),
+        |(107, 'rocks', 'box of assorted rocks', 5.3),
+        |(108, 'jacket', 'water resistent black wind breaker', 0.1),
+        |(109, 'spare tire', '24 inch spare tire', 22.2);
+        |""".stripMargin)
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_read_query
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "${getJdbcUrl.replace("mysql", "oceanbase")}",
+                   |  "schema-name"="$getSchemaName",
+                   |  "query" = "select id, name from products",
+                   |  "direct-load.enabled" ="false",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "101,scooter",
+      "102,car battery",
+      "103,12-pack drill bits",
+      "104,hammer",
+      "105,hammer",
+      "106,hammer",
+      "107,rocks",
+      "108,jacket",
+      "109,spare tire"
+    )
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql("select * from test_read_query")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+    dropTables("products")
+  }
+
+  @Test
   def testDataFrameRead(): Unit = {
     initialize("sql/mysql/products.sql")
 
@@ -269,8 +411,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
                    |OPTIONS(
-                   |  "host"= "$getHost",
-                   |  "sql-port" = "$getPort",
+                   |  "url"= "$getJdbcUrl",
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
@@ -296,8 +437,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     // DataFrame read
     val dataFrame = session.read
       .format("oceanbase")
-      .option("host", getHost)
-      .option("sql-port", getPort)
+      .option("url", getJdbcUrl)
       .option("username", getUsername)
       .option("password", getPassword)
       .option("table-name", "products")

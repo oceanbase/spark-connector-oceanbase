@@ -15,7 +15,7 @@
  */
 package org.apache.spark.sql
 
-import com.oceanbase.spark.cfg.ConnectionOptions
+import com.oceanbase.spark.config.OceanBaseConfig
 
 import org.apache.spark.{sql, Partition}
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation}
@@ -31,8 +31,8 @@ class OceanBaseJDBCRelation(
     if (
       jdbcOptions.parameters
         .getOrElse(
-          ConnectionOptions.ENABLE_DIRECT_LOAD_WRITE,
-          s"${ConnectionOptions.ENABLE_DIRECT_LOAD_WRITE_DEFAULT}")
+          OceanBaseConfig.DIRECT_LOAD_ENABLE.getKey,
+          OceanBaseConfig.DIRECT_LOAD_ENABLE.getDefaultValue.toString)
         .toBoolean
     ) {
       data.write

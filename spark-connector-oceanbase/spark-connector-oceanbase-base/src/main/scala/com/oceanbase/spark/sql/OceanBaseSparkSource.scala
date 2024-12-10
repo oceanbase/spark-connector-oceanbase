@@ -15,7 +15,7 @@
  */
 package com.oceanbase.spark.sql
 
-import com.oceanbase.spark.cfg.{ConnectionOptions, SparkSettings}
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.directload.DirectLoadUtils
 import com.oceanbase.spark.jdbc.OBJdbcUtils
 import com.oceanbase.spark.listener.DirectLoadListener
@@ -27,7 +27,7 @@ import org.apache.spark.sql
 import org.apache.spark.sql.{DataFrame, SaveMode, SQLContext}
 import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, DataSourceRegister, Filter, RelationProvider, SchemaRelationProvider, StreamSinkProvider}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConverters.mapAsJavaMapConverter
 
 @Deprecated
 private[sql] class OceanBaseSparkSource
@@ -49,10 +49,8 @@ private[sql] class OceanBaseSparkSource
       mode: SaveMode,
       parameters: Map[String, String],
       dataFrame: DataFrame): BaseRelation = {
-    val sparkSettings = new SparkSettings(sqlContext.sparkContext.getConf)
-    sparkSettings.merge(parameters.asJava)
-
-    createDirectLoadRelation(sqlContext, mode, dataFrame, sparkSettings)
+    val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
+    createDirectLoadRelation(sqlContext, mode, dataFrame, oceanBaseConfig)
 
     createRelation(sqlContext, parameters)
   }
@@ -66,21 +64,21 @@ object OceanBaseSparkSource {
       sqlContext: SQLContext,
       mode: SaveMode,
       dataFrame: DataFrame,
-      sparkSettings: SparkSettings): Unit = {
+      oceanBaseConfig: OceanBaseConfig): Unit = {
     mode match {
       case sql.SaveMode.Append => // do nothing
       case sql.SaveMode.Overwrite =>
-        OBJdbcUtils.truncateTable(sparkSettings)
+        OBJdbcUtils.truncateTable(oceanBaseConfig)
       case _ =>
         throw new NotImplementedError(s"${mode.name()} mode is not currently supported.")
     }
     // Init direct-loader.
-    val directLoader = DirectLoadUtils.buildDirectLoaderFromSetting(sparkSettings)
+    val directLoader = DirectLoadUtils.buildDirectLoaderFromSetting(oceanBaseConfig)
     val executionId = directLoader.begin()
-    sparkSettings.setProperty(ConnectionOptions.EXECUTION_ID, executionId)
+    oceanBaseConfig.set(OceanBaseConfig.DIRECT_LOAD_EXECUTION_ID, executionId)
 
     sqlContext.sparkContext.addSparkListener(new DirectLoadListener(directLoader))
-    val writer = new DirectLoadWriter(sparkSettings)
+    val writer = new DirectLoadWriter(oceanBaseConfig)
     writer.write(dataFrame)
 
     directLoader.commit()

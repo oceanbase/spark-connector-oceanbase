@@ -102,8 +102,7 @@ mvn clean package -Dscala.version=2.11.12 -Dscala.binary.version=2.11 -DskipTest
 CREATE TEMPORARY VIEW spark_oceanbase
 USING oceanbase
 OPTIONS(
-  "host"= "localhost",
-  "sql-port" = "2881",
+  "url"= "jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false",
   "schema-name"="test",
   "table-name"="test",
   "username"="root",
@@ -117,8 +116,7 @@ SELECT * FROM spark_oceanbase;
 
 ```scala
 val oceanBaseSparkDF = spark.read.format("OceanBase")
-  .option("host", "localhost")
-  .option("sql-port", 2881)
+  .option("url", "jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false")
   .option("username", "root")
   .option("password", "123456")
   .option("table-name", "test")
@@ -177,12 +175,11 @@ CREATE TABLE test.orders (
 CREATE TEMPORARY VIEW test_jdbc
 USING oceanbase
 OPTIONS(
-  "host"="localhost",
-  "sql-port" = "2881",
+  "url"="jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false",
   "schema-name"="test",
   "table-name"="orders",
   "username"="root@test",
-  "password"=""
+  "password"="123456"
 );
 
 insert into table test_jdbc
@@ -203,8 +200,7 @@ import org.apache.spark.sql.SaveMode
 df.write
   .format("oceanbase")
   .mode(saveMode = SaveMode.Append)
-  .option("host", "localhost")
-  .option("sql-port", 2881)
+  .option("url", "jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false")
   .option("username", "root")
   .option("password", "123456")
   .option("table-name", "orders")
@@ -220,13 +216,13 @@ df.write
 CREATE TEMPORARY VIEW test_direct
 USING oceanbase
 OPTIONS(
-  "host"="localhost",
-  "sql-port" = "2881",
+  "url"="jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false",
   "schema-name"="test",
   "table-name"="orders",
   "username"="root@test",
-  "password"="",
+  "password"="123456",
   "direct-load.enabled" = true,
+  "direct-load.host" = "localhost",
   "direct-load.rpc-port" = "2882"
 );
 
@@ -248,13 +244,13 @@ import org.apache.spark.sql.SaveMode
 df.write
   .format("oceanbase")
   .mode(saveMode = SaveMode.Append)
-  .option("host", "localhost")
-  .option("sql-port", 2881)
+  .option("url", "jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false")
   .option("username", "root")
   .option("password", "123456")
   .option("table-name", "orders")
   .option("schema-name", "test")
   .option("direct-load.enabled", "true")
+  .option("direct-load.host", "localhost")
   .option("direct-load.rpc-port", "2882")
   .save()
 ```
@@ -275,16 +271,10 @@ df.write
         </thead>
         <tbody>
             <tr>
-                <td>host</td>
+                <td>url</td>
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
-                <td>数据库的 JDBC url。</td>
-            </tr>
-            <tr>
-                <td>sql-port</td>
-                <td style="word-wrap: break-word;">2881</td>
-                <td>Int</td>
-                <td>SQL 端口。</td>
+                <td>连接到OceanBase的 JDBC url.</td>
             </tr>
             <tr>
                 <td>username</td>
@@ -332,6 +322,12 @@ df.write
                 <td>false</td>
                 <td>Boolean</td>
                 <td>是否开启旁路导入写入。</td>
+            </tr>
+            <tr>
+                <td>direct-load.host</td>
+                <td></td>
+                <td>String</td>
+                <td>旁路导入用到的host地址。</td>
             </tr>
             <tr>
                 <td>direct-load.rpc-port</td>
