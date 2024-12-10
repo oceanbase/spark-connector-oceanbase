@@ -15,12 +15,13 @@
  */
 package org.apache.spark.sql
 
-import com.oceanbase.spark.cfg.{ConnectionOptions, SparkSettings}
-import com.oceanbase.spark.jdbc.OBJdbcUtils.{getCompatibleMode, getJdbcUrl, OB_MYSQL_URL}
+import com.oceanbase.spark.config.OceanBaseConfig
+import com.oceanbase.spark.jdbc.OBJdbcUtils.getCompatibleMode
 import com.oceanbase.spark.sql.OceanBaseSparkSource
 
-import OceanBaseSparkDataSource.SHORT_NAME
+import OceanBaseSparkDataSource.{JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, SHORT_NAME}
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
+import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import org.apache.spark.sql.sources._
 
 import scala.collection.JavaConverters.mapAsJavaMapConverter
@@ -32,9 +33,8 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
   override def createRelation(
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
-    val sparkSettings = new SparkSettings(sqlContext.sparkContext.getConf)
-    sparkSettings.merge(parameters.asJava)
-    val jdbcOptions = buildJDBCOptions(parameters, sparkSettings)._1
+    val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
+    val jdbcOptions = buildJDBCOptions(parameters, oceanBaseConfig)._1
     val resolver = sqlContext.conf.resolver
     val timeZoneId = sqlContext.conf.sessionLocalTimeZone
     val schema = JDBCRelation.getSchema(resolver, jdbcOptions)
@@ -47,35 +47,49 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       mode: SaveMode,
       parameters: Map[String, String],
       dataFrame: DataFrame): BaseRelation = {
-    val sparkSettings = new SparkSettings(sqlContext.sparkContext.getConf)
-    sparkSettings.merge(parameters.asJava)
-    val enableDirectLoadWrite = sparkSettings.getBooleanProperty(
-      ConnectionOptions.ENABLE_DIRECT_LOAD_WRITE,
-      ConnectionOptions.ENABLE_DIRECT_LOAD_WRITE_DEFAULT)
+    val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
+    val enableDirectLoadWrite = oceanBaseConfig.getDirectLoadEnable
     if (!enableDirectLoadWrite) {
-      val param = buildJDBCOptions(parameters, sparkSettings)._2
+      val param = buildJDBCOptions(parameters, oceanBaseConfig)._2
       super.createRelation(sqlContext, mode, param, dataFrame)
     } else {
-      OceanBaseSparkSource.createDirectLoadRelation(sqlContext, mode, dataFrame, sparkSettings)
+      OceanBaseSparkSource.createDirectLoadRelation(sqlContext, mode, dataFrame, oceanBaseConfig)
       createRelation(sqlContext, parameters)
     }
   }
 
   private def buildJDBCOptions(
       parameters: Map[String, String],
-      sparkSettings: SparkSettings): (JDBCOptions, Map[String, String]) = {
-    val url: String = getJdbcUrl(sparkSettings)
-    val table: String = parameters(ConnectionOptions.TABLE_NAME)
-    val paraMap = parameters ++ Map(
-      "url" -> url,
-      "dbtable" -> table,
-      "user" -> parameters(ConnectionOptions.USERNAME),
-      "isolationLevel" -> "READ_COMMITTED"
+      oceanBaseConfig: OceanBaseConfig): (JDBCOptions, Map[String, String]) = {
+    var paraMap = parameters ++ Map(
+      JDBC_URL -> oceanBaseConfig.getURL,
+      JDBC_USER -> parameters(OceanBaseConfig.USERNAME.getKey),
+      JDBC_TXN_ISOLATION_LEVEL -> {
+        if (!parameters.contains(JDBC_TXN_ISOLATION_LEVEL)) "READ_COMMITTED"
+        else parameters(JDBC_TXN_ISOLATION_LEVEL)
+      }
     )
-    (new JDBCOptions(url, table, paraMap), paraMap)
+    // It is not allowed to specify dbtable and query options at the same time.
+    if (parameters.contains(JDBCOptions.JDBC_QUERY_STRING)) {
+      paraMap =
+        paraMap + (JDBCOptions.JDBC_QUERY_STRING -> parameters(JDBCOptions.JDBC_QUERY_STRING))
+    } else {
+      paraMap = paraMap + (JDBCOptions.JDBC_TABLE_NAME -> oceanBaseConfig.getTableName)
+    }
+
+    // Set dialect
+    if ("MySQL".equalsIgnoreCase(getCompatibleMode(oceanBaseConfig))) {
+      JdbcDialects.registerDialect(OceanBaseMySQLDialect)
+    } else {
+      JdbcDialects.registerDialect(OceanBaseOracleDialect)
+    }
+    (new JDBCOptions(paraMap), paraMap)
   }
 }
 
 object OceanBaseSparkDataSource {
   val SHORT_NAME: String = "oceanbase"
+  val JDBC_URL = "url"
+  val JDBC_USER = "user"
+  val JDBC_TXN_ISOLATION_LEVEL = "isolationLevel"
 }

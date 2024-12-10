@@ -17,7 +17,6 @@
 package com.oceanbase.spark.directload;
 
 import java.io.Serializable;
-import java.util.Objects;
 
 
 import com.alipay.oceanbase.rpc.direct_load.ObDirectLoadConnection;
@@ -95,60 +94,36 @@ public class DirectLoaderBuilder implements Serializable {
     }
 
     public DirectLoaderBuilder parallel(Integer parallel) {
-        if (Objects.isNull(parallel)) {
-            return this;
-        }
-
         this.parallel = parallel;
         return this;
     }
 
     public DirectLoaderBuilder maxErrorCount(Long maxErrorCount) {
-        if (Objects.isNull(maxErrorCount)) {
-            return this;
-        }
         this.maxErrorCount = maxErrorCount;
         return this;
     }
 
     public DirectLoaderBuilder duplicateKeyAction(String duplicateKeyAction) {
-        if (Objects.isNull(duplicateKeyAction)) {
-            return this;
-        }
         this.duplicateKeyAction = ObLoadDupActionType.valueOf(duplicateKeyAction);
         return this;
     }
 
     public DirectLoaderBuilder directLoadMethod(String directLoadMethod) {
-        if (Objects.isNull(directLoadMethod)) {
-            return this;
-        }
         this.directLoadMethod = directLoadMethod;
         return this;
     }
 
     public DirectLoaderBuilder timeout(Long timeout) {
-        if (Objects.isNull(timeout)) {
-            return this;
-        }
         this.timeout = timeout;
         return this;
     }
 
     public DirectLoaderBuilder heartBeatTimeout(Long heartBeatTimeout) {
-        if (Objects.isNull(heartBeatTimeout)) {
-            return this;
-        }
-
         this.heartBeatTimeout = heartBeatTimeout;
         return this;
     }
 
     public DirectLoaderBuilder heartBeatInterval(Long heartBeatInterval) {
-        if (Objects.isNull(heartBeatInterval)) {
-            return this;
-        }
-
         this.heartBeatInterval = heartBeatInterval;
         return this;
     }

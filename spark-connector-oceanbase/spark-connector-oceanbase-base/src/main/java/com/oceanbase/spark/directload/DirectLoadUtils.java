@@ -16,33 +16,31 @@
 
 package com.oceanbase.spark.directload;
 
-import com.oceanbase.spark.cfg.ConnectionOptions;
-import com.oceanbase.spark.cfg.OceanBaseUserInfo;
-import com.oceanbase.spark.cfg.SparkSettings;
+import com.oceanbase.spark.config.OceanBaseConfig;
+import com.oceanbase.spark.config.OceanBaseUserInfo;
 
 /** The utils of {@link DirectLoader} */
 public class DirectLoadUtils {
 
-    public static DirectLoader buildDirectLoaderFromSetting(SparkSettings settings) {
+    public static DirectLoader buildDirectLoaderFromSetting(OceanBaseConfig oceanBaseConfig) {
         try {
-            OceanBaseUserInfo userInfo = OceanBaseUserInfo.parse(settings);
+            OceanBaseUserInfo userInfo = OceanBaseUserInfo.parse(oceanBaseConfig);
             return new DirectLoaderBuilder()
-                    .host(settings.getProperty(ConnectionOptions.HOST))
-                    .port(settings.getIntegerProperty(ConnectionOptions.RPC_PORT))
+                    .host(oceanBaseConfig.getDirectLoadHost())
+                    .port(oceanBaseConfig.getDirectLoadPort())
                     .user(userInfo.getUser())
-                    .password(settings.getProperty(ConnectionOptions.PASSWORD))
+                    .password(oceanBaseConfig.getPassword())
                     .tenant(userInfo.getTenant())
-                    .schema(settings.getProperty(ConnectionOptions.SCHEMA_NAME))
-                    .table(settings.getProperty(ConnectionOptions.TABLE_NAME))
-                    .executionId(settings.getProperty(ConnectionOptions.EXECUTION_ID))
-                    .duplicateKeyAction(settings.getProperty(ConnectionOptions.DUP_ACTION))
-                    .maxErrorCount(settings.getLongProperty(ConnectionOptions.MAX_ERROR_ROWS))
-                    .timeout(settings.getLongProperty(ConnectionOptions.TIMEOUT))
-                    .heartBeatTimeout(settings.getLongProperty(ConnectionOptions.HEARTBEAT_TIMEOUT))
-                    .heartBeatInterval(
-                            settings.getLongProperty(ConnectionOptions.HEARTBEAT_INTERVAL))
-                    .directLoadMethod(settings.getProperty(ConnectionOptions.LOAD_METHOD))
-                    .parallel(settings.getIntegerProperty(ConnectionOptions.PARALLEL))
+                    .schema(oceanBaseConfig.getSchemaName())
+                    .table(oceanBaseConfig.getTableName())
+                    .executionId(oceanBaseConfig.getDirectLoadExecutionId())
+                    .duplicateKeyAction(oceanBaseConfig.getDirectLoadDupAction())
+                    .maxErrorCount(oceanBaseConfig.getDirectLoadMaxErrorRows())
+                    .timeout(oceanBaseConfig.getDirectLoadTimeout())
+                    .heartBeatTimeout(oceanBaseConfig.getDirectLoadHeartbeatTimeout())
+                    .heartBeatInterval(oceanBaseConfig.getDirectLoadHeartbeatInterval())
+                    .directLoadMethod(oceanBaseConfig.getDirectLoadLoadMethod())
+                    .parallel(oceanBaseConfig.getDirectLoadParallel())
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("Fail to build DirectLoader.", e);
