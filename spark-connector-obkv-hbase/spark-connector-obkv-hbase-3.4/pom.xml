@@ -69,15 +69,19 @@ under the License.
                                 <includes combine.children="append">
                                     <include>com.oceanbase:*</include>
                                     <include>com.alibaba:*</include>
-                                    <include>com.alipay.sofa:bolt</include>
-                                    <include>com.alipay.sofa.common:sofa-common-tools</include>
-                                    <include>org.apache.hbase:*</include>
+                                    <include>com.alipay.*:*</include>
+                                    <include>com.google.*:*</include>
+                                    <include>org.apache.hadoop*:*</include>
+                                    <include>org.apache.hbase*:*</include>
                                     <include>mysql:mysql-connector-java</include>
+                                    <!-- This is only needed for Spark 3.3 and above. -->
+                                    <include>com.lmax:disruptor</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
                                 <relocation>
-                                    <!-- Resolve dependency conflicts in direct-load API. -->
+                                    <!-- Resolve dependency conflicts in direct-load API.
+                                         This is only needed for Spark 3.4. -->
                                     <pattern>org.apache.logging</pattern>
                                     <shadedPattern>shade.org.apache.logging</shadedPattern>
                                 </relocation>

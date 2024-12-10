@@ -73,16 +73,10 @@ under the License.
                                     <include>com.oceanbase:obkv-table-client</include>
                                     <include>com.alipay.sofa:bolt</include>
                                     <include>com.alipay.sofa.common:sofa-common-tools</include>
+                                    <!-- This is only needed for Spark 3.3 and above. -->
                                     <include>com.lmax:disruptor</include>
                                 </includes>
                             </artifactSet>
-                            <relocations>
-                                <relocation>
-                                    <!-- Resolve dependency conflicts in direct-load API. -->
-                                    <pattern>org.apache.logging</pattern>
-                                    <shadedPattern>shade.org.apache.logging</shadedPattern>
-                                </relocation>
-                            </relocations>
                         </configuration>
                     </execution>
                 </executions>

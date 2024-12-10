@@ -69,20 +69,13 @@ under the License.
                                 <includes combine.children="append">
                                     <include>com.oceanbase:*</include>
                                     <include>com.alibaba:*</include>
-                                    <include>com.alipay.sofa:bolt</include>
-                                    <include>com.alipay.sofa.common:sofa-common-tools</include>
-                                    <include>org.apache.hbase:*</include>
+                                    <include>com.alipay.*:*</include>
+                                    <include>com.google.*:*</include>
+                                    <include>org.apache.hadoop*:*</include>
+                                    <include>org.apache.hbase*:*</include>
                                     <include>mysql:mysql-connector-java</include>
                                 </includes>
                             </artifactSet>
-                            <filters>
-                                <filter>
-                                    <artifact>com.oceanbase:obkv-table-client</artifact>
-                                    <excludes>
-                                        <exclude>**/log4j/log-conf.xml</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
                         </configuration>
                     </execution>
                 </executions>
