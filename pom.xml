@@ -21,6 +21,9 @@ under the License.
     <version>${revision}</version>
     <packaging>pom</packaging>
 
+    <name>Spark Connector OceanBase</name>
+    <description>Spark Connectors for OceanBase</description>
+
     <modules>
         <module>spark-connector-obkv-hbase</module>
         <module>spark-connector-oceanbase</module>
@@ -296,6 +299,7 @@ under the License.
 
             </plugins>
         </pluginManagement>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
