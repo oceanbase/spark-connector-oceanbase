@@ -307,6 +307,9 @@ under the License.
                         <goals>
                             <goal>jar</goal>
                         </goals>
+                        <configuration>
+                            <includePom>true</includePom>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -345,6 +348,17 @@ under the License.
                         <goals>
                             <goal>test-jar</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>empty-javadoc-jar</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <classifier>javadoc</classifier>
+                            <classesDirectory>${basedir}/src/main/java</classesDirectory>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -442,6 +456,7 @@ under the License.
         </plugins>
     </build>
 
+    <url>https://www.oceanbase.com/</url>
     <inceptionYear>2024</inceptionYear>
 
     <organization>
