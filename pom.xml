@@ -21,6 +21,9 @@ under the License.
     <version>${revision}</version>
     <packaging>pom</packaging>
 
+    <name>Spark Connector OceanBase</name>
+    <description>Spark Connectors for OceanBase</description>
+
     <modules>
         <module>spark-connector-obkv-hbase</module>
         <module>spark-connector-oceanbase</module>
@@ -32,7 +35,7 @@ under the License.
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <revision>1.0-SNAPSHOT</revision>
+        <revision>1.1-SNAPSHOT</revision>
         <scala.version>2.12.15</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <slf4j.version>1.7.32</slf4j.version>
@@ -296,6 +299,7 @@ under the License.
 
             </plugins>
         </pluginManagement>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -307,6 +311,9 @@ under the License.
                         <goals>
                             <goal>jar</goal>
                         </goals>
+                        <configuration>
+                            <includePom>true</includePom>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -345,6 +352,17 @@ under the License.
                         <goals>
                             <goal>test-jar</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>empty-javadoc-jar</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <classifier>javadoc</classifier>
+                            <classesDirectory>${basedir}/src/main/java</classesDirectory>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -442,6 +460,7 @@ under the License.
         </plugins>
     </build>
 
+    <url>https://www.oceanbase.com/</url>
     <inceptionYear>2024</inceptionYear>
 
     <organization>
