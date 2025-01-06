@@ -34,7 +34,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
                    |OPTIONS(
-                   |  "url"= "$getJdbcUrl",
+                   |  "url"= "$getJdbcUrlWithoutDB",
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
@@ -89,7 +89,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
                    |OPTIONS(
-                   |  "url"= "$getJdbcUrl",
+                   |  "url"= "$getJdbcUrlWithoutDB",
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
@@ -206,7 +206,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
                    |OPTIONS(
-                   |  "url"= "$getJdbcUrl",
+                   |  "url"= "$getJdbcUrlWithoutDB",
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
@@ -437,7 +437,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     // DataFrame read
     val dataFrame = session.read
       .format("oceanbase")
-      .option("url", getJdbcUrl)
+      .option("url", getJdbcUrlWithoutDB)
       .option("username", getUsername)
       .option("password", getPassword)
       .option("table-name", "products")
@@ -469,6 +469,10 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     session.stop()
     dropTables("products")
   }
+
+  def getJdbcUrlWithoutDB: String =
+    s"jdbc:mysql://$getHost:$getPort?useUnicode=true&characterEncoding=UTF-8&useSSL=false"
+
 }
 
 object OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {

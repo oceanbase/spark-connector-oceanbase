@@ -16,10 +16,10 @@
 package org.apache.spark.sql
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.jdbc.OBJdbcUtils.getCompatibleMode
+import com.oceanbase.spark.jdbc.OBJdbcUtils.{getCompatibleMode, getDbTable}
 import com.oceanbase.spark.sql.OceanBaseSparkSource
 
-import OceanBaseSparkDataSource.{JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, SHORT_NAME}
+import OceanBaseSparkDataSource.{JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
 import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import org.apache.spark.sql.sources._
@@ -65,7 +65,7 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       JDBC_URL -> oceanBaseConfig.getURL,
       JDBC_USER -> parameters(OceanBaseConfig.USERNAME.getKey),
       JDBC_TXN_ISOLATION_LEVEL -> {
-        if (!parameters.contains(JDBC_TXN_ISOLATION_LEVEL)) "READ_COMMITTED"
+        if (!parameters.contains(JDBC_TXN_ISOLATION_LEVEL)) OCEANBASE_DEFAULT_ISOLATION_LEVEL
         else parameters(JDBC_TXN_ISOLATION_LEVEL)
       }
     )
@@ -74,7 +74,7 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       paraMap =
         paraMap + (JDBCOptions.JDBC_QUERY_STRING -> parameters(JDBCOptions.JDBC_QUERY_STRING))
     } else {
-      paraMap = paraMap + (JDBCOptions.JDBC_TABLE_NAME -> oceanBaseConfig.getTableName)
+      paraMap = paraMap + (JDBCOptions.JDBC_TABLE_NAME -> getDbTable(oceanBaseConfig))
     }
 
     // Set dialect
@@ -92,4 +92,5 @@ object OceanBaseSparkDataSource {
   val JDBC_URL = "url"
   val JDBC_USER = "user"
   val JDBC_TXN_ISOLATION_LEVEL = "isolationLevel"
+  val OCEANBASE_DEFAULT_ISOLATION_LEVEL = "READ_COMMITTED"
 }

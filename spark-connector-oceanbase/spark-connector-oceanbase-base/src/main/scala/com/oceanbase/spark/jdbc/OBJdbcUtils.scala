@@ -36,10 +36,19 @@ object OBJdbcUtils {
     val statement = conn.createStatement
     try {
       val rs = statement.executeQuery("SHOW VARIABLES LIKE 'ob_compatibility_mode'")
-      if (rs.next) rs.getString("VALUE") else null
+      if (rs.next) rs.getString("VALUE")
+      else throw new RuntimeException("Failed to obtain compatible mode of OceanBase.")
     } finally {
       statement.close()
       conn.close()
+    }
+  }
+
+  def getDbTable(oceanBaseConfig: OceanBaseConfig): String = {
+    if ("MySQL".equalsIgnoreCase(getCompatibleMode(oceanBaseConfig))) {
+      s"`${oceanBaseConfig.getSchemaName}`.`${oceanBaseConfig.getTableName}`"
+    } else {
+      s""""${oceanBaseConfig.getSchemaName}"."${oceanBaseConfig.getTableName}""""
     }
   }
 
