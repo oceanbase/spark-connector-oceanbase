@@ -84,6 +84,49 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testDirectLoadWithEmptySparkPartition(): Unit = {
+    initialize("sql/mysql/products.sql")
+
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "$getJdbcUrlWithoutDB",
+                   |  "rpc-port" = "$getRpcPort",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="products",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword",
+                   |  "direct-load.enabled"=true,
+                   |  "direct-load.host"="$getHost",
+                   |  "direct-load.rpc-port"=$getRpcPort
+                   |);
+                   |""".stripMargin)
+
+    session
+      .sql("""
+             |INSERT INTO test_sink
+             |SELECT /*+ REPARTITION(3) */ 101, 'scooter', 'Small 2-wheel scooter', 3.14;
+             |""".stripMargin)
+      .repartition(3)
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "101,scooter,Small 2-wheel scooter,3.1400000000"
+    )
+    session.stop()
+
+    waitingAndAssertTableCount("products", expected.size)
+
+    val actual: util.List[String] = queryTable("products")
+
+    assertEqualsInAnyOrder(expected, actual)
+
+    dropTables("products")
+  }
+
+  @Test
   def testDataFrameDirectLoadWrite(): Unit = {
     val session = SparkSession.builder().master("local[1]").getOrCreate()
     val df = session

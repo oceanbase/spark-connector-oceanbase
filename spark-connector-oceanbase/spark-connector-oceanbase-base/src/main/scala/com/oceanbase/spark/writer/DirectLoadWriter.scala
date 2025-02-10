@@ -61,6 +61,8 @@ class DirectLoadWriter(oceanBaseConfig: OceanBaseConfig) extends Serializable {
   }
 
   private def flush(buffer: ArrayBuffer[Row], directLoader: DirectLoader): Unit = {
+    if (buffer.isEmpty) return
+
     val bucket = new ObDirectLoadBucket()
     buffer.foreach(
       row => {
