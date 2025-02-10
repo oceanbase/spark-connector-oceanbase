@@ -16,16 +16,14 @@
 package com.oceanbase.spark.sql
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.directload.DirectLoadUtils
-import com.oceanbase.spark.jdbc.OBJdbcUtils
-import com.oceanbase.spark.listener.DirectLoadListener
+import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.writer.DirectLoadWriter
 
 import OceanBaseSparkSource.{createDirectLoadRelation, SHORT_NAME}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql
 import org.apache.spark.sql.{DataFrame, SaveMode, SQLContext}
-import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, DataSourceRegister, Filter, RelationProvider, SchemaRelationProvider, StreamSinkProvider}
+import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, DataSourceRegister, RelationProvider}
 
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
@@ -72,16 +70,6 @@ object OceanBaseSparkSource {
       case _ =>
         throw new NotImplementedError(s"${mode.name()} mode is not currently supported.")
     }
-    // Init direct-loader.
-    val directLoader = DirectLoadUtils.buildDirectLoaderFromSetting(oceanBaseConfig)
-    val executionId = directLoader.begin()
-    oceanBaseConfig.set(OceanBaseConfig.DIRECT_LOAD_EXECUTION_ID, executionId)
-
-    sqlContext.sparkContext.addSparkListener(new DirectLoadListener(directLoader))
-    val writer = new DirectLoadWriter(oceanBaseConfig)
-    writer.write(dataFrame)
-
-    directLoader.commit()
-    directLoader.close()
+    DirectLoadWriter.savaTable(dataFrame, oceanBaseConfig)
   }
 }

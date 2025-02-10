@@ -16,7 +16,7 @@
 package com.oceanbase.spark.sql
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.jdbc.OBJdbcUtils
+import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.sql
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}

@@ -75,3 +75,18 @@ class DirectLoadWriter(oceanBaseConfig: OceanBaseConfig) extends Serializable {
     buffer.clear()
   }
 }
+
+object DirectLoadWriter {
+
+  def savaTable(dataFrame: DataFrame, oceanBaseConfig: OceanBaseConfig): Unit = {
+    // Init direct-loader.
+    val directLoader = DirectLoadUtils.buildDirectLoaderFromSetting(oceanBaseConfig)
+    val executionId = directLoader.begin()
+    oceanBaseConfig.set(OceanBaseConfig.DIRECT_LOAD_EXECUTION_ID, executionId)
+    val writer = new DirectLoadWriter(oceanBaseConfig)
+    writer.write(dataFrame)
+
+    directLoader.commit()
+    directLoader.close()
+  }
+}

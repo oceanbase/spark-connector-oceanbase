@@ -16,8 +16,8 @@
 package org.apache.spark.sql
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.jdbc.OBJdbcUtils.{getCompatibleMode, getDbTable}
 import com.oceanbase.spark.sql.OceanBaseSparkSource
+import com.oceanbase.spark.utils.OBJdbcUtils.{getCompatibleMode, getDbTable}
 
 import OceanBaseSparkDataSource.{JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
@@ -64,10 +64,9 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
     var paraMap = parameters ++ Map(
       JDBC_URL -> oceanBaseConfig.getURL,
       JDBC_USER -> parameters(OceanBaseConfig.USERNAME.getKey),
-      JDBC_TXN_ISOLATION_LEVEL -> {
-        if (!parameters.contains(JDBC_TXN_ISOLATION_LEVEL)) OCEANBASE_DEFAULT_ISOLATION_LEVEL
-        else parameters(JDBC_TXN_ISOLATION_LEVEL)
-      }
+      JDBC_TXN_ISOLATION_LEVEL -> parameters.getOrElse(
+        JDBC_TXN_ISOLATION_LEVEL,
+        OCEANBASE_DEFAULT_ISOLATION_LEVEL)
     )
     // It is not allowed to specify dbtable and query options at the same time.
     if (parameters.contains(JDBCOptions.JDBC_QUERY_STRING)) {
