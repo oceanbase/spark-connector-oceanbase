@@ -85,10 +85,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
   @Test
   def testDirectLoadWithEmptySparkPartition(): Unit = {
-    initialize("sql/mysql/products.sql")
-
-    val session = SparkSession.builder().master("local[*]").getOrCreate()
-
+    val session = SparkSession.builder().master("local[1]").getOrCreate()
     session.sql(s"""
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
@@ -104,7 +101,6 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "direct-load.rpc-port"=$getRpcPort
                    |);
                    |""".stripMargin)
-
     session
       .sql("""
              |INSERT INTO test_sink
@@ -117,13 +113,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     )
     session.stop()
 
-    waitingAndAssertTableCount("products", expected.size)
-
-    val actual: util.List[String] = queryTable("products")
-
-    assertEqualsInAnyOrder(expected, actual)
-
-    dropTables("products")
+    verifyTableData(TEST_TABLE_PRODUCTS, expected)
   }
 
   @Test
