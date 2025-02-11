@@ -273,40 +273,7 @@ class OceanBaseCatalog
     }
 
   override def alterNamespace(namespace: Array[String], changes: NamespaceChange*): Unit = {
-    namespace match {
-      case Array(db) =>
-        changes.foreach {
-          case set: NamespaceChange.SetProperty =>
-            if (set.property() == SupportsNamespaces.PROP_COMMENT) {
-              OBJdbcUtils.withConnection(options) {
-                conn =>
-                  OBJdbcUtils.unifiedCatalogException(s"Failed create comment on name space: $db") {
-                    dialect.alterSchemaComment(conn, options, db, set.value)
-                  }
-              }
-            } else {
-              throw throw new UnsupportedOperationException()
-            }
-
-          case unset: NamespaceChange.RemoveProperty =>
-            if (unset.property() == SupportsNamespaces.PROP_COMMENT) {
-              OBJdbcUtils.withConnection(options) {
-                conn =>
-                  OBJdbcUtils.unifiedCatalogException(s"Failed remove comment on name space: $db") {
-                    dialect.removeSchemaComment(conn, options, db)
-                  }
-              }
-            } else {
-              throw new UnsupportedOperationException(unset.property())
-            }
-
-          case _ =>
-            throw new UnsupportedOperationException(changes.mkString(","))
-        }
-
-      case _ =>
-        throw new UnsupportedOperationException(namespace.mkString("."))
-    }
+    throw new UnsupportedOperationException("OceanBase does not support alter namespace property.")
   }
 
   /** Note: Do not add the override keyword to ensure compatibility with older Spark versions. */

@@ -35,19 +35,11 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       options: JDBCOptions,
       schema: String,
       comment: String): Unit = {
+    // OceanBase mysql mode does not support schema comments, so we ignore the comment parameter.
     val statement = conn.createStatement
     try {
       statement.setQueryTimeout(options.queryTimeout)
-      val schemaCommentQuery = if (comment.nonEmpty) {
-        // We generate comment query here so that it can fail earlier without creating the schema.
-        getSchemaCommentQuery(schema, comment)
-      } else {
-        comment
-      }
       statement.executeUpdate(s"CREATE SCHEMA ${quoteIdentifier(schema)}")
-      if (comment.nonEmpty) {
-        statement.executeUpdate(schemaCommentQuery)
-      }
     } finally {
       statement.close()
     }
@@ -71,18 +63,6 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
         logWarning("Cannot show schemas.")
     }
     schemaBuilder.result
-  }
-
-  override def alterSchemaComment(
-      conn: Connection,
-      options: JDBCOptions,
-      schema: String,
-      comment: String): Unit = {
-    executeStatement(conn, options, getSchemaCommentQuery(schema, comment))
-  }
-
-  override def removeSchemaComment(conn: Connection, options: JDBCOptions, schema: String): Unit = {
-    executeStatement(conn, options, removeSchemaCommentQuery(schema))
   }
 
   /** Drops a schema from OceanBase. */

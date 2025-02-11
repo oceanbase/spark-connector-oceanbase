@@ -148,24 +148,8 @@ abstract class OceanBaseDialect extends Logging with Serializable {
 
   def listSchemas(conn: Connection, options: JDBCOptions): Array[Array[String]]
 
-  def alterSchemaComment(
-      conn: Connection,
-      options: JDBCOptions,
-      schema: String,
-      comment: String): Unit
-
-  def removeSchemaComment(conn: Connection, options: JDBCOptions, schema: String): Unit
-
   /** Drops a schema from the JDBC database. */
   def dropSchema(conn: Connection, options: JDBCOptions, schema: String, cascade: Boolean): Unit
-
-  def getSchemaCommentQuery(schema: String, comment: String): String = {
-    s"COMMENT ON SCHEMA ${quoteIdentifier(schema)} IS '$comment'"
-  }
-
-  def removeSchemaCommentQuery(schema: String): String = {
-    s"COMMENT ON SCHEMA ${quoteIdentifier(schema)} IS NULL"
-  }
 
   /**
    * Quotes the identifier. This is used to put quotes around the identifier in case the column name

@@ -75,19 +75,27 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     assertEqualsInAnyOrder(expectedDbList, dbList)
 
     val tableList = session.sql("show tables").collect().map(_.toString()).toList.asJava
-    println(tableList)
     val expectedTableList = Seq(
       "[test,products,false]",
       "[test,products_no_pri_key,false]",
       "[test,products_full_pri_key,false]").toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
+    // test create/drop namespace
     Assertions.assertDoesNotThrow(new ThrowingSupplier[Unit] {
       override def get(): Unit = {
         session.sql("create database spark")
         session.sql("use spark")
       }
     })
+    val expectedCreateDbList =
+      Seq("[information_schema]", "[mysql]", "[oceanbase]", "[test]", "[spark]").toList.asJava
+    val dbList1 = session.sql("show databases").collect().map(_.toString()).toList.asJava
+    assertEqualsInAnyOrder(expectedCreateDbList, dbList1)
+    session.sql("drop database spark")
+    val dbList2 = session.sql("show databases").collect().map(_.toString()).toList.asJava
+    assertEqualsInAnyOrder(expectedDbList, dbList2)
+
     session.stop()
   }
 

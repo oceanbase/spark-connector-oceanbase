@@ -42,16 +42,6 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
   override def listSchemas(conn: Connection, options: JDBCOptions): Array[Array[String]] =
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
 
-  override def alterSchemaComment(
-      conn: Connection,
-      options: JDBCOptions,
-      schema: String,
-      comment: String): Unit = throw new UnsupportedOperationException(
-    "Not currently supported in oracle mode")
-
-  override def removeSchemaComment(conn: Connection, options: JDBCOptions, schema: String): Unit =
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
-
   /** Drops a schema from OceanBase. */
   override def dropSchema(
       conn: Connection,
