@@ -16,10 +16,12 @@
 package org.apache.spark.sql
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.sql.OceanBaseSparkSource
+import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.utils.OBJdbcUtils.{getCompatibleMode, getDbTable}
+import com.oceanbase.spark.writer.DirectLoadWriter
 
-import OceanBaseSparkDataSource.{JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import OceanBaseSparkDataSource.{saveTableBasedDirectLoad, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import org.apache.spark.sql
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
 import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import org.apache.spark.sql.sources._
@@ -53,7 +55,7 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       val param = buildJDBCOptions(parameters, oceanBaseConfig)._2
       super.createRelation(sqlContext, mode, param, dataFrame)
     } else {
-      OceanBaseSparkSource.createDirectLoadRelation(sqlContext, mode, dataFrame, oceanBaseConfig)
+      saveTableBasedDirectLoad(mode, dataFrame, oceanBaseConfig)
       createRelation(sqlContext, parameters)
     }
   }
@@ -92,4 +94,18 @@ object OceanBaseSparkDataSource {
   val JDBC_USER = "user"
   val JDBC_TXN_ISOLATION_LEVEL = "isolationLevel"
   val OCEANBASE_DEFAULT_ISOLATION_LEVEL = "READ_COMMITTED"
+
+  def saveTableBasedDirectLoad(
+      mode: SaveMode,
+      dataFrame: DataFrame,
+      oceanBaseConfig: OceanBaseConfig): Unit = {
+    mode match {
+      case sql.SaveMode.Append => // do nothing
+      case sql.SaveMode.Overwrite =>
+        OBJdbcUtils.truncateTable(oceanBaseConfig)
+      case _ =>
+        throw new NotImplementedError(s"${mode.name()} mode is not currently supported.")
+    }
+    DirectLoadWriter.savaTable(dataFrame, oceanBaseConfig)
+  }
 }

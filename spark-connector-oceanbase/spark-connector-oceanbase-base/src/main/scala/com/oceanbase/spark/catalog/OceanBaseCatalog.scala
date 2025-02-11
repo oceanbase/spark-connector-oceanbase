@@ -103,7 +103,8 @@ class OceanBaseCatalog
           dialect.dropTable(conn, getTableName(ident), options)
           true
         } catch {
-          case _: SQLException => false
+          case ex: SQLException =>
+            throw OceanBaseCatalogException(s"Failed to drop table ${getTableName(ident)}", ex)
         }
     }
   }
