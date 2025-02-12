@@ -42,8 +42,8 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
     private static final int CONFIG_SERVER_PORT = 8080;
     private static final String CONFIG_URL_PATH = "/services?Action=GetObProxyConfig";
 
-    private static final String CLUSTER_NAME = "flink-oceanbase-ci";
-    private static final String TEST_TENANT = "flink";
+    private static final String CLUSTER_NAME = "spark-oceanbase-ci";
+    private static final String TEST_TENANT = "spark";
     private static final String SYS_PASSWORD = "123456";
     private static final String TEST_PASSWORD = "654321";
 
