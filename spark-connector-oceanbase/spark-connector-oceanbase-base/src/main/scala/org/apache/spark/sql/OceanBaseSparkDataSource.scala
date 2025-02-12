@@ -20,7 +20,7 @@ import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.utils.OBJdbcUtils.{getCompatibleMode, getDbTable}
 import com.oceanbase.spark.writer.DirectLoadWriter
 
-import OceanBaseSparkDataSource.{saveTableBasedDirectLoad, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import OceanBaseSparkDataSource.{writeDataViaDirectLoad, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
 import org.apache.spark.sql
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
 import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
@@ -55,7 +55,7 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       val param = buildJDBCOptions(parameters, oceanBaseConfig)._2
       super.createRelation(sqlContext, mode, param, dataFrame)
     } else {
-      saveTableBasedDirectLoad(mode, dataFrame, oceanBaseConfig)
+      writeDataViaDirectLoad(mode, dataFrame, oceanBaseConfig)
       createRelation(sqlContext, parameters)
     }
   }
@@ -95,7 +95,23 @@ object OceanBaseSparkDataSource {
   val JDBC_TXN_ISOLATION_LEVEL = "isolationLevel"
   val OCEANBASE_DEFAULT_ISOLATION_LEVEL = "READ_COMMITTED"
 
-  def saveTableBasedDirectLoad(
+  /**
+   * Writes DataFrame data using OceanBase's direct-load feature
+   *   - Append mode: Directly appends data without pre-checking
+   *   - Overwrite mode: Truncates target table before writing
+   *   - Other modes: Throws NotImplementedError
+   *
+   * @param mode
+   *   Spark SaveMode specifying write behavior
+   * @param dataFrame
+   *   DataFrame containing data to write
+   * @param oceanBaseConfig
+   *   Configuration for OceanBase connection
+   * @note
+   *   Direct load is OceanBase's high-performance data loading feature that writes directly to
+   *   storage layer
+   */
+  def writeDataViaDirectLoad(
       mode: SaveMode,
       dataFrame: DataFrame,
       oceanBaseConfig: OceanBaseConfig): Unit = {
