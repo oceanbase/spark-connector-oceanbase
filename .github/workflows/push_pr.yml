@@ -39,7 +39,7 @@ jobs:
     strategy:
       matrix:
         spark_version: ["2.4.6"]
-    uses: ./.github/workflows/test_scala2_11.yml
+    uses: ./.github/workflows/test.yml
     with:
       module: spark-connector-oceanbase-e2e-tests
-      maven_opts: "-D spark_version=${{ matrix.spark_version }}"
+      maven_opts: "-D spark_version=${{ matrix.spark_version }} -D scala.version=2.11.12 -D scala.binary.version=2.11"
