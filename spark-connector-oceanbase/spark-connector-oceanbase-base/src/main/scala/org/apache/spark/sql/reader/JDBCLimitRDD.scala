@@ -23,13 +23,14 @@ import org.apache.spark.{InterruptibleIterator, Partition, SparkContext, TaskCon
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcUtils}
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.sources.{And, EqualNullSafe, EqualTo, Filter, GreaterThan, GreaterThanOrEqual, In, IsNotNull, IsNull, LessThan, LessThanOrEqual, Not, Or, StringContains, StringEndsWith, StringStartsWith}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
 
-import java.sql.{Connection, PreparedStatement, ResultSet}
+import java.sql.{Connection, JDBCType, PreparedStatement, ResultSet, ResultSetMetaData, SQLException}
 
 import scala.util.control.NonFatal
 
@@ -66,7 +67,7 @@ object JDBCLimitRDD extends Logging {
         statement.setQueryTimeout(options.queryTimeout)
         val rs = statement.executeQuery()
         try {
-          JdbcUtils.getSchema(rs, dialect, alwaysNullable = true)
+          getSchema(rs, dialect, alwaysNullable = true)
         } finally {
           rs.close()
         }
@@ -191,6 +192,147 @@ object JDBCLimitRDD extends Logging {
       url,
       options,
       groupByColumns)
+  }
+
+  /**
+   * Copy from
+   * [[org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getSchema(ResultSet, JdbcDialect, Boolean)]]
+   * to solve compatibility issues with lower Spark versions.
+   *
+   * @note
+   *   This is a temporary solution pending BATCH_READ refactoring.
+   * @param resultSet
+   *   JDBC ResultSet containing metadata
+   * @param dialect
+   *   Spark JdbcDialect implementation
+   * @param alwaysNullable
+   *   If true, forces all columns to be nullable
+   * @return
+   *   Catalyst schema (StructType) representation
+   * @see
+   *   [[org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils]]
+   */
+  def getSchema(
+      resultSet: ResultSet,
+      dialect: JdbcDialect,
+      alwaysNullable: Boolean = false): StructType = {
+    val rsmd = resultSet.getMetaData
+    val ncols = rsmd.getColumnCount
+    val fields = new Array[StructField](ncols)
+    var i = 0
+    while (i < ncols) {
+      val columnName = rsmd.getColumnLabel(i + 1)
+      val dataType = rsmd.getColumnType(i + 1)
+      val typeName = rsmd.getColumnTypeName(i + 1)
+      val fieldSize = rsmd.getPrecision(i + 1)
+      val fieldScale = rsmd.getScale(i + 1)
+      val isSigned =
+        try rsmd.isSigned(i + 1)
+        catch {
+          // Workaround for HIVE-14684:
+          case e: SQLException
+              if e.getMessage == "Method not supported" &&
+                rsmd.getClass.getName == "org.apache.hive.jdbc.HiveResultSetMetaData" =>
+            true
+        }
+      val nullable =
+        if (alwaysNullable) true else rsmd.isNullable(i + 1) != ResultSetMetaData.columnNoNulls
+      val metadata = new MetadataBuilder()
+      metadata.putLong("scale", fieldScale)
+
+      dataType match {
+        case java.sql.Types.TIME =>
+          // SPARK-33888
+          // - include TIME type metadata
+          // - always build the metadata
+          metadata.putBoolean("logical_time_type", true)
+        case java.sql.Types.ROWID =>
+          metadata.putBoolean("rowid", true)
+        case _ =>
+      }
+
+      val columnType =
+        dialect
+          .getCatalystType(dataType, typeName, fieldSize, metadata)
+          .getOrElse(getCatalystType(dataType, fieldSize, fieldScale, isSigned))
+      fields(i) = StructField(columnName, columnType, nullable, metadata.build())
+      i = i + 1
+    }
+    new StructType(fields)
+  }
+
+  /**
+   * Maps a JDBC type to a Catalyst type. This function is called only when the JdbcDialect class
+   * corresponding to your database driver returns null.
+   *
+   * @param sqlType
+   *   \- A field of java.sql.Types
+   * @return
+   *   The Catalyst type corresponding to sqlType.
+   */
+  private def getCatalystType(
+      sqlType: Int,
+      precision: Int,
+      scale: Int,
+      signed: Boolean): DataType = {
+    val answer = sqlType match {
+      // scalastyle:off
+      case java.sql.Types.ARRAY => null
+      case java.sql.Types.BIGINT =>
+        if (signed) { LongType }
+        else { DecimalType(20, 0) }
+      case java.sql.Types.BINARY => BinaryType
+      case java.sql.Types.BIT => BooleanType // @see JdbcDialect for quirks
+      case java.sql.Types.BLOB => BinaryType
+      case java.sql.Types.BOOLEAN => BooleanType
+      case java.sql.Types.CHAR => StringType
+      case java.sql.Types.CLOB => StringType
+      case java.sql.Types.DATALINK => null
+      case java.sql.Types.DATE => DateType
+      case java.sql.Types.DECIMAL if precision != 0 || scale != 0 =>
+        DecimalType.bounded(precision, scale)
+      case java.sql.Types.DECIMAL => DecimalType.SYSTEM_DEFAULT
+      case java.sql.Types.DISTINCT => null
+      case java.sql.Types.DOUBLE => DoubleType
+      case java.sql.Types.FLOAT => FloatType
+      case java.sql.Types.INTEGER =>
+        if (signed) { IntegerType }
+        else { LongType }
+      case java.sql.Types.JAVA_OBJECT => null
+      case java.sql.Types.LONGNVARCHAR => StringType
+      case java.sql.Types.LONGVARBINARY => BinaryType
+      case java.sql.Types.LONGVARCHAR => StringType
+      case java.sql.Types.NCHAR => StringType
+      case java.sql.Types.NCLOB => StringType
+      case java.sql.Types.NULL => null
+      case java.sql.Types.NUMERIC if precision != 0 || scale != 0 =>
+        DecimalType.bounded(precision, scale)
+      case java.sql.Types.NUMERIC => DecimalType.SYSTEM_DEFAULT
+      case java.sql.Types.NVARCHAR => StringType
+      case java.sql.Types.OTHER => null
+      case java.sql.Types.REAL => DoubleType
+      case java.sql.Types.REF => StringType
+      case java.sql.Types.REF_CURSOR => null
+      case java.sql.Types.ROWID => StringType
+      case java.sql.Types.SMALLINT => IntegerType
+      case java.sql.Types.SQLXML => StringType
+      case java.sql.Types.STRUCT => StringType
+      case java.sql.Types.TIME => TimestampType
+      case java.sql.Types.TIME_WITH_TIMEZONE => null
+      case java.sql.Types.TIMESTAMP => TimestampType
+      case java.sql.Types.TIMESTAMP_WITH_TIMEZONE => null
+      case java.sql.Types.TINYINT => IntegerType
+      case java.sql.Types.VARBINARY => BinaryType
+      case java.sql.Types.VARCHAR => StringType
+      case _ =>
+        throw new RuntimeException(s"Unsupported type: $sqlType ")
+      // scalastyle:on
+    }
+
+    if (answer == null) {
+      throw new RuntimeException(s"Unsupported type: $sqlType ")
+    }
+    answer
   }
 }
 
