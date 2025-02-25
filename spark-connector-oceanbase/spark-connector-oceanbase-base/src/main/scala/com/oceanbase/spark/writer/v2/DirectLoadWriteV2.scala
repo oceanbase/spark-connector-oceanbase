@@ -44,7 +44,8 @@ class DirectLoadWriteV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
   directLoader.begin()
 
   override def write(record: InternalRow): Unit = {
-    buffer += record
+    // Added copy() method to fix data duplication issue caused by CTAS syntax
+    buffer += record.copy()
     if (buffer.length >= DEFAULT_BUFFER_SIZE) flush()
   }
 

@@ -27,7 +27,6 @@ import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.connector.catalog._
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import org.apache.spark.sql.reader.JDBCLimitRDD
 import org.apache.spark.sql.types.StructType
@@ -143,15 +142,18 @@ class OceanBaseCatalog
       partitions: Array[Transform],
       properties: java.util.Map[String, String]): Table = {
     checkNamespace(ident.namespace())
-    // TODO: Support create table with partitions
-    if (partitions.nonEmpty) {
-      throw new UnsupportedOperationException(
-        s"OceanBase catalog current not support create partition table: ${ident.toString}")
+    // TODO: Supports two-level partitioning.
+    if (partitions.length >= 2) {
+      throw OceanBaseCatalogException(
+        s"The OceanBase catalog does not yet support secondary or higher-level partitioning")
     }
 
-    var tableOptions = options.parameters + (JDBCOptions.JDBC_TABLE_NAME -> getTableName(ident))
+    var tableOptions = options.parameters ++ Map(
+      JDBCOptions.JDBC_TABLE_NAME -> getTableName(ident),
+      CURRENT_DATABASE -> ident.namespace().mkString("."),
+      CURRENT_TABLE -> ident.name())
     var tableComment: String = ""
-    var tableProperties: String = ""
+
     if (!properties.isEmpty) {
       properties.asScala.foreach {
         case (k, v) =>
@@ -165,29 +167,26 @@ class OceanBaseCatalog
             case TableCatalog.PROP_OWNER => // owner is ignored. It is default to current user name.
             case TableCatalog.PROP_LOCATION =>
               throw new UnsupportedOperationException("This syntax is not currently supported.")
-            case _ => tableProperties = tableProperties + " " + s"$k $v"
+            case _ =>
           }
       }
     }
 
-    if (tableComment != "") {
+    if (tableComment.nonEmpty) {
       tableOptions = tableOptions + (JDBCOptions.JDBC_TABLE_COMMENT -> tableComment)
-    }
-    if (tableProperties != "") {
-      // table property is set in JDBC_CREATE_TABLE_OPTIONS, which will be appended
-      // to CREATE TABLE statement.
-      // E.g., "CREATE TABLE t (name string) ENGINE InnoDB DEFAULT CHARACTER SET utf8"
-      // Spark doesn't check if these table properties are supported by databases. If
-      // table property is invalid, database will fail the table creation.
-      tableOptions = tableOptions + (JDBCOptions.JDBC_CREATE_TABLE_OPTIONS -> tableProperties)
     }
 
     val writeOptions = new JdbcOptionsInWrite(tableOptions)
-    val caseSensitive = SQLConf.get.caseSensitiveAnalysis
     OBJdbcUtils.withConnection(options) {
       conn =>
         OBJdbcUtils.unifiedCatalogException(s"Failed table creation: $ident") {
-          dialect.createTable(conn, getTableName(ident), schema, caseSensitive, writeOptions)
+          dialect.createTable(
+            conn,
+            getTableName(ident),
+            schema,
+            partitions,
+            writeOptions,
+            properties)
         }
     }
 
