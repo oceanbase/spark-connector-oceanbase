@@ -36,7 +36,7 @@ jobs:
           cache: 'maven'
 
       - name: Maven build
-        run: mvn install -DskipTests=true
+        run: mvn install -DskipTests=true ${{ inputs.maven_opts }}
 
       - name: Maven test
         run: mvn verify -pl ${{ inputs.module }} -am ${{ inputs.maven_opts }}
