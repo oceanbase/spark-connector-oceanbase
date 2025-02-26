@@ -16,5 +16,5 @@
 
 package com.oceanbase.spark.catalog
 
-case class OceanBaseCatalogException(message: String, cause: Throwable)
+case class OceanBaseCatalogException(message: String, cause: Throwable = null)
   extends Exception(message, cause)

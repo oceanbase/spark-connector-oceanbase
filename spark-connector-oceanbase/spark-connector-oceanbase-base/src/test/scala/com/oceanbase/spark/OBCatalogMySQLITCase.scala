@@ -158,6 +158,47 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testTableCreate(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.defaultCatalog", "ob")
+      .getOrCreate()
+    insertTestData(session, "products")
+    // Test CTAS
+    session.sql("create table test1 as select * from products")
+    queryAndVerifyTableData(session, "test1")
+
+    // test bucket partition table:
+    //   1. column comment test
+    //   2. table comment test
+    //   3. table options test
+    session.sql("""
+                  |CREATE TABLE test2(
+                  |  user_id BIGINT COMMENT 'test_for_key',
+                  |  name VARCHAR(255)
+                  |)
+                  |PARTITIONED BY (bucket(16, user_id))
+                  |COMMENT 'test_for_table_create'
+                  |TBLPROPERTIES('replica_num' = 2, COMPRESSION = 'zstd_1.0');
+                  |""".stripMargin)
+    val showCreateTable = getShowCreateTable(s"$getSchemaName.test2")
+    Assertions.assertTrue(
+      showCreateTable.contains("test_for_key")
+        && showCreateTable.contains("test_for_table_create")
+        && showCreateTable.contains("partition by key(`user_id`)")
+        && showCreateTable.contains("COMPRESSION = 'zstd_1.0'")
+        && showCreateTable.contains("REPLICA_NUM = 1"))
+    dropTables("test1", "test2")
+    session.stop()
+  }
+
   private def queryAndVerifyTableData(session: SparkSession, tableName: String): Unit = {
     import scala.collection.JavaConverters._
     val actual = session

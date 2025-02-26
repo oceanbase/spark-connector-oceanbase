@@ -40,6 +40,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.platform.commons.util.StringUtils;
+
 public abstract class OceanBaseTestBase implements OceanBaseMetadata {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -182,6 +184,22 @@ public abstract class OceanBaseTestBase implements OceanBaseMetadata {
             for (String tableName : tableNames) {
                 statement.execute("DROP TABLE " + tableName);
             }
+        }
+    }
+
+    public String getShowCreateTable(String tableName) throws SQLException {
+        String sql = String.format("SHOW CREATE TABLE %s", tableName);
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery(sql);
+            String showCreateTable = null;
+            if (rs.next()) {
+                showCreateTable = rs.getString(2);
+            }
+            if (StringUtils.isBlank(showCreateTable))
+                throw new RuntimeException("Failed to get table create DDL");
+            return showCreateTable;
         }
     }
 

@@ -16,10 +16,12 @@
 
 package com.oceanbase.spark.dialect
 
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
 import org.apache.spark.sql.types.StructType
 
 import java.sql.Connection
+import java.util
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -27,6 +29,15 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
   override def quoteIdentifier(colName: String): String = {
     s""""$colName""""
   }
+
+  override def createTable(
+      conn: Connection,
+      tableName: String,
+      schema: StructType,
+      partitions: Array[Transform],
+      options: JdbcOptionsInWrite,
+      properties: util.Map[String, String]): Unit =
+    throw new UnsupportedOperationException("Not currently supported in oracle mode")
 
   /** Creates a schema. */
   override def createSchema(
