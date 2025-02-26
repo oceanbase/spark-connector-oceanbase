@@ -16,21 +16,20 @@
 
 package org.apache.spark.sql.reader
 
-import com.oceanbase.spark.read.OBMySQLLimitPartition
+import com.oceanbase.spark.reader.OBMySQLLimitPartition
 import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.{InterruptibleIterator, Partition, SparkContext, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcUtils}
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.sources.{And, EqualNullSafe, EqualTo, Filter, GreaterThan, GreaterThanOrEqual, In, IsNotNull, IsNull, LessThan, LessThanOrEqual, Not, Or, StringContains, StringEndsWith, StringStartsWith}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.CompletionIterator
 
-import java.sql.{Connection, JDBCType, PreparedStatement, ResultSet, ResultSetMetaData, SQLException}
+import java.sql.{Connection, PreparedStatement, ResultSet, ResultSetMetaData, SQLException}
 
 import scala.util.control.NonFatal
 

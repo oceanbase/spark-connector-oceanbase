@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.oceanbase.spark.read.v2
+package com.oceanbase.spark.reader.v2
 
 import com.oceanbase.spark.dialect.OceanBaseDialect
 

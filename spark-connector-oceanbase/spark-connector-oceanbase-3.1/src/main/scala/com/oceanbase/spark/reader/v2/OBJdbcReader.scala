@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.oceanbase.spark.read.v2
+package com.oceanbase.spark.reader.v2
 
 import com.oceanbase.spark.dialect.OceanBaseDialect
-import com.oceanbase.spark.read.v2.OBJdbcReader.{makeGetters, OBValueGetter}
+import com.oceanbase.spark.reader.v2.OBJdbcReader.{makeGetters, OBValueGetter}
 import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.internal.Logging
@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.util.{DateTimeUtils, GenericArrayData}
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader}
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.sources.Filter
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, Metadata, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
 import java.sql.{PreparedStatement, ResultSet}

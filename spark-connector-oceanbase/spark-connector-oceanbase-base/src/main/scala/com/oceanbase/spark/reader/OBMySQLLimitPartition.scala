@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.oceanbase.spark.read.v2
+package com.oceanbase.spark.reader
 
 import com.oceanbase.spark.catalog.OceanBaseCatalog
 import com.oceanbase.spark.utils.OBJdbcUtils
 
-import org.apache.spark.sql.connector.read.InputPartition
+import org.apache.spark.Partition
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 
 import java.util.Objects
@@ -28,15 +28,17 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /** Data corresponding to one partition of a JDBCLimitRDD. */
-case class OBMySQLPartition(partitionClause: String, limitOffsetClause: String, idx: Int)
-  extends InputPartition {}
+case class OBMySQLLimitPartition(partitionClause: String, limitOffsetClause: String, idx: Int)
+  extends Partition {
+  override def index: Int = idx
+}
 
-object OBMySQLPartition {
+object OBMySQLLimitPartition {
 
   private val EMPTY_STRING = ""
   private val PARTITION_QUERY_FORMAT = "PARTITION(%s)"
 
-  def columnPartition(jdbcOptions: JDBCOptions): Array[InputPartition] = {
+  def columnPartition(jdbcOptions: JDBCOptions): Array[Partition] = {
     // Determine whether a partition table.
     val obPartInfos: Array[OBPartInfo] = obtainPartInfo(jdbcOptions)
     require(obPartInfos.nonEmpty, "Failed to obtain partition info of table")
@@ -91,16 +93,16 @@ object OBMySQLPartition {
     arrayBuilder.result()
   }
 
-  private def computeForNonPartTable(jdbcOptions: JDBCOptions): Array[InputPartition] = {
+  private def computeForNonPartTable(jdbcOptions: JDBCOptions): Array[Partition] = {
     val count: Long = obtainCount(jdbcOptions, EMPTY_STRING)
     require(count >= 0, "Total must be a positive number")
-    computeQueryPart(count, EMPTY_STRING).asInstanceOf[Array[InputPartition]]
+    computeQueryPart(count, EMPTY_STRING).asInstanceOf[Array[Partition]]
   }
 
   private def computeForPartTable(
       jdbcOptions: JDBCOptions,
-      obPartInfos: Array[OBPartInfo]): Array[InputPartition] = {
-    val arr = new ArrayBuffer[OBMySQLPartition]()
+      obPartInfos: Array[OBPartInfo]): Array[Partition] = {
+    val arr = new ArrayBuffer[OBMySQLLimitPartition]()
     obPartInfos.foreach(
       obPartInfo => {
         val partitionName = obPartInfo.subPartName match {
@@ -114,7 +116,7 @@ object OBMySQLPartition {
 
     arr.zipWithIndex.map {
       case (partInfo, index) =>
-        OBMySQLPartition(partInfo.partitionClause, partInfo.limitOffsetClause, index)
+        OBMySQLLimitPartition(partInfo.partitionClause, partInfo.limitOffsetClause, index)
     }.toArray
   }
 
@@ -138,7 +140,9 @@ object OBMySQLPartition {
     }
   }
 
-  private def computeQueryPart(count: Long, partitionClause: String): Array[OBMySQLPartition] = {
+  private def computeQueryPart(
+      count: Long,
+      partitionClause: String): Array[OBMySQLLimitPartition] = {
     val step = calLimit(count)
     require(count >= 0, "Total must be a positive number")
 
@@ -148,7 +152,7 @@ object OBMySQLPartition {
       .map(i => (i * step, step, i))
       .map {
         case (offset, limit, index) =>
-          OBMySQLPartition(partitionClause, s"LIMIT $offset,$limit", idx = index)
+          OBMySQLLimitPartition(partitionClause, s"LIMIT $offset,$limit", idx = index)
       }
       .toArray
   }

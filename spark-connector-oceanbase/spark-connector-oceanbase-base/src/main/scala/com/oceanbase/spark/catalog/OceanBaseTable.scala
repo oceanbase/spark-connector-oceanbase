@@ -17,8 +17,8 @@ package com.oceanbase.spark.catalog
 
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
-import com.oceanbase.spark.read.JDBCLimitScanBuilder
-import com.oceanbase.spark.read.v2.OBJdbcScanBuilder
+import com.oceanbase.spark.reader.JDBCLimitScanBuilder
+import com.oceanbase.spark.reader.v2.OBJdbcScanBuilder
 import com.oceanbase.spark.writer.v2.{DirectLoadWriteBuilderV2, JDBCWriteBuilder}
 
 import org.apache.spark.sql.SparkSession
