@@ -17,12 +17,14 @@ package com.oceanbase.spark.catalog
 
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
-import com.oceanbase.spark.read.JDBCLimitScanBuilder
+import com.oceanbase.spark.reader.JDBCLimitScanBuilder
+import com.oceanbase.spark.reader.v2.OBJdbcScanBuilder
 import com.oceanbase.spark.writer.v2.{DirectLoadWriteBuilderV2, JDBCWriteBuilder}
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.connector.catalog._
 import org.apache.spark.sql.connector.catalog.TableCapability._
+import org.apache.spark.sql.connector.read.ScanBuilder
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.types.StructType
@@ -47,10 +49,13 @@ case class OceanBaseTable(
     util.EnumSet.of(BATCH_READ, BATCH_WRITE, TRUNCATE)
   }
 
-  override def newScanBuilder(options: CaseInsensitiveStringMap): JDBCLimitScanBuilder = {
+  override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
     val mergedOptions = new JDBCOptions(
       jdbcOptions.parameters ++ options.asCaseSensitiveMap().asScala)
-    JDBCLimitScanBuilder(SparkSession.active, schema, mergedOptions)
+    jdbcOptions.parameters.get("enable-legacy_batch_reader").map(_.toBoolean) match {
+      case Some(true) => JDBCLimitScanBuilder(SparkSession.active, schema, mergedOptions)
+      case _ => OBJdbcScanBuilder(schema, mergedOptions, dialect)
+    }
   }
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {

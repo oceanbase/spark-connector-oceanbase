@@ -18,14 +18,18 @@ package com.oceanbase.spark.dialect
 
 import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 
+import org.apache.commons.lang3.StringUtils
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.util.{DateFormatter, DateTimeUtils, TimestampFormatter}
 import org.apache.spark.sql.connector.catalog.TableChange
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.jdbc.JdbcDialects
 import org.apache.spark.sql.types.StructType
 
-import java.sql.Connection
+import java.sql.{Connection, Date, Timestamp}
+import java.time.{Instant, LocalDate}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
@@ -150,6 +154,36 @@ abstract class OceanBaseDialect extends Logging with Serializable {
       tableName: String,
       schema: StructType,
       priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String
+
+  /**
+   * Escape special characters in SQL string literals.
+   * @param value
+   *   The string to be escaped.
+   * @return
+   *   Escaped string.
+   */
+  def escapeSql(value: String): String =
+    if (value == null) null else StringUtils.replace(value, "'", "''")
+
+  /**
+   * Converts value to SQL expression.
+   * @param value
+   *   The value to be converted.
+   * @return
+   *   Converted value.
+   */
+  def compileValue(value: Any): Any = value match {
+    case stringValue: String => s"'${escapeSql(stringValue)}'"
+    case timestampValue: Timestamp => "'" + timestampValue + "'"
+    case timestampValue: Instant =>
+      val timestampFormatter = TimestampFormatter.getFractionFormatter(
+        DateTimeUtils.getZoneId(SQLConf.get.sessionLocalTimeZone))
+      s"'${timestampFormatter.format(timestampValue)}'"
+    case dateValue: Date => "'" + dateValue + "'"
+    case dateValue: LocalDate => s"'${DateFormatter().format(dateValue)}'"
+    case arrayValue: Array[Any] => arrayValue.map(compileValue).mkString(", ")
+    case _ => value
+  }
 }
 
 case class PriKeyColumnInfo(columnName: String, columnType: String, columnKey: String)
