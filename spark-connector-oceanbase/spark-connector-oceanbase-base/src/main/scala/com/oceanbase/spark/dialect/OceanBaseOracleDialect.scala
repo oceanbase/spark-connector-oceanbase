@@ -20,7 +20,7 @@ import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
 import org.apache.spark.sql.types.StructType
 
-import java.sql.Connection
+import java.sql.{Connection, Date, Timestamp}
 import java.util
 
 import scala.collection.mutable.ArrayBuffer
@@ -77,5 +77,18 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
       schema: StructType,
       priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String = {
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
+  }
+
+  override def compileValue(value: Any): Any = value match {
+    // The JDBC drivers support date literals in SQL statements written in the
+    // format: {d 'yyyy-mm-dd'} and timestamp literals in SQL statements written
+    // in the format: {ts 'yyyy-mm-dd hh:mm:ss.f...'}. For details, see
+    // 'Oracle Database JDBC Developer’s Guide and Reference, 11g Release 1 (11.1)'
+    // Appendix A Reference Information.
+    case stringValue: String => s"'${escapeSql(stringValue)}'"
+    case timestampValue: Timestamp => "{ts '" + timestampValue + "'}"
+    case dateValue: Date => "{d '" + dateValue + "'}"
+    case arrayValue: Array[Any] => arrayValue.map(compileValue).mkString(", ")
+    case _ => value
   }
 }

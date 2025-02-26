@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.oceanbase.spark.read
+package com.oceanbase.spark.reader
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
