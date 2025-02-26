@@ -19,15 +19,105 @@ package com.oceanbase.spark.dialect
 import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
-import org.apache.spark.sql.types.StructType
+import org.apache.commons.lang3.StringUtils
+import org.apache.spark.sql.ExprUtils
+import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType, VarcharType}
 
 import java.sql.Connection
 
+import scala.collection.JavaConverters.mapAsScalaMapConverter
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer;
 
 class OceanBaseMySQLDialect extends OceanBaseDialect {
+
+  def createTable(
+      conn: Connection,
+      tableName: String,
+      schema: StructType,
+      partitions: Array[Transform],
+      options: JdbcOptionsInWrite,
+      properties: java.util.Map[String, String]): Unit = {
+
+    def buildCreateTableSQL(
+        tableName: String,
+        schema: StructType,
+        transforms: Array[Transform],
+        options: JdbcOptionsInWrite): String = {
+      val partitionClause = buildPartitionClause(transforms, options)
+      val columnClause = schema.fields
+        .map {
+          field =>
+            val obType = toOceanBaseMySQLType(field.dataType)
+            val nullability = if (field.nullable) StringUtils.EMPTY else "NOT NULL"
+            val comment = field.getComment() match {
+              case Some(v) => s"COMMENT '$v'"
+              case _ => StringUtils.EMPTY
+            }
+            // TODO: support default value
+            s"${quoteIdentifier(field.name)} $obType $nullability $comment".trim
+        }
+        .mkString(",\n  ")
+      val tableComment = options.tableComment match {
+        case comment if comment.nonEmpty => s"COMMENT '$comment'"
+        case _ => StringUtils.EMPTY
+      }
+      val tableOption = properties.asScala
+        .map(tuple => (tuple._1.toLowerCase, tuple._2))
+        .flatMap {
+          case ("charset", value) => Some(s"DEFAULT CHARSET = $value")
+          case ("collate", value) => Some(s"COLLATE = $value")
+          case ("primary_zone", value) => Some(s"PRIMARY_ZONE = '$value'")
+          case ("replica_num", value) => Some(s"REPLICA_NUM = $value")
+          case ("compression", value) => Some(s"COMPRESSION = '$value'")
+          case (k, _) =>
+            logWarning(s"Ignored unsupported table property: $k")
+            None
+        }
+        .mkString(" ", " ", "")
+      s"""
+         |CREATE TABLE $tableName (
+         |  $columnClause
+         |) $tableOption $tableComment
+         |$partitionClause;
+         |""".stripMargin.trim
+    }
+
+    def toOceanBaseMySQLType(dataType: DataType): String = {
+      val defaultStringLength = 10240
+      dataType match {
+        case BooleanType => "BOOLEAN"
+        case ByteType => "BYTE"
+        case ShortType => "SMALLINT"
+        case IntegerType => "INT"
+        case LongType => "BIGINT"
+        case FloatType => "FLOAT"
+        case DoubleType => "DOUBLE"
+        case d: DecimalType => s"DECIMAL(${d.precision},${d.scale})"
+        case c: CharType => s"CHAR(${c.length})"
+        case v: VarcharType => s"VARCHAR(${v.length})"
+        case StringType => s"VARCHAR($defaultStringLength)"
+        case BinaryType => "BINARY"
+        case DateType => "DATE"
+        case TimestampType => "DATETIME"
+        // TODO: Support array data-type
+        case _ => throw new UnsupportedOperationException(s"Unsupported type: $dataType")
+      }
+    }
+
+    def buildPartitionClause(transforms: Array[Transform], options: JdbcOptionsInWrite): String = {
+      transforms match {
+        case transforms if transforms.nonEmpty =>
+          ExprUtils.toOBMySQLPartition(transforms.head, options)
+        case _ => ""
+      }
+    }
+
+    val sql = buildCreateTableSQL(tableName, schema, partitions, options)
+    executeStatement(conn, options, sql)
+  }
 
   /** Creates a schema. */
   override def createSchema(
