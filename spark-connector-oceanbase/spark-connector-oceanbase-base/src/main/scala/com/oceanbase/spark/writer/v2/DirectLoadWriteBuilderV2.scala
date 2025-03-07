@@ -15,46 +15,38 @@
  */
 package com.oceanbase.spark.writer.v2
 
-import com.oceanbase.spark.catalog.OceanBaseCatalog
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.directload.{DirectLoader, DirectLoadUtils}
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.metric.CustomMetric
 import org.apache.spark.sql.connector.write.{BatchWrite, DataWriter, DataWriterFactory, PhysicalWriteInfo, Write, WriteBuilder, WriterCommitMessage}
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.types.StructType
 
-import scala.collection.JavaConverters.mapAsJavaMapConverter
-
 /** Direct-load writing implementation based on Spark DataSource V2 API. */
-case class DirectLoadWriteBuilderV2(schema: StructType, options: JDBCOptions) extends WriteBuilder {
-  override def build(): Write = new DirectLoadWrite(schema, options)
+case class DirectLoadWriteBuilderV2(schema: StructType, config: OceanBaseConfig)
+  extends WriteBuilder {
+  override def build(): Write = new DirectLoadWrite(schema, config)
 }
 
-class DirectLoadWrite(schema: StructType, option: JDBCOptions) extends Write {
+class DirectLoadWrite(schema: StructType, config: OceanBaseConfig) extends Write {
   override def toBatch: BatchWrite = {
-    val map = option.parameters ++ Map(
-      OceanBaseConfig.SCHEMA_NAME.getKey -> option.parameters(OceanBaseCatalog.CURRENT_DATABASE),
-      OceanBaseConfig.TABLE_NAME.getKey -> option.parameters(OceanBaseCatalog.CURRENT_TABLE)
-    )
-    new DirectLoadBatchWrite(schema, new OceanBaseConfig(map.asJava))
+    new DirectLoadBatchWrite(schema, config)
   }
 
   override def supportedCustomMetrics(): Array[CustomMetric] = Array()
 }
 
 /** This will be performed on the Driver side and no serialization is required. */
-class DirectLoadBatchWrite(schema: StructType, oceanBaseConfig: OceanBaseConfig)
-  extends BatchWrite {
+class DirectLoadBatchWrite(schema: StructType, config: OceanBaseConfig) extends BatchWrite {
 
-  val directLoader: DirectLoader = DirectLoadUtils.buildDirectLoaderFromSetting(oceanBaseConfig)
+  val directLoader: DirectLoader = DirectLoadUtils.buildDirectLoaderFromSetting(config)
   val executionId: String = directLoader.begin()
-  oceanBaseConfig.set(OceanBaseConfig.DIRECT_LOAD_EXECUTION_ID, executionId)
+  config.set(OceanBaseConfig.DIRECT_LOAD_EXECUTION_ID, executionId)
 
   override def createBatchWriterFactory(info: PhysicalWriteInfo): DataWriterFactory = {
 
-    new DirectLoadDataWriterFactory(schema: StructType, oceanBaseConfig)
+    new DirectLoadDataWriterFactory(schema: StructType, config)
   }
 
   override def commit(messages: Array[WriterCommitMessage]): Unit = {
@@ -67,10 +59,10 @@ class DirectLoadBatchWrite(schema: StructType, oceanBaseConfig: OceanBaseConfig)
   }
 }
 
-class DirectLoadDataWriterFactory(schema: StructType, oceanBaseConfig: OceanBaseConfig)
+class DirectLoadDataWriterFactory(schema: StructType, config: OceanBaseConfig)
   extends DataWriterFactory {
 
   override def createWriter(partitionId: Int, taskId: Long): DataWriter[InternalRow] = {
-    new DirectLoadWriteV2(schema, oceanBaseConfig)
+    new DirectLoadWriteV2(schema, config)
   }
 }

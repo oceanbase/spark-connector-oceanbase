@@ -17,44 +17,35 @@
 
 package com.oceanbase.spark.utils
 
+import com.oceanbase.spark.config.OceanBaseConfig
+
+import org.apache.commons.lang3.StringUtils
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
-import org.apache.spark.sql.jdbc.JdbcConnectionProvider
 
-import java.sql.{Connection, Driver}
-import java.util.Properties
+import java.sql.{Connection, DriverManager}
 
-import scala.collection.JavaConverters._
+object OceanBaseConnectionProvider extends Logging {
+  private val driverSupportSet: Set[String] =
+    Set("com.mysql.jdbc.Driver", "com.mysql.cj.jdbc.Driver", "com.oceanbase.jdbc.Driver")
 
-object OceanBaseConnectionProvider extends JdbcConnectionProvider with Logging {
-
-  /** Additional properties for data connection (Data source property takes precedence). */
-  private def getAdditionalProperties(options: JDBCOptions): Properties = new Properties()
-
-  override val name: String = "OceanBase"
-
-  override def canHandle(driver: Driver, options: Map[String, String]): Boolean = {
-    val jdbcOptions = new JDBCOptions(options)
-    jdbcOptions.keytab == null || jdbcOptions.principal == null
-  }
-
-  override def getConnection(driver: Driver, options: Map[String, String]): Connection = {
-    val jdbcOptions = new JDBCOptions(options)
-    val properties = getAdditionalProperties(jdbcOptions)
-    jdbcOptions.asConnectionProperties.asScala.foreach {
-      case (k, v) =>
-        properties.put(k, v)
+  def getConnection(oceanBaseConfig: OceanBaseConfig): Connection = {
+    var driver = oceanBaseConfig.getDriver
+    try {
+      if (StringUtils.isBlank(driver)) {
+        driver = DriverManager.getDriver(oceanBaseConfig.getURL).getClass.getCanonicalName
+        Class.forName(driver)
+      } else {
+        require(driverSupportSet.contains(driver.toLowerCase), s"Unsupported driver class: $driver")
+        Class.forName(driver)
+      }
+      val connection = DriverManager.getConnection(
+        oceanBaseConfig.getURL,
+        oceanBaseConfig.getUsername,
+        oceanBaseConfig.getPassword
+      )
+      connection
+    } catch {
+      case e: Exception => throw new RuntimeException("Failed to obtain connection.", e)
     }
-    logDebug(s"JDBC connection initiated with URL: ${jdbcOptions.url} and properties: $properties")
-    driver.connect(jdbcOptions.url, properties)
-  }
-
-  /** Note: Do not add the override keyword to ensure compatibility with older Spark versions. */
-  def modifiesSecurityContext(
-      driver: Driver,
-      options: Map[String, String]
-  ): Boolean = {
-    // OceanBaseConnectionProvider is the default unsecure connection provider, so just return false
-    false
   }
 }

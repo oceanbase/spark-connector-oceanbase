@@ -16,6 +16,7 @@
 
 package com.oceanbase.spark.reader.v2
 
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 import com.oceanbase.spark.reader.v2.OBJdbcReader.{makeGetters, OBValueGetter}
 import com.oceanbase.spark.utils.OBJdbcUtils
@@ -26,7 +27,6 @@ import org.apache.spark.sql.catalyst.{InternalRow, SQLConfHelper}
 import org.apache.spark.sql.catalyst.expressions.SpecificInternalRow
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, GenericArrayData}
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader}
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit
 
 class OBJdbcReader(
     schema: StructType,
-    options: JDBCOptions,
+    config: OceanBaseConfig,
     partition: InputPartition,
     pushedFilter: Array[Filter],
     dialect: OceanBaseDialect)
@@ -47,12 +47,12 @@ class OBJdbcReader(
 
   private val getters: Array[OBValueGetter] = makeGetters(schema)
   private val mutableRow = new SpecificInternalRow(schema.fields.map(x => x.dataType))
-  private lazy val conn = OBJdbcUtils.getConnection(options)
+  private lazy val conn = OBJdbcUtils.getConnection(config)
   private lazy val stmt: PreparedStatement =
     conn.prepareStatement(buildQuerySql(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
   private lazy val rs: ResultSet = {
-    stmt.setFetchSize(options.fetchSize)
-    stmt.setQueryTimeout(options.queryTimeout)
+    stmt.setFetchSize(config.getJdbcFetchSize)
+    stmt.setQueryTimeout(config.getJdbcQueryTimeout)
     stmt.executeQuery()
   }
 
@@ -105,7 +105,7 @@ class OBJdbcReader(
     }
     val part: OBMySQLPartition = partition.asInstanceOf[OBMySQLPartition]
     s"""
-       |SELECT $columnStr FROM ${options.tableOrQuery} ${part.partitionClause}
+       |SELECT $columnStr FROM ${config.getDbTable} ${part.partitionClause}
        |$whereClause ${part.limitOffsetClause}
        |""".stripMargin
   }

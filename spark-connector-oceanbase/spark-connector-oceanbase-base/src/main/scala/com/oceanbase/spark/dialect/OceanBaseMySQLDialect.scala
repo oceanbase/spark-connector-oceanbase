@@ -16,16 +16,17 @@
 
 package com.oceanbase.spark.dialect
 
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.ExprUtils
 import org.apache.spark.sql.connector.expressions.Transform
-import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
-import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType, VarcharType}
+import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite, JdbcUtils}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
 
-import java.sql.Connection
+import java.sql.{Connection, Types}
 
 import scala.collection.JavaConverters.mapAsScalaMapConverter
 import scala.collection.mutable
@@ -38,15 +39,15 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       tableName: String,
       schema: StructType,
       partitions: Array[Transform],
-      options: JdbcOptionsInWrite,
+      config: OceanBaseConfig,
       properties: java.util.Map[String, String]): Unit = {
 
     def buildCreateTableSQL(
         tableName: String,
         schema: StructType,
         transforms: Array[Transform],
-        options: JdbcOptionsInWrite): String = {
-      val partitionClause = buildPartitionClause(transforms, options)
+        config: OceanBaseConfig): String = {
+      val partitionClause = buildPartitionClause(transforms, config)
       val columnClause = schema.fields
         .map {
           field =>
@@ -60,7 +61,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
             s"${quoteIdentifier(field.name)} $obType $nullability $comment".trim
         }
         .mkString(",\n  ")
-      val tableComment = options.tableComment match {
+      val tableComment = Option(config.getTableComment) match {
         case comment if comment.nonEmpty => s"COMMENT '$comment'"
         case _ => StringUtils.EMPTY
       }
@@ -107,42 +108,42 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       }
     }
 
-    def buildPartitionClause(transforms: Array[Transform], options: JdbcOptionsInWrite): String = {
+    def buildPartitionClause(transforms: Array[Transform], config: OceanBaseConfig): String = {
       transforms match {
         case transforms if transforms.nonEmpty =>
-          ExprUtils.toOBMySQLPartition(transforms.head, options)
+          ExprUtils.toOBMySQLPartition(transforms.head, config)
         case _ => ""
       }
     }
 
-    val sql = buildCreateTableSQL(tableName, schema, partitions, options)
-    executeStatement(conn, options, sql)
+    val sql = buildCreateTableSQL(tableName, schema, partitions, config)
+    executeStatement(conn, config, sql)
   }
 
   /** Creates a schema. */
   override def createSchema(
       conn: Connection,
-      options: JDBCOptions,
+      config: OceanBaseConfig,
       schema: String,
       comment: String): Unit = {
     // OceanBase mysql mode does not support schema comments, so we ignore the comment parameter.
     val statement = conn.createStatement
     try {
-      statement.setQueryTimeout(options.queryTimeout)
+      statement.setQueryTimeout(config.getJdbcQueryTimeout)
       statement.executeUpdate(s"CREATE SCHEMA ${quoteIdentifier(schema)}")
     } finally {
       statement.close()
     }
   }
 
-  override def schemaExists(conn: Connection, options: JDBCOptions, schema: String): Boolean = {
-    listSchemas(conn, options).exists(_.head == schema)
+  override def schemaExists(conn: Connection, config: OceanBaseConfig, schema: String): Boolean = {
+    listSchemas(conn, config).exists(_.head == schema)
   }
 
-  override def listSchemas(conn: Connection, options: JDBCOptions): Array[Array[String]] = {
+  override def listSchemas(conn: Connection, config: OceanBaseConfig): Array[Array[String]] = {
     val schemaBuilder = mutable.ArrayBuilder.make[Array[String]]
     try {
-      OBJdbcUtils.executeQuery(conn, options, "SHOW SCHEMAS") {
+      OBJdbcUtils.executeQuery(conn, config, "SHOW SCHEMAS") {
         rs =>
           while (rs.next()) {
             schemaBuilder += Array(rs.getString("Database"))
@@ -158,12 +159,12 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
   /** Drops a schema from OceanBase. */
   override def dropSchema(
       conn: Connection,
-      options: JDBCOptions,
+      config: OceanBaseConfig,
       schema: String,
       cascade: Boolean): Unit = {
     executeStatement(
       conn,
-      options,
+      config,
       if (cascade) {
         s"DROP SCHEMA ${quoteIdentifier(schema)} CASCADE"
       } else {
@@ -174,7 +175,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
   def getPriKeyInfo(
       schemaName: String,
       tableName: String,
-      option: JDBCOptions): ArrayBuffer[PriKeyColumnInfo] = {
+      config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
     val sql =
       s"""
          |select
@@ -186,10 +187,10 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
          |  and TABLE_NAME = '$tableName';
          |""".stripMargin
 
-    OBJdbcUtils.withConnection(option) {
+    OBJdbcUtils.withConnection(config) {
       val arrayBuffer = ArrayBuffer[PriKeyColumnInfo]()
       conn =>
-        OBJdbcUtils.executeQuery(conn, option, sql) {
+        OBJdbcUtils.executeQuery(conn, config, sql) {
           rs =>
             {
               while (rs.next()) {
@@ -239,4 +240,25 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     }
   }
 
+  override def getJDBCType(dt: DataType): Option[JdbcType] = dt match {
+    // See SPARK-35446: MySQL treats REAL as a synonym to DOUBLE by default
+    // We override getJDBCType so that FloatType is mapped to FLOAT instead
+    case FloatType => Option(JdbcType("FLOAT", java.sql.Types.FLOAT))
+    case _ => getCommonJDBCType(dt)
+  }
+
+  override def getCatalystType(
+      sqlType: Int,
+      typeName: String,
+      size: Int,
+      md: MetadataBuilder): Option[DataType] = {
+    if (sqlType == Types.VARBINARY && typeName.equals("BIT") && size != 1) {
+      // This could instead be a BinaryType if we'd rather return bit-vectors of up to 64 bits as
+      // byte arrays instead of longs.
+      md.putLong("binarylong", 1)
+      Option(LongType)
+    } else if (sqlType == Types.BIT && typeName.equals("TINYINT")) {
+      Option(BooleanType)
+    } else None
+  }
 }

@@ -16,11 +16,10 @@
 
 package com.oceanbase.spark.reader.v2
 
-import com.oceanbase.spark.catalog.OceanBaseCatalog
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.sql.connector.read.InputPartition
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 
 import java.util.Objects
 
@@ -36,17 +35,17 @@ object OBMySQLPartition {
   private val EMPTY_STRING = ""
   private val PARTITION_QUERY_FORMAT = "PARTITION(%s)"
 
-  def columnPartition(jdbcOptions: JDBCOptions): Array[InputPartition] = {
+  def columnPartition(config: OceanBaseConfig): Array[InputPartition] = {
     // Determine whether a partition table.
-    val obPartInfos: Array[OBPartInfo] = obtainPartInfo(jdbcOptions)
+    val obPartInfos: Array[OBPartInfo] = obtainPartInfo(config)
     require(obPartInfos.nonEmpty, "Failed to obtain partition info of table")
 
     if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
       // For non-partition table
-      computeForNonPartTable(jdbcOptions)
+      computeForNonPartTable(config)
     } else {
       // For partition table
-      computeForPartTable(jdbcOptions, obPartInfos)
+      computeForPartTable(config, obPartInfos)
     }
   }
 
@@ -58,9 +57,9 @@ object OBMySQLPartition {
     case _ => 500000
   }
 
-  private def obtainPartInfo(jdbcOptions: JDBCOptions): Array[OBPartInfo] = {
+  private def obtainPartInfo(config: OceanBaseConfig): Array[OBPartInfo] = {
     val arrayBuilder = new mutable.ArrayBuilder.ofRef[OBPartInfo]
-    OBJdbcUtils.withConnection(jdbcOptions) {
+    OBJdbcUtils.withConnection(config) {
       conn =>
         {
           val statement = conn.createStatement()
@@ -71,8 +70,8 @@ object OBMySQLPartition {
                |from
                |  information_schema.partitions
                |where
-               |      TABLE_SCHEMA = '${jdbcOptions.parameters(OceanBaseCatalog.CURRENT_DATABASE)}'
-               |  and TABLE_NAME = '${jdbcOptions.parameters(OceanBaseCatalog.CURRENT_TABLE)}';
+               |      TABLE_SCHEMA = '${config.getSchemaName}'
+               |  and TABLE_NAME = '${config.getTableName}';
                |""".stripMargin
           try {
             val rs = statement.executeQuery(sql)
@@ -91,14 +90,14 @@ object OBMySQLPartition {
     arrayBuilder.result()
   }
 
-  private def computeForNonPartTable(jdbcOptions: JDBCOptions): Array[InputPartition] = {
-    val count: Long = obtainCount(jdbcOptions, EMPTY_STRING)
+  private def computeForNonPartTable(config: OceanBaseConfig): Array[InputPartition] = {
+    val count: Long = obtainCount(config, EMPTY_STRING)
     require(count >= 0, "Total must be a positive number")
     computeQueryPart(count, EMPTY_STRING).asInstanceOf[Array[InputPartition]]
   }
 
   private def computeForPartTable(
-      jdbcOptions: JDBCOptions,
+      config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo]): Array[InputPartition] = {
     val arr = new ArrayBuffer[OBMySQLPartition]()
     obPartInfos.foreach(
@@ -107,7 +106,7 @@ object OBMySQLPartition {
           case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
           case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
         }
-        val count = obtainCount(jdbcOptions, partitionName)
+        val count = obtainCount(config, partitionName)
         val partitions = computeQueryPart(count, partitionName)
         arr ++= partitions
       })
@@ -118,12 +117,12 @@ object OBMySQLPartition {
     }.toArray
   }
 
-  private def obtainCount(jdbcOptions: JDBCOptions, partName: String) = {
-    OBJdbcUtils.withConnection(jdbcOptions) {
+  private def obtainCount(config: OceanBaseConfig, partName: String) = {
+    OBJdbcUtils.withConnection(config) {
       conn =>
         {
           val statement = conn.createStatement()
-          val tableName = jdbcOptions.parameters(JDBCOptions.JDBC_TABLE_NAME)
+          val tableName = config.getDbTable
           val sql = s"SELECT count(1) AS cnt FROM $tableName $partName"
           try {
             val rs = statement.executeQuery(sql)
