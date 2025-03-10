@@ -16,14 +16,13 @@
 
 package com.oceanbase.spark.reader.v2
 
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.ExprUtils.compileFilter
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.connector.expressions.NamedReference
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReader, PartitionReaderFactory, Scan, ScanBuilder, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 
@@ -31,10 +30,7 @@ import org.apache.spark.sql.types.StructType
  * This is for compatibility with Spark 3.1, which does not support the SupportsPushDownAggregates
  * feature.
  */
-case class OBJdbcScanBuilder(
-    schema: StructType,
-    jdbcOptions: JDBCOptions,
-    dialect: OceanBaseDialect)
+case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialect: OceanBaseDialect)
   extends ScanBuilder
   with SupportsPushDownFilters
   with SupportsPushDownRequiredColumns
@@ -59,14 +55,14 @@ case class OBJdbcScanBuilder(
   override def build(): Scan =
     OBJdbcBatchScan(
       finalSchema: StructType,
-      jdbcOptions: JDBCOptions,
+      config: OceanBaseConfig,
       pushedFilter: Array[Filter],
       dialect: OceanBaseDialect)
 }
 
 case class OBJdbcBatchScan(
     schema: StructType,
-    jdbcOptions: JDBCOptions,
+    config: OceanBaseConfig,
     pushedFilter: Array[Filter],
     dialect: OceanBaseDialect)
   extends Scan {
@@ -76,32 +72,32 @@ case class OBJdbcBatchScan(
   override def toBatch: Batch =
     new OBJdbcBatch(
       schema: StructType,
-      jdbcOptions: JDBCOptions,
+      config: OceanBaseConfig,
       pushedFilter: Array[Filter],
       dialect: OceanBaseDialect)
 }
 
 class OBJdbcBatch(
     schema: StructType,
-    jdbcOptions: JDBCOptions,
+    config: OceanBaseConfig,
     pushedFilter: Array[Filter],
     dialect: OceanBaseDialect)
   extends Batch {
   private lazy val inputPartitions: Array[InputPartition] =
-    OBMySQLPartition.columnPartition(jdbcOptions)
+    OBMySQLPartition.columnPartition(config)
 
   override def planInputPartitions(): Array[InputPartition] = inputPartitions
 
   override def createReaderFactory(): PartitionReaderFactory = new OBJdbcReaderFactory(
     schema: StructType,
-    jdbcOptions: JDBCOptions,
+    config: OceanBaseConfig,
     pushedFilter: Array[Filter],
     dialect: OceanBaseDialect)
 }
 
 class OBJdbcReaderFactory(
     schema: StructType,
-    jdbcOptions: JDBCOptions,
+    config: OceanBaseConfig,
     pushedFilter: Array[Filter],
     dialect: OceanBaseDialect)
   extends PartitionReaderFactory {
@@ -109,7 +105,7 @@ class OBJdbcReaderFactory(
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] =
     new OBJdbcReader(
       schema: StructType,
-      jdbcOptions: JDBCOptions,
+      config: OceanBaseConfig,
       partition: InputPartition,
       pushedFilter: Array[Filter],
       dialect: OceanBaseDialect)

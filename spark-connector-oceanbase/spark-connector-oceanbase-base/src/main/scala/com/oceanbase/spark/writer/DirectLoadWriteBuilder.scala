@@ -15,19 +15,17 @@
  */
 package com.oceanbase.spark.writer
 
-import com.oceanbase.spark.catalog.OceanBaseCatalog
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.connector.write.{BatchWrite, SupportsTruncate, V1Write, Write, WriteBuilder}
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.connector.write.{SupportsTruncate, V1Write, WriteBuilder}
 import org.apache.spark.sql.sources.InsertableRelation
 
-import scala.collection.JavaConverters.mapAsJavaMapConverter
-
 @Deprecated
-case class DirectLoadWriteBuilder(options: JDBCOptions) extends WriteBuilder with SupportsTruncate {
+case class DirectLoadWriteBuilder(config: OceanBaseConfig)
+  extends WriteBuilder
+  with SupportsTruncate {
   private var isTruncate = false
 
   override def truncate(): WriteBuilder = {
@@ -40,22 +38,14 @@ case class DirectLoadWriteBuilder(options: JDBCOptions) extends WriteBuilder wit
     override def toInsertableRelation: InsertableRelation = new InsertableRelation {
       override def insert(data: DataFrame, overwrite: Boolean): Unit = {
         if (isTruncate) {
-          OBJdbcUtils.withConnection(options) {
+          OBJdbcUtils.withConnection(config) {
             conn =>
               {
-                OBJdbcUtils.executeStatement(
-                  conn,
-                  options,
-                  s"TRUNCATE TABLE ${options.parameters(JDBCOptions.JDBC_TABLE_NAME)}")
+                OBJdbcUtils.executeStatement(conn, config, s"TRUNCATE TABLE ${config.getDbTable}")
               }
           }
         }
-        val map = options.parameters ++ Map(
-          OceanBaseConfig.SCHEMA_NAME.getKey -> options.parameters(
-            OceanBaseCatalog.CURRENT_DATABASE),
-          OceanBaseConfig.TABLE_NAME.getKey -> options.parameters(OceanBaseCatalog.CURRENT_TABLE)
-        )
-        DirectLoadWriter.savaTable(data, new OceanBaseConfig(map.asJava))
+        DirectLoadWriter.savaTable(data, config)
       }
     }
   }

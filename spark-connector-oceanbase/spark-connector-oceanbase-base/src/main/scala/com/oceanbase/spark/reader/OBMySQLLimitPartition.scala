@@ -17,6 +17,7 @@
 package com.oceanbase.spark.reader
 
 import com.oceanbase.spark.catalog.OceanBaseCatalog
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.Partition
@@ -73,8 +74,8 @@ object OBMySQLLimitPartition {
                |from
                |  information_schema.partitions
                |where
-               |      TABLE_SCHEMA = '${jdbcOptions.parameters(OceanBaseCatalog.CURRENT_DATABASE)}'
-               |  and TABLE_NAME = '${jdbcOptions.parameters(OceanBaseCatalog.CURRENT_TABLE)}';
+               |      TABLE_SCHEMA = '${jdbcOptions.parameters(OceanBaseConfig.SCHEMA_NAME.getKey)}'
+               |  and TABLE_NAME = '${jdbcOptions.parameters(OceanBaseConfig.TABLE_NAME.getKey)}';
                |""".stripMargin
           try {
             val rs = statement.executeQuery(sql)

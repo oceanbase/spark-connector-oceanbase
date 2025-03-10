@@ -15,6 +15,7 @@
  */
 package com.oceanbase.spark.writer.v2
 
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -24,16 +25,16 @@ import org.apache.spark.sql.types.StructType
 
 class JDBCWriteBuilder(
     schema: StructType,
-    option: JDBCOptions,
+    config: OceanBaseConfig,
     dialect: OceanBaseDialect
 ) extends WriteBuilder {
   override def buildForBatch(): BatchWrite =
-    new JDBCBatchWrite(schema, option, dialect)
+    new JDBCBatchWrite(schema, config, dialect)
 }
 
 class JDBCBatchWrite(
     schema: StructType,
-    option: JDBCOptions,
+    config: OceanBaseConfig,
     dialect: OceanBaseDialect
 ) extends BatchWrite
   with DataWriterFactory {
@@ -50,6 +51,6 @@ class JDBCBatchWrite(
       partitionId: Int,
       taskId: Long
   ): DataWriter[InternalRow] = {
-    new JDBCWriter(schema: StructType, option: JDBCOptions, dialect)
+    new JDBCWriter(schema: StructType, config, dialect)
   }
 }

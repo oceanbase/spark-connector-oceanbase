@@ -16,19 +16,15 @@
 
 package com.oceanbase.spark.catalog
 
-import com.oceanbase.spark.catalog.OceanBaseCatalog.{extractDatabaseName, preDefineMap, CURRENT_DATABASE, CURRENT_TABLE, DEFAULT_DATABASE}
+import com.oceanbase.spark.catalog.OceanBaseCatalog.{extractDatabaseName, resolveTable}
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.{OceanBaseDialect, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.OceanBaseSparkDataSource.{JDBC_TXN_ISOLATION_LEVEL, OCEANBASE_DEFAULT_ISOLATION_LEVEL}
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.connector.catalog._
 import org.apache.spark.sql.connector.expressions.Transform
-import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
-import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
-import org.apache.spark.sql.reader.JDBCLimitRDD
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
@@ -44,7 +40,7 @@ class OceanBaseCatalog
   with Logging {
 
   private var catalogName: Option[String] = None
-  private var options: JDBCOptions = _
+  private var config: OceanBaseConfig = _
   private var dialect: OceanBaseDialect = _
 
   override def name(): String = {
@@ -55,25 +51,22 @@ class OceanBaseCatalog
   override def initialize(name: String, options: CaseInsensitiveStringMap): Unit = {
     assert(catalogName.isEmpty, "The OceanBase catalog is already initialed")
     catalogName = Some(name)
+    config = new OceanBaseConfig(options)
 
-    val map = options.asCaseSensitiveMap().asScala.toMap
-    this.options = new JDBCOptions(map ++ preDefineMap(map))
     // Register dialect for mysql and oracle modes.
-    OBJdbcUtils.getCompatibleMode(this.options).map(_.toLowerCase) match {
+    OBJdbcUtils.getCompatibleMode(this.config).map(_.toLowerCase) match {
       case Some("mysql") =>
         dialect = new OceanBaseMySQLDialect
-        // TODO: Refactor BATCH_READ implements to remove the code
-        JdbcDialects.registerDialect(OceanBaseMySQLDialect)
       case Some("oracle") =>
         dialect = new OceanBaseOracleDialect
-        JdbcDialects.registerDialect(OceanBaseOracleDialect)
       case _ =>
     }
   }
 
   override def listTables(namespace: Array[String]): Array[Identifier] = {
     checkNamespace(namespace)
-    OBJdbcUtils.withConnection(options) {
+    val config = genNewOceanBaseConfig(this.config, namespace)
+    OBJdbcUtils.withConnection(config) {
       conn =>
         val schemaPattern = if (namespace.length == 1) namespace.head else null
         val rs = conn.getMetaData
@@ -87,19 +80,19 @@ class OceanBaseCatalog
 
   override def tableExists(ident: Identifier): Boolean = {
     checkNamespace(ident.namespace())
-    val writeOptions = new JdbcOptionsInWrite(
-      options.parameters + (JDBCOptions.JDBC_TABLE_NAME -> getTableName(ident)))
+    val config = genNewOceanBaseConfig(this.config, ident)
     OBJdbcUtils.unifiedCatalogException(s"Failed table existence check: $ident") {
-      OBJdbcUtils.withConnection(options)(dialect.tableExists(_, writeOptions))
+      OBJdbcUtils.withConnection(config)(dialect.tableExists(_, config))
     }
   }
 
   override def dropTable(ident: Identifier): Boolean = {
     checkNamespace(ident.namespace())
-    OBJdbcUtils.withConnection(options) {
+    val config = genNewOceanBaseConfig(this.config, ident)
+    OBJdbcUtils.withConnection(config) {
       conn =>
         try {
-          dialect.dropTable(conn, getTableName(ident), options)
+          dialect.dropTable(conn, getTableName(ident), config)
           true
         } catch {
           case ex: SQLException =>
@@ -110,24 +103,20 @@ class OceanBaseCatalog
 
   override def renameTable(oldIdent: Identifier, newIdent: Identifier): Unit = {
     checkNamespace(oldIdent.namespace())
-    OBJdbcUtils.withConnection(options) {
+    OBJdbcUtils.withConnection(config) {
       conn =>
         OBJdbcUtils.unifiedCatalogException(s"Failed table renaming from $oldIdent to $newIdent") {
-          dialect.renameTable(conn, getTableName(oldIdent), getTableName(newIdent), options)
+          dialect.renameTable(conn, getTableName(oldIdent), getTableName(newIdent), config)
         }
     }
   }
 
   override def loadTable(ident: Identifier): Table = {
     checkNamespace(ident.namespace())
-    val optionsWithTableName = new JDBCOptions(
-      options.parameters ++ mutable.Map(
-        JDBCOptions.JDBC_TABLE_NAME -> getTableName(ident),
-        CURRENT_DATABASE -> ident.namespace().mkString("."),
-        CURRENT_TABLE -> ident.name()))
+    val config = genNewOceanBaseConfig(this.config, ident)
     try {
-      val schema = JDBCLimitRDD.resolveTable(optionsWithTableName)
-      OceanBaseTable(ident, schema, optionsWithTableName, dialect)
+      val schema = resolveTable(config, dialect)
+      OceanBaseTable(ident, schema, config, dialect)
     } catch {
       case ex: IllegalArgumentException =>
         throw new IllegalArgumentException(
@@ -148,12 +137,7 @@ class OceanBaseCatalog
         s"The OceanBase catalog does not yet support secondary or higher-level partitioning")
     }
 
-    var tableOptions = options.parameters ++ Map(
-      JDBCOptions.JDBC_TABLE_NAME -> getTableName(ident),
-      CURRENT_DATABASE -> ident.namespace().mkString("."),
-      CURRENT_TABLE -> ident.name())
     var tableComment: String = ""
-
     if (!properties.isEmpty) {
       properties.asScala.foreach {
         case (k, v) =>
@@ -171,34 +155,27 @@ class OceanBaseCatalog
           }
       }
     }
-
+    val config = genNewOceanBaseConfig(this.config, ident)
     if (tableComment.nonEmpty) {
-      tableOptions = tableOptions + (JDBCOptions.JDBC_TABLE_COMMENT -> tableComment)
+      config.setProperty(OceanBaseConfig.TABLE_COMMENT, tableComment)
     }
-
-    val writeOptions = new JdbcOptionsInWrite(tableOptions)
-    OBJdbcUtils.withConnection(options) {
+    OBJdbcUtils.withConnection(config) {
       conn =>
         OBJdbcUtils.unifiedCatalogException(s"Failed table creation: $ident") {
-          dialect.createTable(
-            conn,
-            getTableName(ident),
-            schema,
-            partitions,
-            writeOptions,
-            properties)
+          dialect.createTable(conn, getTableName(ident), schema, partitions, config, properties)
         }
     }
 
-    OceanBaseTable(ident, schema, writeOptions, dialect)
+    OceanBaseTable(ident, schema, config, dialect)
   }
 
   override def alterTable(ident: Identifier, changes: TableChange*): Table = {
     checkNamespace(ident.namespace())
-    OBJdbcUtils.withConnection(options) {
+    val config = genNewOceanBaseConfig(this.config, ident)
+    OBJdbcUtils.withConnection(config) {
       conn =>
         OBJdbcUtils.unifiedCatalogException(s"Failed table altering: $ident") {
-          dialect.alterTable(conn, getTableName(ident), changes, options)
+          dialect.alterTable(conn, getTableName(ident), changes, config)
         }
         loadTable(ident)
     }
@@ -206,12 +183,12 @@ class OceanBaseCatalog
 
   override def namespaceExists(namespace: Array[String]): Boolean = namespace match {
     case Array(db) =>
-      OBJdbcUtils.withConnection(options)(conn => dialect.schemaExists(conn, options, db))
+      OBJdbcUtils.withConnection(config)(conn => dialect.schemaExists(conn, config, db))
     case _ => false
   }
 
   override def listNamespaces(): Array[Array[String]] = {
-    OBJdbcUtils.withConnection(options)(conn => dialect.listSchemas(conn, options))
+    OBJdbcUtils.withConnection(config)(conn => dialect.listSchemas(conn, config))
   }
 
   override def listNamespaces(namespace: Array[String]): Array[Array[String]] = {
@@ -257,10 +234,10 @@ class OceanBaseCatalog
               }
           }
         }
-        OBJdbcUtils.withConnection(options) {
+        OBJdbcUtils.withConnection(config) {
           conn =>
             OBJdbcUtils.unifiedCatalogException(s"Failed create name space: $db") {
-              dialect.createSchema(conn, options, db, comment)
+              dialect.createSchema(conn, config, db, comment)
             }
         }
 
@@ -280,10 +257,10 @@ class OceanBaseCatalog
   def dropNamespace(namespace: Array[String], cascade: Boolean): Boolean =
     namespace match {
       case Array(db) if namespaceExists(namespace) =>
-        OBJdbcUtils.withConnection(options) {
+        OBJdbcUtils.withConnection(config) {
           conn =>
             OBJdbcUtils.unifiedCatalogException(s"Failed drop name space: $db") {
-              dialect.dropSchema(conn, options, db, cascade)
+              dialect.dropSchema(conn, config, db, cascade)
               true
             }
         }
@@ -296,10 +273,10 @@ class OceanBaseCatalog
   def dropNamespace(namespace: Array[String]): Boolean = {
     namespace match {
       case Array(db) if namespaceExists(namespace) =>
-        OBJdbcUtils.withConnection(options) {
+        OBJdbcUtils.withConnection(config) {
           conn =>
             OBJdbcUtils.unifiedCatalogException(s"Failed to drop namespace: $db") {
-              dialect.dropSchema(conn, options, db, cascade = false)
+              dialect.dropSchema(conn, config, db, cascade = false)
               true
             }
         }
@@ -321,10 +298,26 @@ class OceanBaseCatalog
     (ident.namespace() :+ ident.name()).map(dialect.quoteIdentifier).mkString(".")
   }
 
+  private def genNewOceanBaseConfig(config: OceanBaseConfig, ident: Identifier): OceanBaseConfig = {
+    val properties = config.getProperties
+    properties.put(OceanBaseConfig.SCHEMA_NAME.getKey, ident.namespace().mkString("."))
+    properties.put(OceanBaseConfig.TABLE_NAME.getKey, ident.name())
+    properties.put(OceanBaseConfig.DB_TABLE, getTableName(ident))
+    new OceanBaseConfig(properties)
+  }
+
+  private def genNewOceanBaseConfig(
+      config: OceanBaseConfig,
+      namespace: Array[String]): OceanBaseConfig = {
+    val properties = config.getProperties
+    properties.put(OceanBaseConfig.SCHEMA_NAME.getKey, namespace.mkString("."))
+    new OceanBaseConfig(properties)
+  }
+
   override def defaultNamespace(): Array[String] = {
-    options.parameters.get(DEFAULT_DATABASE) match {
+    Option(config.getSchemaName) match {
       case None =>
-        extractDatabaseName(options.url) match {
+        extractDatabaseName(config.getURL) match {
           case None => Array[String]()
           case Some(value) => Array[String](value)
         }
@@ -335,32 +328,6 @@ class OceanBaseCatalog
 }
 
 object OceanBaseCatalog {
-  private val FAKE_TABLE_NAME = "__invalid_table"
-  private val DEFAULT_DATABASE = "schema-name"
-  private val ADAPT_USERNAME = "user"
-  val CURRENT_DATABASE = "current-database"
-  val CURRENT_TABLE = "current-table"
-
-  private val JDBC_PUSH_DOWN_LIMIT = "pushDownLimit"
-  private val JDBC_PUSH_DOWN_OFFSET = "pushDownOffset"
-  private val JDBC_PUSH_DOWN_TABLES_AMPLE = "pushDownTableSample"
-
-  // 1. Disable agg push down 2. Disable limit & offset push down
-  // 3. Enable fetchSize  4. Disable table sample 5. Enable predicates push down
-  def preDefineMap(options: Map[String, String]): Map[String, String] = {
-    Map(
-      JDBC_PUSH_DOWN_LIMIT -> false.toString,
-      JDBC_PUSH_DOWN_OFFSET -> false.toString,
-      JDBCOptions.JDBC_BATCH_FETCH_SIZE -> options.getOrElse(
-        JDBCOptions.JDBC_BATCH_FETCH_SIZE,
-        1000.toString),
-      JDBC_PUSH_DOWN_TABLES_AMPLE -> false.toString,
-      JDBCOptions.JDBC_TABLE_NAME -> FAKE_TABLE_NAME,
-      ADAPT_USERNAME -> options(OceanBaseConfig.USERNAME.getKey),
-      JDBC_TXN_ISOLATION_LEVEL -> options
-        .getOrElse(JDBC_TXN_ISOLATION_LEVEL, OCEANBASE_DEFAULT_ISOLATION_LEVEL)
-    )
-  }
 
   def extractDatabaseName(jdbcUrl: String): Option[String] = {
     val pattern = "(?i)^jdbc:(mysql|oceanbase)://[^/]+/([^?]+).*".r
@@ -368,6 +335,15 @@ object OceanBaseCatalog {
     jdbcUrl match {
       case pattern(_, databaseName) => Some(databaseName)
       case _ => None
+    }
+  }
+
+  /** Takes a (schema, table) specification and returns the table's Catalyst schema. */
+  def resolveTable(config: OceanBaseConfig, dialect: OceanBaseDialect): StructType = {
+    OBJdbcUtils.withConnection(config) {
+      conn =>
+        OBJdbcUtils.executeQuery(conn, config, dialect.getSchemaQuery(config.getDbTable))(
+          rs => OBJdbcUtils.getSchema(rs, dialect))
     }
   }
 }

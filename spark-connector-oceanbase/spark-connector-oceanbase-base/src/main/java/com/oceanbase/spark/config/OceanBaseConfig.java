@@ -172,9 +172,64 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    // ======== JDBC Related =========
+    public static final ConfigEntry<String> DRIVER =
+            new ConfigBuilder("driver")
+                    .doc("The class name of the JDBC driver to use to connect to this URL.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .stringConf()
+                    .create();
+
+    public static final ConfigEntry<Integer> JDBC_QUERY_TIMEOUT =
+            new ConfigBuilder("jdbc.query-timeout")
+                    .doc(
+                            "The number of seconds the driver will wait for a Statement object to execute to the given number of seconds. Zero means there is no limit. In the write path, this option depends on how JDBC drivers implement the API setQueryTimeout.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .intConf()
+                    .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(0);
+
+    public static final ConfigEntry<Integer> JDBC_FETCH_SIZE =
+            new ConfigBuilder("jdbc.fetch-size")
+                    .doc(
+                            "The JDBC fetch size, which determines how many rows to fetch per round trip.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .intConf()
+                    .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(100);
+
+    public static final ConfigEntry<Integer> JDBC_BATCH_SIZE =
+            new ConfigBuilder("jdbc.batch-size")
+                    .doc(
+                            "The JDBC batch size, which determines how many rows to insert per round trip. This can help performance on JDBC drivers. This option applies only to writing.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .intConf()
+                    .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(1024);
+
+    public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_PREDICATE =
+            new ConfigBuilder("jdbc.pushDownPredicate")
+                    .doc(
+                            "The option to enable or disable predicate push-down into the JDBC data source. The default value is true, in which case Spark will push down filters to the JDBC data source as much as possible.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
+    public static final String DB_TABLE = "dbTable";
+    public static final String TABLE_COMMENT = "tableComment";
+    public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
+
     public OceanBaseConfig(Map<String, String> properties) {
         super();
         loadFromMap(properties, k -> true);
+    }
+
+    public Map<String, String> getProperties() {
+        return super.configMap;
+    }
+
+    public void setProperty(String key, String value) {
+        super.configMap.put(key, value);
     }
 
     public String getURL() {
@@ -217,7 +272,7 @@ public class OceanBaseConfig extends Config implements Serializable {
         return get(DIRECT_LOAD_PARALLEL);
     }
 
-    public int getBatchSize() {
+    public int getDirectLoadBatchSize() {
         return get(DIRECT_LOAD_BATCH_SIZE);
     }
 
@@ -251,5 +306,33 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public boolean getDirectLoadUseRepartition() {
         return get(DIRECT_LOAD_TASK_USE_REPARTITION);
+    }
+
+    public Integer getJdbcFetchSize() {
+        return get(JDBC_FETCH_SIZE);
+    }
+
+    public Integer getJdbcBatchSize() {
+        return get(JDBC_BATCH_SIZE);
+    }
+
+    public Integer getJdbcQueryTimeout() {
+        return get(JDBC_QUERY_TIMEOUT);
+    }
+
+    public String getDriver() {
+        return get(DRIVER);
+    }
+
+    public String getDbTable() {
+        return getProperties().get(DB_TABLE);
+    }
+
+    public String getTableComment() {
+        return getProperties().get(TABLE_COMMENT);
+    }
+
+    public Boolean getPushDownPredicate() {
+        return get(JDBC_PUSH_DOWN_PREDICATE);
     }
 }

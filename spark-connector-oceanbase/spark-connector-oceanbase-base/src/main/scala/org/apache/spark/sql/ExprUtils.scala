@@ -15,17 +15,17 @@
  */
 package org.apache.spark.sql
 
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.connector.expressions.{BucketTransform, DaysTransform, HoursTransform, IdentityTransform, Transform, YearsTransform}
-import org.apache.spark.sql.execution.datasources.jdbc.JdbcOptionsInWrite
 import org.apache.spark.sql.jdbc.OceanBaseMySQLDialect
 import org.apache.spark.sql.sources.{AlwaysFalse, AlwaysTrue, And, EqualNullSafe, EqualTo, Filter, GreaterThan, GreaterThanOrEqual, In, IsNotNull, IsNull, LessThan, LessThanOrEqual, Not, Or, StringContains, StringEndsWith, StringStartsWith}
 
 object ExprUtils extends SQLConfHelper with Serializable {
 
-  def toOBMySQLPartition(transform: Transform, options: JdbcOptionsInWrite): String =
+  def toOBMySQLPartition(transform: Transform, config: OceanBaseConfig): String =
     transform match {
       case bucket: BucketTransform =>
         val identities = bucket.columns

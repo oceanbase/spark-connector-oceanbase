@@ -37,7 +37,7 @@ import scala.collection.JavaConverters._
 case class OceanBaseTable(
     ident: Identifier,
     schema: StructType,
-    jdbcOptions: JDBCOptions,
+    config: OceanBaseConfig,
     dialect: OceanBaseDialect)
   extends Table
   with SupportsRead
@@ -51,21 +51,22 @@ case class OceanBaseTable(
 
   override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
     val mergedOptions = new JDBCOptions(
-      jdbcOptions.parameters ++ options.asCaseSensitiveMap().asScala)
-    jdbcOptions.parameters.get("enable-legacy_batch_reader").map(_.toBoolean) match {
+      config.getProperties.asScala.toMap ++ options.asCaseSensitiveMap().asScala)
+
+    mergedOptions.parameters
+      .get(OceanBaseConfig.ENABLE_LEGACY_BATCH_READER)
+      .map(_.toBoolean) match {
       case Some(true) => JDBCLimitScanBuilder(SparkSession.active, schema, mergedOptions)
-      case _ => OBJdbcScanBuilder(schema, mergedOptions, dialect)
+      case _ => OBJdbcScanBuilder(schema, config, dialect)
     }
   }
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    jdbcOptions.parameters.get(OceanBaseConfig.DIRECT_LOAD_ENABLE.getKey).map(_.toBoolean) match {
-      case Some(true) => DirectLoadWriteBuilderV2(schema, options = jdbcOptions)
-      // By default, it is written in jdbc mode.
-      case _ => {
-        new JDBCWriteBuilder(schema, jdbcOptions, dialect)
-      }
-    }
 
+    if (config.getDirectLoadEnable) {
+      DirectLoadWriteBuilderV2(schema, config)
+    } else {
+      new JDBCWriteBuilder(schema, config, dialect)
+    }
   }
 }

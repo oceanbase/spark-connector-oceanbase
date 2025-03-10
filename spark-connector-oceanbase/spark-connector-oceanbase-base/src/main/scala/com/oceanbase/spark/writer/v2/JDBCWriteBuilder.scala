@@ -15,26 +15,27 @@
  */
 package com.oceanbase.spark.writer.v2
 
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.metric.CustomMetric
 import org.apache.spark.sql.connector.write.{BatchWrite, DataWriter, DataWriterFactory, PhysicalWriteInfo, Write, WriteBuilder, WriterCommitMessage}
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.types.StructType
 
-class JDBCWriteBuilder(schema: StructType, option: JDBCOptions, dialect: OceanBaseDialect)
+class JDBCWriteBuilder(schema: StructType, config: OceanBaseConfig, dialect: OceanBaseDialect)
   extends WriteBuilder {
-  override def build(): Write = new JDBCWrite(schema, option, dialect)
+  override def build(): Write = new JDBCWrite(schema, config, dialect)
 }
 
-class JDBCWrite(schema: StructType, option: JDBCOptions, dialect: OceanBaseDialect) extends Write {
-  override def toBatch: BatchWrite = new JDBCBatchWrite(schema, option, dialect)
+class JDBCWrite(schema: StructType, config: OceanBaseConfig, dialect: OceanBaseDialect)
+  extends Write {
+  override def toBatch: BatchWrite = new JDBCBatchWrite(schema, config, dialect)
 
   override def supportedCustomMetrics(): Array[CustomMetric] = Array()
 }
 
-class JDBCBatchWrite(schema: StructType, option: JDBCOptions, dialect: OceanBaseDialect)
+class JDBCBatchWrite(schema: StructType, config: OceanBaseConfig, dialect: OceanBaseDialect)
   extends BatchWrite
   with DataWriterFactory {
 
@@ -45,6 +46,6 @@ class JDBCBatchWrite(schema: StructType, option: JDBCOptions, dialect: OceanBase
   override def abort(messages: Array[WriterCommitMessage]): Unit = {}
 
   override def createWriter(partitionId: Int, taskId: Long): DataWriter[InternalRow] = {
-    new JDBCWriter(schema: StructType, option: JDBCOptions, dialect)
+    new JDBCWriter(schema: StructType, config, dialect)
   }
 }
