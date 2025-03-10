@@ -28,4 +28,5 @@ public interface ConfigConstants {
     String POSITIVE_NUMBER_ERROR_MSG = "The value must be a positive number";
 
     String VERSION_1_0_0 = "1.0";
+    String VERSION_1_1_0 = "1.1";
 }

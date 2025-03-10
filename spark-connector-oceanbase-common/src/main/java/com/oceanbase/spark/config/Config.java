@@ -32,7 +32,7 @@ public abstract class Config implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Config.class);
 
-    private final ConcurrentMap<String, String> configMap;
+    protected final ConcurrentMap<String, String> configMap;
 
     private final Map<String, DeprecatedConfig> deprecatedConfigMap;
 

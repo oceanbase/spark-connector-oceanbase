@@ -15,7 +15,7 @@
  */
 package com.oceanbase.spark.writer.v2
 
-import com.oceanbase.spark.catalog.OceanBaseCatalog
+import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 import com.oceanbase.spark.utils.{OBJdbcUtils, RetryUtils}
 import com.oceanbase.spark.utils.OBJdbcUtils.OBValueSetter
@@ -24,7 +24,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.metric.CustomTaskMetric
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.types.StructType
 
 import java.sql.{Connection, SQLException, Types}
@@ -32,13 +31,13 @@ import java.sql.{Connection, SQLException, Types}
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 
-class JDBCWriter(schema: StructType, option: JDBCOptions, dialect: OceanBaseDialect)
+class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBaseDialect)
   extends DataWriter[InternalRow]
   with Logging {
 
-  private val DEFAULT_BUFFER_SIZE = 1024
+  private val DEFAULT_BUFFER_SIZE = config.getJdbcBatchSize
   val buffer: ArrayBuffer[InternalRow] = ArrayBuffer[InternalRow]()
-  lazy val conn: Connection = OBJdbcUtils.getConnection(option)
+  lazy val conn: Connection = OBJdbcUtils.getConnection(config)
   lazy val sql: String = getInsertSql
   private val setters: Array[OBValueSetter] =
     schema.fields.map(f => OBJdbcUtils.makeSetter(f.dataType))
@@ -100,11 +99,8 @@ class JDBCWriter(schema: StructType, option: JDBCOptions, dialect: OceanBaseDial
   }
 
   private def getInsertSql: String = {
-    val priKeyColInfos = dialect.getPriKeyInfo(
-      option.parameters(OceanBaseCatalog.CURRENT_DATABASE),
-      option.parameters(OceanBaseCatalog.CURRENT_TABLE),
-      option)
-    val tableName = option.parameters(JDBCOptions.JDBC_TABLE_NAME)
+    val priKeyColInfos = dialect.getPriKeyInfo(config.getSchemaName, config.getTableName, config)
+    val tableName = config.getDbTable
     if (null != priKeyColInfos && priKeyColInfos.nonEmpty) {
       dialect.getUpsertIntoStatement(tableName, schema, priKeyColInfos)
     } else {

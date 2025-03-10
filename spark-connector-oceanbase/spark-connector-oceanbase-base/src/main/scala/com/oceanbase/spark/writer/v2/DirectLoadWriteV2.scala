@@ -37,7 +37,7 @@ class DirectLoadWriteV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
   extends DataWriter[InternalRow]
   with Logging {
 
-  private val DEFAULT_BUFFER_SIZE = 1024
+  private val DEFAULT_BUFFER_SIZE = oceanBaseConfig.getDirectLoadBatchSize
   val buffer: ArrayBuffer[InternalRow] = ArrayBuffer[InternalRow]()
   val directLoader: DirectLoader =
     DirectLoadUtils.buildDirectLoaderFromSetting(oceanBaseConfig)

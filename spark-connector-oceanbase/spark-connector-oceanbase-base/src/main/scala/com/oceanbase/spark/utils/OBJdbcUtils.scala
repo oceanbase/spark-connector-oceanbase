@@ -18,45 +18,29 @@ package com.oceanbase.spark.utils
 
 import com.oceanbase.spark.catalog.OceanBaseCatalogException
 import com.oceanbase.spark.config.OceanBaseConfig
+import com.oceanbase.spark.dialect.OceanBaseDialect
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.execution.datasources.jdbc.{DriverRegistry, JDBCOptions}
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, TimestampType}
+import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.types.DecimalType.{MAX_PRECISION, MAX_SCALE}
 
-import java.sql.{Connection, Driver, DriverManager, PreparedStatement, ResultSet}
+import java.sql.{Connection, PreparedStatement, ResultSet, ResultSetMetaData, SQLException}
+
+import scala.collection.JavaConverters.mapAsJavaMapConverter
+import scala.math.min
 
 object OBJdbcUtils {
 
   private val COMPATIBLE_MODE_STATEMENT = "SHOW VARIABLES LIKE 'ob_compatibility_mode'"
 
-  def getConnection(oceanBaseConfig: OceanBaseConfig): Connection = {
-    val connection = DriverManager.getConnection(
-      oceanBaseConfig.getURL,
-      oceanBaseConfig.getUsername,
-      oceanBaseConfig.getPassword
-    )
-    connection
-  }
-
-  def getCompatibleMode(oceanBaseConfig: OceanBaseConfig): String = {
-    val conn = getConnection(oceanBaseConfig)
-    val statement = conn.createStatement
-    try {
-      val rs = statement.executeQuery("SHOW VARIABLES LIKE 'ob_compatibility_mode'")
-      if (rs.next) rs.getString("VALUE")
-      else throw new RuntimeException("Failed to obtain compatible mode of OceanBase.")
-    } finally {
-      statement.close()
-      conn.close()
-    }
-  }
-
   def getDbTable(oceanBaseConfig: OceanBaseConfig): String = {
-    if ("MySQL".equalsIgnoreCase(getCompatibleMode(oceanBaseConfig))) {
-      s"`${oceanBaseConfig.getSchemaName}`.`${oceanBaseConfig.getTableName}`"
-    } else {
-      s""""${oceanBaseConfig.getSchemaName}"."${oceanBaseConfig.getTableName}""""
+    getCompatibleMode(oceanBaseConfig).map(_.toLowerCase) match {
+      case Some("mysql") => s"`${oceanBaseConfig.getSchemaName}`.`${oceanBaseConfig.getTableName}`"
+      case Some("oracle") =>
+        s""""${oceanBaseConfig.getSchemaName}"."${oceanBaseConfig.getTableName}""""
+      case _ => throw new RuntimeException("Failed to get OceanBase's compatible mode")
     }
   }
 
@@ -72,12 +56,12 @@ object OBJdbcUtils {
     }
   }
 
-  def getCompatibleMode(option: JDBCOptions): Option[String] = {
-    withConnection(option) {
+  def getCompatibleMode(config: OceanBaseConfig): Option[String] = {
+    withConnection(config) {
       conn =>
         {
           var compatibleMode: Option[String] = None
-          executeQuery(conn, option, COMPATIBLE_MODE_STATEMENT) {
+          executeQuery(conn, config, COMPATIBLE_MODE_STATEMENT) {
             rs =>
               if (rs.next()) {
                 compatibleMode = Option(rs.getString("VALUE"))
@@ -88,15 +72,30 @@ object OBJdbcUtils {
     }
   }
 
-  def getConnection(options: JDBCOptions): Connection = {
-    val driverClass: String = options.driverClass
-    DriverRegistry.register(driverClass)
-    val driver: Driver = DriverRegistry.get(driverClass)
-    val connection = OceanBaseConnectionProvider.getConnection(driver, options.parameters)
+  def getConnection(option: JDBCOptions): Connection = {
+    val config = new OceanBaseConfig(option.parameters.asJava)
+    val connection = OceanBaseConnectionProvider.getConnection(oceanBaseConfig = config)
     require(
       connection != null,
-      s"The driver could not open a JDBC connection. Check the URL: ${options.url}")
+      s"The driver could not open a JDBC connection. Check the URL: ${config.getURL}")
     connection
+  }
+
+  def getConnection(config: OceanBaseConfig): Connection = {
+    val connection = OceanBaseConnectionProvider.getConnection(oceanBaseConfig = config)
+    require(
+      connection != null,
+      s"The driver could not open a JDBC connection. Check the URL: ${config.getURL}")
+    connection
+  }
+
+  def withConnection[T](config: OceanBaseConfig)(f: Connection => T): T = {
+    val conn = getConnection(config)
+    try {
+      f(conn)
+    } finally {
+      conn.close()
+    }
   }
 
   def withConnection[T](options: JDBCOptions)(f: Connection => T): T = {
@@ -108,21 +107,21 @@ object OBJdbcUtils {
     }
   }
 
-  def executeStatement(conn: Connection, options: JDBCOptions, sql: String): Unit = {
+  def executeStatement(conn: Connection, config: OceanBaseConfig, sql: String): Unit = {
     val statement = conn.createStatement
     try {
-      statement.setQueryTimeout(options.queryTimeout)
+      statement.setQueryTimeout(config.getJdbcQueryTimeout)
       statement.executeUpdate(sql)
     } finally {
       statement.close()
     }
   }
 
-  def executeQuery(conn: Connection, options: JDBCOptions, sql: String)(
-      f: ResultSet => Unit): Unit = {
+  def executeQuery[T](conn: Connection, config: OceanBaseConfig, sql: String)(
+      f: ResultSet => T): T = {
     val statement = conn.createStatement
     try {
-      statement.setQueryTimeout(options.queryTimeout)
+      statement.setQueryTimeout(config.getJdbcQueryTimeout)
       val rs = statement.executeQuery(sql)
       try {
         f(rs)
@@ -202,5 +201,129 @@ object OBJdbcUtils {
     case _ =>
       (_: PreparedStatement, _: InternalRow, pos: Int) =>
         throw new IllegalArgumentException(s"Can't translate non-null value for field $pos")
+  }
+
+  /**
+   * Copy from
+   * [[org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getSchema(ResultSet, JdbcDialect, Boolean)]]
+   * to solve compatibility issues with lower Spark versions.
+   */
+  def getSchema(
+      resultSet: ResultSet,
+      dialect: OceanBaseDialect,
+      alwaysNullable: Boolean = false): StructType = {
+    val rsmd = resultSet.getMetaData
+    val ncols = rsmd.getColumnCount
+    val fields = new Array[StructField](ncols)
+    var i = 0
+    while (i < ncols) {
+      val columnName = rsmd.getColumnLabel(i + 1)
+      val dataType = rsmd.getColumnType(i + 1)
+      val typeName = rsmd.getColumnTypeName(i + 1)
+      val fieldSize = rsmd.getPrecision(i + 1)
+      val fieldScale = rsmd.getScale(i + 1)
+      val isSigned =
+        try rsmd.isSigned(i + 1)
+        catch {
+          // Workaround for HIVE-14684:
+          case e: SQLException
+              if e.getMessage == "Method not supported" &&
+                rsmd.getClass.getName == "org.apache.hive.jdbc.HiveResultSetMetaData" =>
+            true
+        }
+      val nullable =
+        if (alwaysNullable) true else rsmd.isNullable(i + 1) != ResultSetMetaData.columnNoNulls
+      val metadata = new MetadataBuilder()
+      metadata.putLong("scale", fieldScale)
+
+      dataType match {
+        case java.sql.Types.TIME =>
+          // SPARK-33888
+          // - include TIME type metadata
+          // - always build the metadata
+          metadata.putBoolean("logical_time_type", true)
+        case java.sql.Types.ROWID =>
+          metadata.putBoolean("rowid", true)
+        case _ =>
+      }
+
+      val columnType =
+        dialect
+          .getCatalystType(dataType, typeName, fieldSize, metadata)
+          .getOrElse(OBJdbcUtils.getCatalystType(dataType, fieldSize, fieldScale, isSigned))
+      fields(i) = StructField(columnName, columnType, nullable, metadata.build())
+      i = i + 1
+    }
+    new StructType(fields)
+  }
+
+  /**
+   * Maps a JDBC type to a Catalyst type. This function is called only when the JdbcDialect class
+   * corresponding to your database driver returns null.
+   *
+   * @param sqlType
+   *   \- A field of java.sql.Types
+   * @return
+   *   The Catalyst type corresponding to sqlType.
+   */
+  def getCatalystType(sqlType: Int, precision: Int, scale: Int, signed: Boolean): DataType = {
+    val answer = sqlType match {
+      // scalastyle:off
+      case java.sql.Types.ARRAY => null
+      case java.sql.Types.BIGINT =>
+        if (signed) { LongType }
+        else { DecimalType(20, 0) }
+      case java.sql.Types.BINARY => BinaryType
+      case java.sql.Types.BIT => BooleanType // @see JdbcDialect for quirks
+      case java.sql.Types.BLOB => BinaryType
+      case java.sql.Types.BOOLEAN => BooleanType
+      case java.sql.Types.CHAR => StringType
+      case java.sql.Types.CLOB => StringType
+      case java.sql.Types.DATALINK => null
+      case java.sql.Types.DATE => DateType
+      case java.sql.Types.DECIMAL if precision != 0 || scale != 0 =>
+        DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
+      case java.sql.Types.DECIMAL => DecimalType.SYSTEM_DEFAULT
+      case java.sql.Types.DISTINCT => null
+      case java.sql.Types.DOUBLE => DoubleType
+      case java.sql.Types.FLOAT => FloatType
+      case java.sql.Types.INTEGER =>
+        if (signed) { IntegerType }
+        else { LongType }
+      case java.sql.Types.JAVA_OBJECT => null
+      case java.sql.Types.LONGNVARCHAR => StringType
+      case java.sql.Types.LONGVARBINARY => BinaryType
+      case java.sql.Types.LONGVARCHAR => StringType
+      case java.sql.Types.NCHAR => StringType
+      case java.sql.Types.NCLOB => StringType
+      case java.sql.Types.NULL => null
+      case java.sql.Types.NUMERIC if precision != 0 || scale != 0 =>
+        DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
+      case java.sql.Types.NUMERIC => DecimalType.SYSTEM_DEFAULT
+      case java.sql.Types.NVARCHAR => StringType
+      case java.sql.Types.OTHER => null
+      case java.sql.Types.REAL => DoubleType
+      case java.sql.Types.REF => StringType
+      case java.sql.Types.REF_CURSOR => null
+      case java.sql.Types.ROWID => StringType
+      case java.sql.Types.SMALLINT => IntegerType
+      case java.sql.Types.SQLXML => StringType
+      case java.sql.Types.STRUCT => StringType
+      case java.sql.Types.TIME => TimestampType
+      case java.sql.Types.TIME_WITH_TIMEZONE => null
+      case java.sql.Types.TIMESTAMP => TimestampType
+      case java.sql.Types.TIMESTAMP_WITH_TIMEZONE => null
+      case java.sql.Types.TINYINT => IntegerType
+      case java.sql.Types.VARBINARY => BinaryType
+      case java.sql.Types.VARCHAR => StringType
+      case _ =>
+        throw new RuntimeException(s"Unsupported type: $sqlType ")
+      // scalastyle:on
+    }
+
+    if (answer == null) {
+      throw new RuntimeException(s"Unsupported type: $sqlType ")
+    }
+    answer
   }
 }

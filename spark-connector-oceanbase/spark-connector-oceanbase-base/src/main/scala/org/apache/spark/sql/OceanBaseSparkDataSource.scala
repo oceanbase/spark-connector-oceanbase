@@ -79,11 +79,11 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
     }
 
     // Set dialect
-    if ("MySQL".equalsIgnoreCase(getCompatibleMode(oceanBaseConfig))) {
-      JdbcDialects.registerDialect(OceanBaseMySQLDialect)
-    } else {
-      JdbcDialects.registerDialect(OceanBaseOracleDialect)
+    getCompatibleMode(oceanBaseConfig).map(_.toLowerCase) match {
+      case Some("oracle") => JdbcDialects.registerDialect(OceanBaseOracleDialect)
+      case _ => JdbcDialects.registerDialect(OceanBaseMySQLDialect)
     }
+
     (new JDBCOptions(paraMap), paraMap)
   }
 }

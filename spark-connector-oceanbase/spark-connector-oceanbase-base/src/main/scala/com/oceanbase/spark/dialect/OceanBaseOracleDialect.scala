@@ -16,12 +16,16 @@
 
 package com.oceanbase.spark.dialect
 
-import org.apache.spark.sql.connector.expressions.Transform
-import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite}
-import org.apache.spark.sql.types.StructType
+import com.oceanbase.spark.config.OceanBaseConfig
 
-import java.sql.{Connection, Date, Timestamp}
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{BooleanType, ByteType, DataType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType}
+
+import java.sql.{Connection, Date, Timestamp, Types}
 import java.util
+import java.util.TimeZone
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -35,28 +39,28 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
       tableName: String,
       schema: StructType,
       partitions: Array[Transform],
-      options: JdbcOptionsInWrite,
+      config: OceanBaseConfig,
       properties: util.Map[String, String]): Unit =
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
 
   /** Creates a schema. */
   override def createSchema(
       conn: Connection,
-      options: JDBCOptions,
+      config: OceanBaseConfig,
       schema: String,
       comment: String): Unit =
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
 
-  override def schemaExists(conn: Connection, options: JDBCOptions, schema: String): Boolean =
+  override def schemaExists(conn: Connection, config: OceanBaseConfig, schema: String): Boolean =
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
 
-  override def listSchemas(conn: Connection, options: JDBCOptions): Array[Array[String]] =
+  override def listSchemas(conn: Connection, config: OceanBaseConfig): Array[Array[String]] =
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
 
   /** Drops a schema from OceanBase. */
   override def dropSchema(
       conn: Connection,
-      options: JDBCOptions,
+      config: OceanBaseConfig,
       schema: String,
       cascade: Boolean): Unit = throw new UnsupportedOperationException(
     "Not currently supported in oracle mode")
@@ -64,7 +68,7 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
   override def getPriKeyInfo(
       schemaName: String,
       tableName: String,
-      option: JDBCOptions): ArrayBuffer[PriKeyColumnInfo] = {
+      config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
   }
 
@@ -90,5 +94,61 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     case dateValue: Date => "{d '" + dateValue + "'}"
     case arrayValue: Array[Any] => arrayValue.map(compileValue).mkString(", ")
     case _ => value
+  }
+
+  override def getJDBCType(dt: DataType): Option[JdbcType] = dt match {
+    // For more details, please see
+    // https://docs.oracle.com/cd/E19501-01/819-3659/gcmaz/
+    case BooleanType => Some(JdbcType("NUMBER(1)", java.sql.Types.BOOLEAN))
+    case IntegerType => Some(JdbcType("NUMBER(10)", java.sql.Types.INTEGER))
+    case LongType => Some(JdbcType("NUMBER(19)", java.sql.Types.BIGINT))
+    case FloatType => Some(JdbcType("NUMBER(19, 4)", java.sql.Types.FLOAT))
+    case DoubleType => Some(JdbcType("NUMBER(19, 4)", java.sql.Types.DOUBLE))
+    case ByteType => Some(JdbcType("NUMBER(3)", java.sql.Types.SMALLINT))
+    case ShortType => Some(JdbcType("NUMBER(5)", java.sql.Types.SMALLINT))
+    case StringType => Some(JdbcType("VARCHAR2(255)", java.sql.Types.VARCHAR))
+    case _ => None
+  }
+
+  override def getCatalystType(
+      sqlType: Int,
+      typeName: String,
+      size: Int,
+      md: MetadataBuilder): Option[DataType] = {
+    sqlType match {
+      case Types.NUMERIC =>
+        val scale = if (null != md) md.build().getLong("scale") else 0L
+        size match {
+          // Handle NUMBER fields that have no precision/scale in special way
+          // because JDBC ResultSetMetaData converts this to 0 precision and -127 scale
+          // For more details, please see
+          // https://github.com/apache/spark/pull/8780#issuecomment-145598968
+          // and
+          // https://github.com/apache/spark/pull/8780#issuecomment-144541760
+          case 0 => Option(DecimalType(DecimalType.MAX_PRECISION, 10))
+          // Handle FLOAT fields in a special way because JDBC ResultSetMetaData converts
+          // this to NUMERIC with -127 scale
+          // Not sure if there is a more robust way to identify the field as a float (or other
+          // numeric types that do not specify a scale.
+          case _ if scale == -127L => Option(DecimalType(DecimalType.MAX_PRECISION, 10))
+          case _ => None
+        }
+      case TIMESTAMPTZ if supportTimeZoneTypes =>
+        Some(TimestampType) // Value for Timestamp with Time Zone in Oracle
+      case BINARY_FLOAT => Some(FloatType) // Value for OracleTypes.BINARY_FLOAT
+      case BINARY_DOUBLE => Some(DoubleType) // Value for OracleTypes.BINARY_DOUBLE
+      case _ => None
+    }
+  }
+
+  private val BINARY_FLOAT = 100
+  private val BINARY_DOUBLE = 101
+  private val TIMESTAMPTZ = -101
+
+  private def supportTimeZoneTypes: Boolean = {
+    val timeZone = DateTimeUtils.getTimeZone(SQLConf.get.sessionLocalTimeZone)
+    // TODO: support timezone types when users are not using the JVM timezone, which
+    // is the default value of SESSION_LOCAL_TIMEZONE
+    timeZone == TimeZone.getDefault
   }
 }

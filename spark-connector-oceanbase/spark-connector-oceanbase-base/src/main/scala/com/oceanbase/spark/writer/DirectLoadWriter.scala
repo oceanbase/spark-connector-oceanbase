@@ -29,7 +29,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class DirectLoadWriter(oceanBaseConfig: OceanBaseConfig) extends Serializable {
 
-  private val bufferSize = oceanBaseConfig.getBatchSize
+  private val bufferSize = oceanBaseConfig.getDirectLoadBatchSize
   private val sinkTaskPartitionSize = oceanBaseConfig.getDirectLoadTaskPartitionSize
   private val sinkTaskUseRepartition: Boolean = oceanBaseConfig.getDirectLoadUseRepartition
 
