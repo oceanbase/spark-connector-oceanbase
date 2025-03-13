@@ -93,7 +93,7 @@ object OBMySQLPartition {
   private def computeForNonPartTable(config: OceanBaseConfig): Array[InputPartition] = {
     val count: Long = obtainCount(config, EMPTY_STRING)
     require(count >= 0, "Total must be a positive number")
-    computeQueryPart(count, EMPTY_STRING).asInstanceOf[Array[InputPartition]]
+    computeQueryPart(count, EMPTY_STRING, config).asInstanceOf[Array[InputPartition]]
   }
 
   private def computeForPartTable(
@@ -107,7 +107,7 @@ object OBMySQLPartition {
           case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
         }
         val count = obtainCount(config, partitionName)
-        val partitions = computeQueryPart(count, partitionName)
+        val partitions = computeQueryPart(count, partitionName, config)
         arr ++= partitions
       })
 
@@ -137,8 +137,11 @@ object OBMySQLPartition {
     }
   }
 
-  private def computeQueryPart(count: Long, partitionClause: String): Array[OBMySQLPartition] = {
-    val step = calLimit(count)
+  private def computeQueryPart(
+      count: Long,
+      partitionClause: String,
+      config: OceanBaseConfig): Array[OBMySQLPartition] = {
+    val step = config.getJdbcMaxRecordsPrePartition.orElse(calLimit(count))
     require(count >= 0, "Total must be a positive number")
 
     // Note: Now when count is 0, skip the spark query and return directly.

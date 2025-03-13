@@ -19,6 +19,7 @@ package com.oceanbase.spark.config;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 
 
 import org.apache.commons.lang3.StringUtils;
@@ -208,12 +209,28 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .createWithDefault(1024);
 
     public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_PREDICATE =
-            new ConfigBuilder("jdbc.pushDownPredicate")
+            new ConfigBuilder("jdbc.push-down-predicate")
                     .doc(
                             "The option to enable or disable predicate push-down into the JDBC data source. The default value is true, in which case Spark will push down filters to the JDBC data source as much as possible.")
                     .version(ConfigConstants.VERSION_1_1_0)
                     .booleanConf()
                     .createWithDefault(false);
+
+    public static final ConfigEntry<Integer> JDBC_PARALLEL_HINT_DEGREE =
+            new ConfigBuilder("jdbc.parallel-hint-degree")
+                    .doc(
+                            "The SQL statements sent by Spark to OB will automatically carry PARALLEL Hint. This parameter can be used to adjust the parallelism, and the default value is 1.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .intConf()
+                    .createWithDefault(1);
+
+    public static final ConfigEntry<Long> JDBC_MAX_RECORDS_PER_PARTITION =
+            new ConfigBuilder("jdbc.max-records-per-partition")
+                    .doc(
+                            "When Spark reads OB, the maximum number of data records that can be used as a Spark partition.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .longConf()
+                    .create();
 
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
@@ -334,5 +351,13 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getPushDownPredicate() {
         return get(JDBC_PUSH_DOWN_PREDICATE);
+    }
+
+    public Integer getJdbcParallelHintDegree() {
+        return get(JDBC_PARALLEL_HINT_DEGREE);
+    }
+
+    public Optional<Long> getJdbcMaxRecordsPrePartition() {
+        return Optional.ofNullable(get(JDBC_MAX_RECORDS_PER_PARTITION));
     }
 }

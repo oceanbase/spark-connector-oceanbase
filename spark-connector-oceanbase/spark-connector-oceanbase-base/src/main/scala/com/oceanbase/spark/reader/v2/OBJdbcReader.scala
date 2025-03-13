@@ -105,7 +105,7 @@ class OBJdbcReader(
     }
     val part: OBMySQLPartition = partition.asInstanceOf[OBMySQLPartition]
     s"""
-       |SELECT $columnStr FROM ${config.getDbTable} ${part.partitionClause}
+       |SELECT /*+ PARALLEL(${config.getJdbcParallelHintDegree}) */ $columnStr FROM ${config.getDbTable} ${part.partitionClause}
        |$whereClause ${part.limitOffsetClause}
        |""".stripMargin
   }
