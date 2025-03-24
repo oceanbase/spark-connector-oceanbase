@@ -23,7 +23,6 @@ import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.ExprUtils
 import org.apache.spark.sql.connector.expressions.Transform
-import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcOptionsInWrite, JdbcUtils}
 import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
 
 import java.sql.{Connection, Types}
