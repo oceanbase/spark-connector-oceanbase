@@ -140,7 +140,7 @@ OPTIONS(
   "table-name"="htable1",
   "username"="root@sys#myob",
   "password"="password",
-  "catalog"="{
+  "schema"="{
     'order_id': {'cf': 'rowkey','col': 'order_id','type': 'int'},
     'order_date': {'cf': 'family1','col': 'order_date','type': 'timestamp'},
     'customer_name': {'cf': 'family1','col': 'customer_name','type': 'string'},
@@ -199,7 +199,7 @@ OPTIONS(
   "table-name"="htable1",
   "username"="root@sys#myob",
   "password"="password",
-  "catalog"="{
+  "schema"="{
     'order_id': {'cf': 'rowkey','col': 'order_id','type': 'int'},
     'order_date': {'cf': 'family1','col': 'order_date','type': 'timestamp'},
     'customer_name': {'cf': 'family1','col': 'customer_name','type': 'string'},
