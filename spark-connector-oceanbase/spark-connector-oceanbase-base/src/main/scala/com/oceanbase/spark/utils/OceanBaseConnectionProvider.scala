@@ -21,22 +21,23 @@ import com.oceanbase.spark.config.OceanBaseConfig
 
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.jdbc.DriverRegistry
 
 import java.sql.{Connection, DriverManager}
 
 object OceanBaseConnectionProvider extends Logging {
   private val driverSupportSet: Set[String] =
-    Set("com.mysql.jdbc.Driver", "com.mysql.cj.jdbc.Driver", "com.oceanbase.jdbc.Driver")
+    Set("com.mysql.jdbc.driver", "com.mysql.cj.jdbc.driver", "com.oceanbase.jdbc.driver")
 
   def getConnection(oceanBaseConfig: OceanBaseConfig): Connection = {
     var driver = oceanBaseConfig.getDriver
     try {
       if (StringUtils.isBlank(driver)) {
         driver = DriverManager.getDriver(oceanBaseConfig.getURL).getClass.getCanonicalName
-        Class.forName(driver)
+        DriverRegistry.register(driver)
       } else {
         require(driverSupportSet.contains(driver.toLowerCase), s"Unsupported driver class: $driver")
-        Class.forName(driver)
+        DriverRegistry.register(driver)
       }
       val connection = DriverManager.getConnection(
         oceanBaseConfig.getURL,
