@@ -42,6 +42,8 @@ public class DirectLoaderBuilder implements Serializable {
     /** Server-side parallelism. */
     private int parallel = 8;
 
+    private int writeThreadNum = 8;
+
     private long maxErrorCount = 0L;
 
     private ObLoadDupActionType duplicateKeyAction = ObLoadDupActionType.REPLACE;
@@ -98,6 +100,11 @@ public class DirectLoaderBuilder implements Serializable {
         return this;
     }
 
+    public DirectLoaderBuilder writeThreadNum(Integer parallel) {
+        this.writeThreadNum = parallel;
+        return this;
+    }
+
     public DirectLoaderBuilder maxErrorCount(Long maxErrorCount) {
         this.maxErrorCount = maxErrorCount;
         return this;
@@ -135,7 +142,7 @@ public class DirectLoaderBuilder implements Serializable {
 
     public DirectLoader build() {
         try {
-            ObDirectLoadConnection obDirectLoadConnection = buildConnection(parallel);
+            ObDirectLoadConnection obDirectLoadConnection = buildConnection(writeThreadNum);
             ObDirectLoadStatement obDirectLoadStatement = buildStatement(obDirectLoadConnection);
             if (StringUtils.isNotBlank(executionId)) {
                 return new DirectLoader(

@@ -41,6 +41,7 @@ public class DirectLoadUtils {
                     .heartBeatInterval(oceanBaseConfig.getDirectLoadHeartbeatInterval())
                     .directLoadMethod(oceanBaseConfig.getDirectLoadLoadMethod())
                     .parallel(oceanBaseConfig.getDirectLoadParallel())
+                    .writeThreadNum(oceanBaseConfig.getDirectLoadWriteThreadNum())
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("Fail to build DirectLoader.", e);
