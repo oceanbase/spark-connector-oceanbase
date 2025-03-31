@@ -28,7 +28,7 @@ import java.util.Properties
 
 object OceanBaseConnectionProvider extends Logging {
   private val driverSupportSet: Set[String] =
-    Set("com.mysql.jdbc.driver", "com.mysql.cj.jdbc.driver", "com.oceanbase.jdbc.driver")
+    Set("com.mysql.jdbc.Driver", "com.mysql.cj.jdbc.Driver", "com.oceanbase.jdbc.Driver")
 
   def getConnection(oceanBaseConfig: OceanBaseConfig): Connection = {
     var driver = oceanBaseConfig.getDriver
@@ -37,7 +37,7 @@ object OceanBaseConnectionProvider extends Logging {
         driver = DriverManager.getDriver(oceanBaseConfig.getURL).getClass.getCanonicalName
         DriverRegistry.register(driver)
       } else {
-        require(driverSupportSet.contains(driver.toLowerCase), s"Unsupported driver class: $driver")
+        require(driverSupportSet.contains(driver), s"Unsupported driver class: $driver")
         DriverRegistry.register(driver)
       }
       val properties = new Properties()
