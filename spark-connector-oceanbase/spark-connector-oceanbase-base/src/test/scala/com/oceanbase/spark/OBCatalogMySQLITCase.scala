@@ -22,6 +22,8 @@ import org.apache.spark.sql.SparkSession
 import org.junit.jupiter.api.{AfterAll, AfterEach, Assertions, BeforeAll, BeforeEach, Test}
 import org.junit.jupiter.api.function.ThrowingSupplier
 
+import java.util
+
 class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
   @BeforeEach
@@ -50,7 +52,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     session.sql("use ob;")
     insertTestData(session, "products")
-    queryAndVerifyTableData(session, "products")
+    queryAndVerifyTableData(session, "products", expected)
 
     session.stop()
   }
@@ -113,7 +115,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     session.sql("use ob;")
     insertTestData(session, "products_no_pri_key")
-    queryAndVerifyTableData(session, "products_no_pri_key")
+    queryAndVerifyTableData(session, "products_no_pri_key", expected)
     session.stop()
   }
 
@@ -132,7 +134,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.sql("use ob;")
     insertTestData(session, "products_full_pri_key")
 
-    queryAndVerifyTableData(session, "products_full_pri_key")
+    queryAndVerifyTableData(session, "products_full_pri_key", expected)
 
     session.stop()
   }
@@ -154,7 +156,11 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .getOrCreate()
 
     insertTestData(session, "products")
-    queryAndVerifyTableData(session, "products")
+    queryAndVerifyTableData(session, "products", expected)
+
+    insertTestData(session, "products_no_pri_key")
+    session.sql("insert overwrite products select * from products_no_pri_key")
+    queryAndVerifyTableData(session, "products", expected)
     session.stop()
   }
 
@@ -173,7 +179,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     insertTestData(session, "products")
     // Test CTAS
     session.sql("create table test1 as select * from products")
-    queryAndVerifyTableData(session, "test1")
+    queryAndVerifyTableData(session, "test1", expected)
 
     // test bucket partition table:
     //   1. column comment test
@@ -199,7 +205,35 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
-  private def queryAndVerifyTableData(session: SparkSession, tableName: String): Unit = {
+  @Test
+  def testTruncateAndOverWriteTable(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+    session.sql("truncate table products")
+    val expect = new util.ArrayList[String]()
+    queryAndVerifyTableData(session, "products", expect)
+
+    insertTestData(session, "products_no_pri_key")
+    session.sql("insert overwrite products select * from products_no_pri_key")
+    queryAndVerifyTableData(session, "products", expected)
+
+    session.stop()
+  }
+
+  private def queryAndVerifyTableData(
+      session: SparkSession,
+      tableName: String,
+      expected: util.List[String]): Unit = {
     import scala.collection.JavaConverters._
     val actual = session
       .sql(s"select * from $tableName")
