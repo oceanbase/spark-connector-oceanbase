@@ -339,6 +339,12 @@ df.write
                 <td>Rpc port number used in direct-load.</td>
             </tr>
             <tr>
+                <td>direct-load.write-thread-num</td>
+                <td>8</td>
+                <td>Integer</td>
+                <td>The number of threads to use when direct-load client are writing.</td>
+            </tr>
+            <tr>
                 <td>direct-load.parallel</td>
                 <td>8</td>
                 <td>Integer</td>

@@ -32,6 +32,7 @@ import java.sql.SQLException
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.util.{Failure, Success, Try}
 
 class OceanBaseCatalog
   extends TableCatalog
@@ -178,6 +179,19 @@ class OceanBaseCatalog
           dialect.alterTable(conn, getTableName(ident), changes, config)
         }
         loadTable(ident)
+    }
+  }
+
+  override def purgeTable(ident: Identifier): Boolean = {
+    val config = genNewOceanBaseConfig(this.config, ident)
+    Try {
+      OBJdbcUtils.withConnection(config) {
+        conn =>
+          OBJdbcUtils.executeStatement(conn, config, dialect.getTruncateQuery(config.getDbTable))
+      }
+    } match {
+      case Success(_) => true
+      case Failure(_) => false
     }
   }
 

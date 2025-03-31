@@ -336,6 +336,12 @@ df.write
                 <td>旁路导入用到的rpc端口。</td>
             </tr>
             <tr>
+                <td>direct-load.write-thread-num</td>
+                <td>8</td>
+                <td>Integer</td>
+                <td>旁路导入客户端写入时使用的线程数。</td>
+            </tr>
+            <tr>
                 <td>direct-load.parallel</td>
                 <td>8</td>
                 <td>Integer</td>
