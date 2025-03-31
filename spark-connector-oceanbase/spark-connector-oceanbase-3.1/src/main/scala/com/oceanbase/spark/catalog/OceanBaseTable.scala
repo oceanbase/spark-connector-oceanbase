@@ -43,8 +43,7 @@ case class OceanBaseTable(
     dialect: OceanBaseDialect)
   extends Table
   with SupportsRead
-  with SupportsWrite
-  with TruncatableTable {
+  with SupportsWrite {
 
   override def name(): String = ident.toString
 
@@ -70,18 +69,6 @@ case class OceanBaseTable(
       DirectLoadWriteBuilderV2(schema, config)
     } else {
       new JDBCWriteBuilder(schema, config, dialect)
-    }
-  }
-
-  override def truncateTable(): Boolean = {
-    Try {
-      OBJdbcUtils.withConnection(config) {
-        conn =>
-          OBJdbcUtils.executeStatement(conn, config, dialect.getTruncateQuery(config.getDbTable))
-      }
-    } match {
-      case Success(_) => true
-      case Failure(_) => false
     }
   }
 }
