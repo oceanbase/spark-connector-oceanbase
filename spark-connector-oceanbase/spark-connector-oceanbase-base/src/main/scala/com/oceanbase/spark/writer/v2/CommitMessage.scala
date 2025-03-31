@@ -13,20 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.oceanbase.spark.writer.v2
 
-package com.oceanbase.spark.config;
+import org.apache.spark.sql.connector.write.WriterCommitMessage
 
-/** Constants used for configuration. */
-public interface ConfigConstants {
-
-    /** The value of messages used to indicate that the configuration is not set. */
-    String NOT_BLANK_ERROR_MSG = "The value can't be blank";
-
-    /**
-     * The value of messages used to indicate that the configuration should be a positive number.
-     */
-    String POSITIVE_NUMBER_ERROR_MSG = "The value must be a positive number";
-
-    String VERSION_1_0_0 = "1.0";
-    String VERSION_1_1_0 = "1.1";
-}
+case class CommitMessage(msg: String = "") extends WriterCommitMessage

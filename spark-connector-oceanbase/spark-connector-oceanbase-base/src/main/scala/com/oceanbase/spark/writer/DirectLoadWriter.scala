@@ -29,7 +29,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class DirectLoadWriter(oceanBaseConfig: OceanBaseConfig) extends Serializable {
 
-  private val bufferSize = oceanBaseConfig.getBatchSize
+  private val bufferSize = oceanBaseConfig.getDirectLoadBatchSize
   private val sinkTaskPartitionSize = oceanBaseConfig.getDirectLoadTaskPartitionSize
   private val sinkTaskUseRepartition: Boolean = oceanBaseConfig.getDirectLoadUseRepartition
 
@@ -61,6 +61,8 @@ class DirectLoadWriter(oceanBaseConfig: OceanBaseConfig) extends Serializable {
   }
 
   private def flush(buffer: ArrayBuffer[Row], directLoader: DirectLoader): Unit = {
+    if (buffer.isEmpty) return
+
     val bucket = new ObDirectLoadBucket()
     buffer.foreach(
       row => {
@@ -73,5 +75,20 @@ class DirectLoadWriter(oceanBaseConfig: OceanBaseConfig) extends Serializable {
 
     directLoader.write(bucket)
     buffer.clear()
+  }
+}
+
+object DirectLoadWriter {
+
+  def savaTable(dataFrame: DataFrame, oceanBaseConfig: OceanBaseConfig): Unit = {
+    // Init direct-loader.
+    val directLoader = DirectLoadUtils.buildDirectLoaderFromSetting(oceanBaseConfig)
+    val executionId = directLoader.begin()
+    oceanBaseConfig.set(OceanBaseConfig.DIRECT_LOAD_EXECUTION_ID, executionId)
+    val writer = new DirectLoadWriter(oceanBaseConfig)
+    writer.write(dataFrame)
+
+    directLoader.commit()
+    directLoader.close()
   }
 }

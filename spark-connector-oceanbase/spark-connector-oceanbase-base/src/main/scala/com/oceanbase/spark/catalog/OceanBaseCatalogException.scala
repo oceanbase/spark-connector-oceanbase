@@ -14,19 +14,7 @@
  * limitations under the License.
  */
 
-package com.oceanbase.spark.config;
+package com.oceanbase.spark.catalog
 
-/** Constants used for configuration. */
-public interface ConfigConstants {
-
-    /** The value of messages used to indicate that the configuration is not set. */
-    String NOT_BLANK_ERROR_MSG = "The value can't be blank";
-
-    /**
-     * The value of messages used to indicate that the configuration should be a positive number.
-     */
-    String POSITIVE_NUMBER_ERROR_MSG = "The value must be a positive number";
-
-    String VERSION_1_0_0 = "1.0";
-    String VERSION_1_1_0 = "1.1";
-}
+case class OceanBaseCatalogException(message: String, cause: Throwable = null)
+  extends Exception(message, cause)

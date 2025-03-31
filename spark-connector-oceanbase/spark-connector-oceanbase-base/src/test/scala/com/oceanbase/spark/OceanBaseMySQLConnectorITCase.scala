@@ -15,19 +15,30 @@
  */
 package com.oceanbase.spark
 
+import com.oceanbase.spark.OceanBaseMySQLConnectorITCase.expected
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
 
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
-import org.junit.jupiter.api.{AfterAll, BeforeAll, Disabled, Test}
+import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Test}
 
 import java.util
 
 class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
+  @BeforeEach
+  def initEach(): Unit = {
+    initialize("sql/mysql/products.sql")
+  }
+
+  @AfterEach
+  def afterEach(): Unit = {
+    dropTables("products", "products_no_pri_key", "products_full_pri_key")
+  }
+
+  val TEST_TABLE_PRODUCTS = "products"
+
   @Test
   def testSqlJDBCWrite(): Unit = {
-    initialize("sql/mysql/products.sql")
-
     val session = SparkSession.builder().master("local[*]").getOrCreate()
 
     session.sql(s"""
@@ -42,48 +53,14 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "password"="$getPassword"
                    |);
                    |""".stripMargin)
-
-    session.sql(
-      """
-        |INSERT INTO test_sink VALUES
-        |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
-        |(102, 'car battery', '12V car battery', 8.1),
-        |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
-        |(104, 'hammer', '12oz carpenter\'s hammer', 0.75),
-        |(105, 'hammer', '14oz carpenter\'s hammer', 0.875),
-        |(106, 'hammer', '16oz carpenter\'s hammer', 1.0),
-        |(107, 'rocks', 'box of assorted rocks', 5.3),
-        |(108, 'jacket', 'water resistent black wind breaker', 0.1),
-        |(109, 'spare tire', '24 inch spare tire', 22.2);
-        |""".stripMargin)
-
-    val expected: util.List[String] = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000",
-      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
-      "104,hammer,12oz carpenter's hammer,0.7500000000",
-      "105,hammer,14oz carpenter's hammer,0.8750000000",
-      "106,hammer,16oz carpenter's hammer,1.0000000000",
-      "107,rocks,box of assorted rocks,5.3000000000",
-      "108,jacket,water resistent black wind breaker,0.1000000000",
-      "109,spare tire,24 inch spare tire,22.2000000000"
-    )
+    insertToProducts(session)
     session.stop()
-
-    waitingAndAssertTableCount("products", expected.size)
-
-    val actual: util.List[String] = queryTable("products")
-
-    assertEqualsInAnyOrder(expected, actual)
-
-    dropTables("products")
+    verifyTableData(TEST_TABLE_PRODUCTS, expected)
   }
 
   @Test
   def testSqlDirectLoadWrite(): Unit = {
-    initialize("sql/mysql/products.sql")
-
-    val session = SparkSession.builder().master("local[*]").getOrCreate()
+    val session = SparkSession.builder().master("local[1]").getOrCreate()
 
     session.sql(s"""
                    |CREATE TEMPORARY VIEW test_sink
@@ -102,47 +79,47 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |);
                    |""".stripMargin)
 
-    session.sql(
-      """
-        |INSERT INTO test_sink VALUES
-        |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
-        |(102, 'car battery', '12V car battery', 8.1),
-        |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
-        |(104, 'hammer', '12oz carpenter\'s hammer', 0.75),
-        |(105, 'hammer', '14oz carpenter\'s hammer', 0.875),
-        |(106, 'hammer', '16oz carpenter\'s hammer', 1.0),
-        |(107, 'rocks', 'box of assorted rocks', 5.3),
-        |(108, 'jacket', 'water resistent black wind breaker', 0.1),
-        |(109, 'spare tire', '24 inch spare tire', 22.2);
-        |""".stripMargin)
+    insertToProducts(session)
+    session.stop()
+    verifyTableData(TEST_TABLE_PRODUCTS, OceanBaseMySQLConnectorITCase.expected)
+  }
+
+  @Test
+  def testDirectLoadWithEmptySparkPartition(): Unit = {
+    val session = SparkSession.builder().master("local[1]").getOrCreate()
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "$getJdbcUrlWithoutDB",
+                   |  "rpc-port" = "$getRpcPort",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="products",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword",
+                   |  "direct-load.enabled"=true,
+                   |  "direct-load.host"="$getHost",
+                   |  "direct-load.rpc-port"=$getRpcPort
+                   |);
+                   |""".stripMargin)
+    session
+      .sql("""
+             |INSERT INTO test_sink
+             |SELECT /*+ REPARTITION(3) */ 101, 'scooter', 'Small 2-wheel scooter', 3.14;
+             |""".stripMargin)
+      .repartition(3)
 
     val expected: util.List[String] = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000",
-      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
-      "104,hammer,12oz carpenter's hammer,0.7500000000",
-      "105,hammer,14oz carpenter's hammer,0.8750000000",
-      "106,hammer,16oz carpenter's hammer,1.0000000000",
-      "107,rocks,box of assorted rocks,5.3000000000",
-      "108,jacket,water resistent black wind breaker,0.1000000000",
-      "109,spare tire,24 inch spare tire,22.2000000000"
+      "101,scooter,Small 2-wheel scooter,3.1400000000"
     )
     session.stop()
 
-    waitingAndAssertTableCount("products", expected.size)
-
-    val actual: util.List[String] = queryTable("products")
-
-    assertEqualsInAnyOrder(expected, actual)
-
-    dropTables("products")
+    verifyTableData(TEST_TABLE_PRODUCTS, expected)
   }
 
   @Test
   def testDataFrameDirectLoadWrite(): Unit = {
-    initialize("sql/mysql/products.sql")
-
-    val session = SparkSession.builder().master("local[*]").getOrCreate()
+    val session = SparkSession.builder().master("local[1]").getOrCreate()
     val df = session
       .createDataFrame(
         Seq(
@@ -174,33 +151,13 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
       .option("direct-load.host", getHost)
       .option("direct-load.rpc-port", value = getRpcPort)
       .save()
+
     session.stop()
-
-    val expected: util.List[String] = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000",
-      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
-      "104,hammer,12oz carpenter's hammer,0.7500000000",
-      "105,hammer,14oz carpenter's hammer,0.8750000000",
-      "106,hammer,16oz carpenter's hammer,1.0000000000",
-      "107,rocks,box of assorted rocks,5.3000000000",
-      "108,jacket,water resistent black wind breaker,0.1000000000",
-      "109,spare tire,24 inch spare tire,22.2000000000"
-    )
-
-    waitingAndAssertTableCount("products", expected.size)
-
-    val actual: util.List[String] = queryTable("products")
-
-    assertEqualsInAnyOrder(expected, actual)
-
-    dropTables("products")
+    verifyTableData(TEST_TABLE_PRODUCTS, OceanBaseMySQLConnectorITCase.expected)
   }
 
   @Test
   def testSqlRead(): Unit = {
-    initialize("sql/mysql/products.sql")
-
     val session = SparkSession.builder().master("local[*]").getOrCreate()
 
     session.sql(s"""
@@ -217,31 +174,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |);
                    |""".stripMargin)
 
-    session.sql(
-      """
-        |INSERT INTO test_sink VALUES
-        |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
-        |(102, 'car battery', '12V car battery', 8.1),
-        |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
-        |(104, 'hammer', '12oz carpenter\'s hammer', 0.75),
-        |(105, 'hammer', '14oz carpenter\'s hammer', 0.875),
-        |(106, 'hammer', '16oz carpenter\'s hammer', 1.0),
-        |(107, 'rocks', 'box of assorted rocks', 5.3),
-        |(108, 'jacket', 'water resistent black wind breaker', 0.1),
-        |(109, 'spare tire', '24 inch spare tire', 22.2);
-        |""".stripMargin)
-
-    val expected: util.List[String] = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000",
-      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
-      "104,hammer,12oz carpenter's hammer,0.7500000000",
-      "105,hammer,14oz carpenter's hammer,0.8750000000",
-      "106,hammer,16oz carpenter's hammer,1.0000000000",
-      "107,rocks,box of assorted rocks,5.3000000000",
-      "108,jacket,water resistent black wind breaker,0.1000000000",
-      "109,spare tire,24 inch spare tire,22.2000000000"
-    )
+    insertToProducts(session)
     import scala.collection.JavaConverters._
     val actual = session
       .sql("select * from test_sink")
@@ -254,12 +187,10 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     assertEqualsInAnyOrder(expected, actual)
 
     session.stop()
-    dropTables("products")
   }
 
   @Test
   def testSqlReadWithQuery(): Unit = {
-    initialize("sql/mysql/products.sql")
 
     val session = SparkSession.builder().master("local[*]").getOrCreate()
 
@@ -275,21 +206,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "password"="$getPassword"
                    |);
                    |""".stripMargin)
-
-    session.sql(
-      """
-        |INSERT INTO test_sink VALUES
-        |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
-        |(102, 'car battery', '12V car battery', 8.1),
-        |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
-        |(104, 'hammer', '12oz carpenter\'s hammer', 0.75),
-        |(105, 'hammer', '14oz carpenter\'s hammer', 0.875),
-        |(106, 'hammer', '16oz carpenter\'s hammer', 1.0),
-        |(107, 'rocks', 'box of assorted rocks', 5.3),
-        |(108, 'jacket', 'water resistent black wind breaker', 0.1),
-        |(109, 'spare tire', '24 inch spare tire', 22.2);
-        |""".stripMargin)
-
+    insertToProducts(session)
     session.sql(s"""
                    |CREATE TEMPORARY VIEW test_read_query
                    |USING oceanbase
@@ -326,13 +243,10 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     assertEqualsInAnyOrder(expected, actual)
 
     session.stop()
-    dropTables("products")
   }
 
   @Test
   def testSqlReadWithOceanBaseDriver(): Unit = {
-    initialize("sql/mysql/products.sql")
-
     val session = SparkSession.builder().master("local[*]").getOrCreate()
 
     session.sql(s"""
@@ -348,19 +262,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |);
                    |""".stripMargin)
 
-    session.sql(
-      """
-        |INSERT INTO test_sink VALUES
-        |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
-        |(102, 'car battery', '12V car battery', 8.1),
-        |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
-        |(104, 'hammer', '12oz carpenter\'s hammer', 0.75),
-        |(105, 'hammer', '14oz carpenter\'s hammer', 0.875),
-        |(106, 'hammer', '16oz carpenter\'s hammer', 1.0),
-        |(107, 'rocks', 'box of assorted rocks', 5.3),
-        |(108, 'jacket', 'water resistent black wind breaker', 0.1),
-        |(109, 'spare tire', '24 inch spare tire', 22.2);
-        |""".stripMargin)
+    insertToProducts(session)
 
     session.sql(s"""
                    |CREATE TEMPORARY VIEW test_read_query
@@ -398,13 +300,10 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     assertEqualsInAnyOrder(expected, actual)
 
     session.stop()
-    dropTables("products")
   }
 
   @Test
   def testDataFrameRead(): Unit = {
-    initialize("sql/mysql/products.sql")
-
     val session = SparkSession.builder().master("local[*]").getOrCreate()
 
     // Sql write
@@ -421,6 +320,32 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |);
                    |""".stripMargin)
 
+    insertToProducts(session)
+
+    // DataFrame read
+    val dataFrame = session.read
+      .format("oceanbase")
+      .option("url", getJdbcUrlWithoutDB)
+      .option("username", getUsername)
+      .option("password", getPassword)
+      .option("table-name", "products")
+      .option("schema-name", getSchemaName)
+      .load()
+
+    import scala.collection.JavaConverters._
+    val actual = dataFrame
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+  }
+
+  private def insertToProducts(session: SparkSession): Unit = {
     session.sql(
       """
         |INSERT INTO test_sink VALUES
@@ -434,41 +359,12 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
         |(108, 'jacket', 'water resistent black wind breaker', 0.1),
         |(109, 'spare tire', '24 inch spare tire', 22.2);
         |""".stripMargin)
+  }
 
-    // DataFrame read
-    val dataFrame = session.read
-      .format("oceanbase")
-      .option("url", getJdbcUrlWithoutDB)
-      .option("username", getUsername)
-      .option("password", getPassword)
-      .option("table-name", "products")
-      .option("schema-name", getSchemaName)
-      .load()
-
-    val expected: util.List[String] = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000",
-      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
-      "104,hammer,12oz carpenter's hammer,0.7500000000",
-      "105,hammer,14oz carpenter's hammer,0.8750000000",
-      "106,hammer,16oz carpenter's hammer,1.0000000000",
-      "107,rocks,box of assorted rocks,5.3000000000",
-      "108,jacket,water resistent black wind breaker,0.1000000000",
-      "109,spare tire,24 inch spare tire,22.2000000000"
-    )
-
-    import scala.collection.JavaConverters._
-    val actual = dataFrame
-      .collect()
-      .map(
-        _.toString().drop(1).dropRight(1)
-      )
-      .toList
-      .asJava
+  def verifyTableData(tableName: String, expected: util.List[String]): Unit = {
+    waitingAndAssertTableCount(tableName, expected.size)
+    val actual: util.List[String] = queryTable(tableName)
     assertEqualsInAnyOrder(expected, actual)
-
-    session.stop()
-    dropTables("products")
   }
 
   def getJdbcUrlWithoutDB: String =
@@ -486,4 +382,16 @@ object OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
   def tearDown(): Unit = {
     OceanBaseMySQLTestBase.CONTAINER.stop()
   }
+
+  val expected: util.List[String] = util.Arrays.asList(
+    "101,scooter,Small 2-wheel scooter,3.1400000000",
+    "102,car battery,12V car battery,8.1000000000",
+    "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
+    "104,hammer,12oz carpenter's hammer,0.7500000000",
+    "105,hammer,14oz carpenter's hammer,0.8750000000",
+    "106,hammer,16oz carpenter's hammer,1.0000000000",
+    "107,rocks,box of assorted rocks,5.3000000000",
+    "108,jacket,water resistent black wind breaker,0.1000000000",
+    "109,spare tire,24 inch spare tire,22.2000000000"
+  )
 }

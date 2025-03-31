@@ -16,10 +16,12 @@
 package org.apache.spark.sql
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.jdbc.OBJdbcUtils.{getCompatibleMode, getDbTable}
-import com.oceanbase.spark.sql.OceanBaseSparkSource
+import com.oceanbase.spark.utils.OBJdbcUtils
+import com.oceanbase.spark.utils.OBJdbcUtils.{getCompatibleMode, getDbTable}
+import com.oceanbase.spark.writer.DirectLoadWriter
 
-import OceanBaseSparkDataSource.{JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import OceanBaseSparkDataSource.{writeDataViaDirectLoad, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import org.apache.spark.sql
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
 import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import org.apache.spark.sql.sources._
@@ -53,7 +55,7 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       val param = buildJDBCOptions(parameters, oceanBaseConfig)._2
       super.createRelation(sqlContext, mode, param, dataFrame)
     } else {
-      OceanBaseSparkSource.createDirectLoadRelation(sqlContext, mode, dataFrame, oceanBaseConfig)
+      writeDataViaDirectLoad(mode, dataFrame, oceanBaseConfig)
       createRelation(sqlContext, parameters)
     }
   }
@@ -64,10 +66,9 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
     var paraMap = parameters ++ Map(
       JDBC_URL -> oceanBaseConfig.getURL,
       JDBC_USER -> parameters(OceanBaseConfig.USERNAME.getKey),
-      JDBC_TXN_ISOLATION_LEVEL -> {
-        if (!parameters.contains(JDBC_TXN_ISOLATION_LEVEL)) OCEANBASE_DEFAULT_ISOLATION_LEVEL
-        else parameters(JDBC_TXN_ISOLATION_LEVEL)
-      }
+      JDBC_TXN_ISOLATION_LEVEL -> parameters.getOrElse(
+        JDBC_TXN_ISOLATION_LEVEL,
+        OCEANBASE_DEFAULT_ISOLATION_LEVEL)
     )
     // It is not allowed to specify dbtable and query options at the same time.
     if (parameters.contains(JDBCOptions.JDBC_QUERY_STRING)) {
@@ -78,11 +79,11 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
     }
 
     // Set dialect
-    if ("MySQL".equalsIgnoreCase(getCompatibleMode(oceanBaseConfig))) {
-      JdbcDialects.registerDialect(OceanBaseMySQLDialect)
-    } else {
-      JdbcDialects.registerDialect(OceanBaseOracleDialect)
+    getCompatibleMode(oceanBaseConfig).map(_.toLowerCase) match {
+      case Some("oracle") => JdbcDialects.registerDialect(OceanBaseOracleDialect)
+      case _ => JdbcDialects.registerDialect(OceanBaseMySQLDialect)
     }
+
     (new JDBCOptions(paraMap), paraMap)
   }
 }
@@ -93,4 +94,34 @@ object OceanBaseSparkDataSource {
   val JDBC_USER = "user"
   val JDBC_TXN_ISOLATION_LEVEL = "isolationLevel"
   val OCEANBASE_DEFAULT_ISOLATION_LEVEL = "READ_COMMITTED"
+
+  /**
+   * Writes DataFrame data using OceanBase's direct-load feature
+   *   - Append mode: Directly appends data without pre-checking
+   *   - Overwrite mode: Truncates target table before writing
+   *   - Other modes: Throws NotImplementedError
+   *
+   * @param mode
+   *   Spark SaveMode specifying write behavior
+   * @param dataFrame
+   *   DataFrame containing data to write
+   * @param oceanBaseConfig
+   *   Configuration for OceanBase connection
+   * @note
+   *   Direct load is OceanBase's high-performance data loading feature that writes directly to
+   *   storage layer
+   */
+  def writeDataViaDirectLoad(
+      mode: SaveMode,
+      dataFrame: DataFrame,
+      oceanBaseConfig: OceanBaseConfig): Unit = {
+    mode match {
+      case sql.SaveMode.Append => // do nothing
+      case sql.SaveMode.Overwrite =>
+        OBJdbcUtils.truncateTable(oceanBaseConfig)
+      case _ =>
+        throw new NotImplementedError(s"${mode.name()} mode is not currently supported.")
+    }
+    DirectLoadWriter.savaTable(dataFrame, oceanBaseConfig)
+  }
 }
