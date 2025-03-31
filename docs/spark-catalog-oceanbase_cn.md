@@ -297,6 +297,13 @@ select * from spark_catalog.default.orders;
                 <td>密码。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.driver</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>用于连接到此 URL 的 JDBC 驱动程序的类名。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.schema-name</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;"></td>

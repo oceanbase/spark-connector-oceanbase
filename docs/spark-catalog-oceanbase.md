@@ -298,6 +298,13 @@ select * from spark_catalog.default.orders;
                 <td>The password.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.driver</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>The class name of the JDBC driver to use to connect to this URL.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.schema-name</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>

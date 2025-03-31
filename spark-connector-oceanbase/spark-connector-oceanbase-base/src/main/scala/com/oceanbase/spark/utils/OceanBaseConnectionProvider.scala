@@ -21,8 +21,10 @@ import com.oceanbase.spark.config.OceanBaseConfig
 
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.execution.datasources.jdbc.DriverRegistry
 
 import java.sql.{Connection, DriverManager}
+import java.util.Properties
 
 object OceanBaseConnectionProvider extends Logging {
   private val driverSupportSet: Set[String] =
@@ -33,17 +35,21 @@ object OceanBaseConnectionProvider extends Logging {
     try {
       if (StringUtils.isBlank(driver)) {
         driver = DriverManager.getDriver(oceanBaseConfig.getURL).getClass.getCanonicalName
-        Class.forName(driver)
+        DriverRegistry.register(driver)
       } else {
-        require(driverSupportSet.contains(driver.toLowerCase), s"Unsupported driver class: $driver")
-        Class.forName(driver)
+        require(driverSupportSet.contains(driver), s"Unsupported driver class: $driver")
+        DriverRegistry.register(driver)
       }
-      val connection = DriverManager.getConnection(
-        oceanBaseConfig.getURL,
-        oceanBaseConfig.getUsername,
-        oceanBaseConfig.getPassword
-      )
-      connection
+      val properties = new Properties()
+      properties.put("user", oceanBaseConfig.getUsername)
+      properties.put("password", oceanBaseConfig.getPassword)
+      DriverRegistry.get(driver).connect(oceanBaseConfig.getURL, properties)
+//      val connection = DriverManager.getConnection(
+//        oceanBaseConfig.getURL,
+//        oceanBaseConfig.getUsername,
+//        oceanBaseConfig.getPassword
+//      )
+//      connection
     } catch {
       case e: Exception => throw new RuntimeException("Failed to obtain connection.", e)
     }
