@@ -148,7 +148,7 @@ public class DirectLoaderBuilder implements Serializable {
     }
 
     private String buildSchemaTableName() {
-        return String.format("%s.%s#%s", schema, table, tenant);
+        return String.format("%s.%s#%s-%s", schema, table, tenant, executionId);
     }
 
     public DirectLoader build() {
@@ -193,9 +193,9 @@ public class DirectLoaderBuilder implements Serializable {
                             }
                         });
         LOG.info(
-                "The Connection Map Size: {}, keys: {}",
+                "The direct-load connection map size: {}, keys: {}",
                 directLoadConnMap.size(),
-                directLoadConnMap.keys());
+                String.join(",", directLoadConnMap.keySet()));
         return conn;
     }
 
