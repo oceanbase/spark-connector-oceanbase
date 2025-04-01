@@ -87,7 +87,11 @@ class DirectLoadWriteV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
 
   override def abort(): Unit = {}
 
-  override def close(): Unit = {}
+  override def close(): Unit = {
+    // Only close the Statement of the current Task
+    // TODO：Close the Connection when the direct-load library bug is fixed.
+    if (directLoader.getStatement != null) directLoader.getStatement.close()
+  }
 }
 
 object DirectLoadWriteV2 {
