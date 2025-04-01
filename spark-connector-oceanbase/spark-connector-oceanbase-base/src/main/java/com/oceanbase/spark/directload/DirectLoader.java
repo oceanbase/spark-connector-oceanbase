@@ -140,6 +140,7 @@ public class DirectLoader implements Serializable {
             this.statement.close();
         }
         if (Objects.nonNull(connection)) {
+            DirectLoaderBuilder.directLoadConnMap.remove(schemaTableName);
             this.connection.close();
         }
     }

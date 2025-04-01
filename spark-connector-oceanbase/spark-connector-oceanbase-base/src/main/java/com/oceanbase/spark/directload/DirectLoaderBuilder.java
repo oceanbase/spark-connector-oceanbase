@@ -17,6 +17,7 @@
 package com.oceanbase.spark.directload;
 
 import java.io.Serializable;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 import com.alipay.oceanbase.rpc.direct_load.ObDirectLoadConnection;
@@ -25,9 +26,12 @@ import com.alipay.oceanbase.rpc.direct_load.ObDirectLoadStatement;
 import com.alipay.oceanbase.rpc.direct_load.exception.ObDirectLoadException;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObLoadDupActionType;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The builder for {@link DirectLoader}. */
 public class DirectLoaderBuilder implements Serializable {
+    private static final Logger LOG = LoggerFactory.getLogger(DirectLoaderBuilder.class);
 
     private String host;
     private int port;
@@ -59,6 +63,9 @@ public class DirectLoaderBuilder implements Serializable {
     private String directLoadMethod = "full";
 
     private String executionId;
+
+    protected static final ConcurrentHashMap<String, ObDirectLoadConnection> directLoadConnMap =
+            new ConcurrentHashMap<>();
 
     public DirectLoaderBuilder host(String host) {
         this.host = host;
@@ -140,6 +147,10 @@ public class DirectLoaderBuilder implements Serializable {
         return this;
     }
 
+    private String buildSchemaTableName() {
+        return String.format("%s.%s#%s", schema, table, tenant);
+    }
+
     public DirectLoader build() {
         try {
             ObDirectLoadConnection obDirectLoadConnection = buildConnection(writeThreadNum);
@@ -147,14 +158,14 @@ public class DirectLoaderBuilder implements Serializable {
             if (StringUtils.isNotBlank(executionId)) {
                 return new DirectLoader(
                         this,
-                        String.format("%s.%s", schema, table),
+                        buildSchemaTableName(),
                         obDirectLoadStatement,
                         obDirectLoadConnection,
                         executionId);
             } else {
                 return new DirectLoader(
                         this,
-                        String.format("%s.%s", schema, table),
+                        buildSchemaTableName(),
                         obDirectLoadStatement,
                         obDirectLoadConnection);
             }
@@ -165,12 +176,27 @@ public class DirectLoaderBuilder implements Serializable {
 
     private ObDirectLoadConnection buildConnection(int writeThreadNum)
             throws ObDirectLoadException {
-        return ObDirectLoadManager.getConnectionBuilder()
-                .setServerInfo(host, port)
-                .setLoginInfo(tenant, user, password, schema)
-                .setHeartBeatInfo(heartBeatTimeout, heartBeatInterval)
-                .enableParallelWrite(writeThreadNum)
-                .build();
+        String tableName = buildSchemaTableName();
+        ObDirectLoadConnection conn =
+                directLoadConnMap.computeIfAbsent(
+                        tableName,
+                        v -> {
+                            try {
+                                return ObDirectLoadManager.getConnectionBuilder()
+                                        .setServerInfo(host, port)
+                                        .setLoginInfo(tenant, user, password, schema)
+                                        .setHeartBeatInfo(heartBeatTimeout, heartBeatInterval)
+                                        .enableParallelWrite(writeThreadNum)
+                                        .build();
+                            } catch (ObDirectLoadException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+        LOG.info(
+                "The Connection Map Size: {}, keys: {}",
+                directLoadConnMap.size(),
+                directLoadConnMap.keys());
+        return conn;
     }
 
     private ObDirectLoadStatement buildStatement(ObDirectLoadConnection connection)
