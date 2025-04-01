@@ -64,7 +64,7 @@ public class DirectLoaderBuilder implements Serializable {
 
     private String executionId;
 
-    protected static final ConcurrentHashMap<String, ObDirectLoadConnection> directLoadConnMap =
+    public static final ConcurrentHashMap<String, ObDirectLoadConnection> directLoadConnMap =
             new ConcurrentHashMap<>();
 
     public DirectLoaderBuilder host(String host) {
@@ -147,8 +147,8 @@ public class DirectLoaderBuilder implements Serializable {
         return this;
     }
 
-    private String buildSchemaTableName() {
-        return String.format("%s.%s#%s-%s", schema, table, tenant, executionId);
+    public static String buildSchemaTableName(String schema, String table, String executionId) {
+        return String.format("%s.%s#%s", schema, table, executionId);
     }
 
     public DirectLoader build() {
@@ -158,14 +158,14 @@ public class DirectLoaderBuilder implements Serializable {
             if (StringUtils.isNotBlank(executionId)) {
                 return new DirectLoader(
                         this,
-                        buildSchemaTableName(),
+                        buildSchemaTableName(schema, table, executionId),
                         obDirectLoadStatement,
                         obDirectLoadConnection,
                         executionId);
             } else {
                 return new DirectLoader(
                         this,
-                        buildSchemaTableName(),
+                        buildSchemaTableName(schema, table, executionId),
                         obDirectLoadStatement,
                         obDirectLoadConnection);
             }
@@ -176,7 +176,7 @@ public class DirectLoaderBuilder implements Serializable {
 
     private ObDirectLoadConnection buildConnection(int writeThreadNum)
             throws ObDirectLoadException {
-        String tableName = buildSchemaTableName();
+        String tableName = buildSchemaTableName(schema, table, executionId);
         ObDirectLoadConnection conn =
                 directLoadConnMap.computeIfAbsent(
                         tableName,

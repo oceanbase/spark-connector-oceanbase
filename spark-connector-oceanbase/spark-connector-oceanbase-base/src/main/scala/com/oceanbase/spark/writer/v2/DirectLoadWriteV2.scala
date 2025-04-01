@@ -17,7 +17,7 @@
 package com.oceanbase.spark.writer.v2
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.directload.{DirectLoader, DirectLoadUtils}
+import com.oceanbase.spark.directload.{DirectLoader, DirectLoaderBuilder, DirectLoadUtils}
 import com.oceanbase.spark.utils.RetryUtils
 import com.oceanbase.spark.writer.v2.DirectLoadWriteV2.convertFieldToJava
 
@@ -89,8 +89,13 @@ class DirectLoadWriteV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
 
   override def close(): Unit = {
     // Only close the Statement of the current Task
-    // TODO：Close the Connection when the direct-load library bug is fixed.
     if (directLoader.getStatement != null) directLoader.getStatement.close()
+    // TODO：Close the Connection when the direct-load library bug is fixed.
+    DirectLoaderBuilder.directLoadConnMap.remove(
+      DirectLoaderBuilder.buildSchemaTableName(
+        oceanBaseConfig.getSchemaName,
+        oceanBaseConfig.getTableName,
+        oceanBaseConfig.getDirectLoadExecutionId))
   }
 }
 
