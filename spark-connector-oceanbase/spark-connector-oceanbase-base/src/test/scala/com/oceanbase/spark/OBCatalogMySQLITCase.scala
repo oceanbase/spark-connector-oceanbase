@@ -143,7 +143,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
   def testCatalogDirectLoadWrite(): Unit = {
     val session = SparkSession
       .builder()
-      .master("local[1]")
+      .master("local[*]")
       .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
       .config("spark.sql.catalog.ob.url", getJdbcUrl)
       .config("spark.sql.catalog.ob.username", getUsername)
