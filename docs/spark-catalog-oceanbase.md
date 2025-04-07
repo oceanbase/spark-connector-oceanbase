@@ -372,6 +372,13 @@ select * from spark_catalog.default.orders;
                 <td>Rpc port used in direct-load.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.username</td>
+                <td>否</td>
+                <td></td>
+                <td>String</td>
+                <td>The direct-load's username. If this configuration is not specified, the jdbc username is used.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.parallel</td>
                 <td>No</td>
                 <td>8</td>

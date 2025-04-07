@@ -88,6 +88,13 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .checkValue(port -> port > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(2882);
 
+    public static final ConfigEntry<String> DIRECT_LOAD_USERNAME =
+            new ConfigBuilder("direct-load.username")
+                    .doc("The username used in direct-load")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .stringConf()
+                    .create();
+
     public static final ConfigEntry<Integer> DIRECT_LOAD_PARALLEL =
             new ConfigBuilder("direct-load.parallel")
                     .doc(
@@ -159,7 +166,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .createWithDefault(0);
 
     public static final ConfigEntry<Integer> DIRECT_LOAD_BATCH_SIZE =
-            new ConfigBuilder("direct-load-batch-size")
+            new ConfigBuilder("direct-load.batch-size")
                     .doc("The batch size write to OceanBase one time")
                     .version(ConfigConstants.VERSION_1_0_0)
                     .intConf()
@@ -287,6 +294,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public int getDirectLoadPort() {
         return get(DIRECT_LOAD_RPC_PORT);
+    }
+
+    public String getDirectLoadUserName() {
+        return get(DIRECT_LOAD_USERNAME);
     }
 
     public String getDirectLoadExecutionId() {

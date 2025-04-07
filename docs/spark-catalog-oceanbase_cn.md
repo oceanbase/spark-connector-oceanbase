@@ -371,6 +371,13 @@ select * from spark_catalog.default.orders;
                 <td>旁路导入用到的rpc端口。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.username</td>
+                <td>否</td>
+                <td></td>
+                <td>String</td>
+                <td>旁路导入用户名。如果不指定该配置，则使用jdbc用户名。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.parallel</td>
                 <td>否</td>
                 <td>8</td>
