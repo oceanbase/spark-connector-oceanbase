@@ -153,6 +153,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.direct-load.enabled", "true")
       .config("spark.sql.catalog.ob.direct-load.host", getHost)
       .config("spark.sql.catalog.ob.direct-load.rpc-port", getRpcPort)
+      .config("spark.sql.catalog.ob.direct-load.username", getUsername.split("@").head)
       .getOrCreate()
 
     insertTestData(session, "products")
