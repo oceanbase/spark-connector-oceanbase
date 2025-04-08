@@ -128,6 +128,12 @@ abstract class OceanBaseDialect extends Logging with Serializable {
     s"TRUNCATE TABLE $table"
   }
 
+  def getDeleteWhereSql(tableName: String, whereClause: String): String = {
+    val sql = s"DELETE FROM $tableName $whereClause"
+    logInfo(s"The generated OceanBase delete sql statement: $sql")
+    sql
+  }
+
   def getJDBCType(dt: DataType): Option[JdbcType] = None
 
   /** Creates a schema. */

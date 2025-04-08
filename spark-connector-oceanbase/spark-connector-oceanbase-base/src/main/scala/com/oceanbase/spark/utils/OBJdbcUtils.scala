@@ -112,6 +112,9 @@ object OBJdbcUtils {
     try {
       statement.setQueryTimeout(config.getJdbcQueryTimeout)
       statement.executeUpdate(sql)
+    } catch {
+      case exception: Exception =>
+        throw new RuntimeException(s"Failed to execute sql: $sql", exception.getCause)
     } finally {
       statement.close()
     }
