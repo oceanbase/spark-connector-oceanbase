@@ -231,6 +231,42 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testDeleteWhere(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+    session.sql("delete from products where 1 = 0")
+    queryAndVerifyTableData(session, "products", expected)
+
+    session.sql("delete from products where id = 1")
+    queryAndVerifyTableData(session, "products", expected)
+
+    session.sql("delete from products where description is null")
+    queryAndVerifyTableData(session, "products", expected)
+
+    session.sql("delete from products where id in (101, 102, 103)")
+    session.sql("delete from products where name = 'hammer'")
+
+    session.sql("delete from products where name like 'rock%'")
+    session.sql("delete from products where name like '%jack%' and id = 108 or weight = 5.3")
+    session.sql("delete from products where id >= 109")
+
+    val expect = new util.ArrayList[String]()
+    queryAndVerifyTableData(session, "products", expect)
+
+    session.stop()
+  }
+
   private def queryAndVerifyTableData(
       session: SparkSession,
       tableName: String,

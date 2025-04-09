@@ -22,12 +22,14 @@ import com.oceanbase.spark.reader.v2.OBJdbcScanBuilder
 import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.writer.v2.{DirectLoadWriteBuilderV2, JDBCWriteBuilder}
 
+import org.apache.spark.sql.ExprUtils.compileFilter
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.connector.catalog._
 import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.read.ScanBuilder
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
@@ -44,7 +46,8 @@ case class OceanBaseTable(
   extends Table
   with SupportsRead
   with SupportsWrite
-  with TruncatableTable {
+  with TruncatableTable
+  with SupportsDelete {
 
   override def name(): String = ident.toString
 
@@ -82,6 +85,35 @@ case class OceanBaseTable(
     } match {
       case Success(_) => true
       case Failure(_) => false
+    }
+  }
+
+  override def canDeleteWhere(filters: Array[Filter]): Boolean = {
+    filters.forall(filter => compileFilter(filter, dialect).isDefined)
+  }
+
+  override def deleteWhere(filters: Array[Filter]): Unit = {
+    val filterWhereClause: String =
+      filters
+        .flatMap(compileFilter(_, dialect))
+        .map(p => s"($p)")
+        .mkString(" AND ")
+
+    val whereClause: String = {
+      if (filterWhereClause.nonEmpty) {
+        "WHERE " + filterWhereClause
+      } else {
+        ""
+      }
+    }
+    OBJdbcUtils.withConnection(config) {
+      conn =>
+        {
+          OBJdbcUtils.executeStatement(
+            conn,
+            config,
+            dialect.getDeleteWhereSql(config.getDbTable, whereClause))
+        }
     }
   }
 }
