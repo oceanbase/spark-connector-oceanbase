@@ -30,6 +30,7 @@ under the License.
         <module>spark-connector-obkv-hbase-3.2</module>
         <module>spark-connector-obkv-hbase-3.3</module>
         <module>spark-connector-obkv-hbase-3.4</module>
+        <module>spark-connector-obkv-hbase-3.5</module>
     </modules>
 
     <dependencies>
