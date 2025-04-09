@@ -457,7 +457,8 @@ class JDBCLimitRDD(
     stmt.setFetchSize(options.fetchSize)
     stmt.setQueryTimeout(options.queryTimeout)
     rs = stmt.executeQuery()
-    val rowsIterator = JdbcUtils.resultSetToSparkInternalRows(rs, schema, inputMetrics)
+    val rowsIterator =
+      JdbcUtils.resultSetToSparkInternalRows(rs, dialect = dialect, schema, inputMetrics)
 
     CompletionIterator[InternalRow, Iterator[InternalRow]](
       new InterruptibleIterator(context, rowsIterator),
