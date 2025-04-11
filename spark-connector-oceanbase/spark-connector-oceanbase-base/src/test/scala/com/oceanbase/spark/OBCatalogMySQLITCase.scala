@@ -54,6 +54,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     insertTestData(session, "products")
     queryAndVerifyTableData(session, "products", expected)
 
+    insertTestData(session, "products_no_pri_key")
+    queryAndVerifyTableData(session, "products_no_pri_key", expected)
+
     session.stop()
   }
 

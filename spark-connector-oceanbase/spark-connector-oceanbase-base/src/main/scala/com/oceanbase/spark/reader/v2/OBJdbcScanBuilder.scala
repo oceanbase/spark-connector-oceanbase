@@ -98,7 +98,7 @@ class OBJdbcBatch(
     dialect: OceanBaseDialect)
   extends Batch {
   private lazy val inputPartitions: Array[InputPartition] =
-    OBMySQLPartition.columnPartition(config)
+    OBMySQLPartition.columnPartition(config, dialect)
 
   override def planInputPartitions(): Array[InputPartition] = inputPartitions
 
