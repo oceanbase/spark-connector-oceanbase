@@ -247,6 +247,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .longConf()
                     .create();
 
+    public static final ConfigEntry<Boolean> JDBC_ENABLE_REWRITE_QUERY_SQL =
+            new ConfigBuilder("jdbc.enable-rewrite-query-sql")
+                    .doc(
+                            "Whether to enable rewriting query SQL through inner join to optimize deep paging performance.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -362,6 +370,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public String getDriver() {
         return get(DRIVER);
+    }
+
+    public Boolean getEnableRewriteQuerySql() {
+        return get(JDBC_ENABLE_REWRITE_QUERY_SQL);
     }
 
     public String getDbTable() {

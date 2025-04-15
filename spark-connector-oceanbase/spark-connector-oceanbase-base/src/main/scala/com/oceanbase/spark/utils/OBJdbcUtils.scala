@@ -114,7 +114,7 @@ object OBJdbcUtils {
       statement.executeUpdate(sql)
     } catch {
       case exception: Exception =>
-        throw new RuntimeException(s"Failed to execute sql: $sql", exception.getCause)
+        throw new RuntimeException(s"Failed to execute sql: $sql", exception)
     } finally {
       statement.close()
     }
@@ -133,7 +133,7 @@ object OBJdbcUtils {
       }
     } catch {
       case exception: Exception =>
-        throw new RuntimeException(s"Failed to execute sql: $sql", exception.getCause)
+        throw new RuntimeException(s"Failed to execute sql: $sql", exception)
     } finally {
       statement.close()
     }

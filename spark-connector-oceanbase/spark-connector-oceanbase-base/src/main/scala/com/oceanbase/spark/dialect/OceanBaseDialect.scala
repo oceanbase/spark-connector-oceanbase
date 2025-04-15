@@ -330,6 +330,11 @@ abstract class OceanBaseDialect extends Logging with Serializable {
   }
 }
 
-case class PriKeyColumnInfo(columnName: String, columnType: String, columnKey: String)
+case class PriKeyColumnInfo(
+    columnName: String,
+    columnType: String,
+    columnKey: String,
+    dataType: String,
+    extra: String)
 
 case class JdbcType(databaseTypeDefinition: String, jdbcNullType: Int)
