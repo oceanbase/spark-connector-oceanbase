@@ -25,7 +25,10 @@ CREATE TABLE products_no_pri_key
   name        VARCHAR(255) NOT NULL,
   description VARCHAR(512),
   weight      DECIMAL(20, 10)
-);
+) partition by key(id)
+(partition `p0`,
+ partition `p1`,
+ partition `p2`);
 
 CREATE TABLE products_full_pri_key
 (

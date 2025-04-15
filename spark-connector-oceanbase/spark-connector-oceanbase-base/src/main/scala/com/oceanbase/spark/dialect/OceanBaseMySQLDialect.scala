@@ -178,7 +178,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     val sql =
       s"""
          |select
-         |  COLUMN_NAME, COLUMN_TYPE , COLUMN_KEY
+         |  COLUMN_NAME, COLUMN_TYPE , COLUMN_KEY, DATA_TYPE, EXTRA
          |from
          |  information_schema.columns
          |where
@@ -195,7 +195,12 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
               while (rs.next()) {
                 val columnKey = rs.getString(3)
                 if (null != columnKey && columnKey.equals("PRI")) {
-                  arrayBuffer += PriKeyColumnInfo(rs.getString(1), rs.getString(2), columnKey)
+                  arrayBuffer += PriKeyColumnInfo(
+                    quoteIdentifier(rs.getString(1)),
+                    rs.getString(2),
+                    columnKey,
+                    rs.getString(4),
+                    rs.getString(5))
                 }
               }
             }
