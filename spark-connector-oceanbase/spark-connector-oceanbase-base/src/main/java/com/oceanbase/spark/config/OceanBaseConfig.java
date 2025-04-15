@@ -271,6 +271,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> ENABLE_SPARK_VARCHAR_DATA_TYPE =
+            new ConfigBuilder("enable-spark-varchar-datatype")
+                    .doc(
+                            "When this option is true, the varchar type of OceanBase will be converted to spark's varchar type. Note that spark varchar type is an experimental feature.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -398,6 +406,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableString2Text() {
         return get(ENABLE_STRING_TO_TEXT);
+    }
+
+    public Boolean getEnableSparkVarcharDataType() {
+        return get(ENABLE_SPARK_VARCHAR_DATA_TYPE);
     }
 
     public String getDbTable() {

@@ -243,7 +243,6 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.enable-string-to-text", true.toString)
       .config("spark.sql.defaultCatalog", "ob")
       .getOrCreate()
-    spark.sql("set `spark.sql.catalog.ob.`=true;")
     spark.sql("""
                 |CREATE TABLE test2(
                 |  c1 String,
@@ -251,11 +250,29 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
                 |);
                 |""".stripMargin)
     val showCreateTableTest2 = getShowCreateTable(s"$getSchemaName.test2")
-    println(showCreateTableTest2)
     Assertions.assertTrue(showCreateTableTest2.contains("text"))
     spark.stop()
 
-    dropTables("test1", "test2")
+    val ss = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.enable-spark-varchar-datatype", true.toString)
+      .config("spark.sql.defaultCatalog", "ob")
+      .getOrCreate()
+    ss.sql("create table test3 as select * from products")
+    val showCreateTableTest3 = getShowCreateTable(s"$getSchemaName.test3")
+    println(showCreateTableTest3)
+    Assertions.assertTrue(
+      showCreateTableTest3.contains("varchar(255)")
+        && showCreateTableTest3.contains("varchar(512)"))
+    ss.stop()
+
+    dropTables("test1", "test2", "test3")
   }
 
   @Test
