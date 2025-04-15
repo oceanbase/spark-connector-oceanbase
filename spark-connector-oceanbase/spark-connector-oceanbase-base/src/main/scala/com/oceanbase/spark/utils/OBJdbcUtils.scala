@@ -181,6 +181,14 @@ object OBJdbcUtils {
       (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
         stmt.setString(pos + 1, row.getUTF8String(pos).toString)
 
+    case t: VarcharType =>
+      (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
+        stmt.setString(pos + 1, row.getUTF8String(pos).toString)
+
+    case t: CharType =>
+      (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
+        stmt.setString(pos + 1, row.getUTF8String(pos).toString)
+
     case BinaryType =>
       (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
         stmt.setBytes(pos + 1, row.getBinary(pos))
@@ -286,7 +294,6 @@ object OBJdbcUtils {
       case java.sql.Types.BIT => BooleanType // @see JdbcDialect for quirks
       case java.sql.Types.BLOB => BinaryType
       case java.sql.Types.BOOLEAN => BooleanType
-      case java.sql.Types.CHAR => StringType
       case java.sql.Types.CHAR if precision != 0 =>
         if (config.getEnableSparkVarcharDataType) CharType(precision) else StringType
       case java.sql.Types.CHAR => StringType

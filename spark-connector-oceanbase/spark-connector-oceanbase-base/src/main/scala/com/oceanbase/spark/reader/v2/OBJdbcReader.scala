@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.SpecificInternalRow
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, GenericArrayData}
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader}
 import org.apache.spark.sql.sources.Filter
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, Metadata, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, Metadata, ShortType, StringType, StructType, TimestampType, VarcharType}
 import org.apache.spark.unsafe.types.UTF8String
 
 import java.sql.{PreparedStatement, ResultSet}
@@ -193,6 +193,14 @@ object OBJdbcReader extends SQLConfHelper {
 
     case ByteType =>
       (rs: ResultSet, row: InternalRow, pos: Int) => row.setByte(pos, rs.getByte(pos + 1))
+
+    case _: CharType =>
+      (rs: ResultSet, row: InternalRow, pos: Int) =>
+        row.update(pos, UTF8String.fromString(rs.getString(pos + 1)))
+
+    case _: VarcharType =>
+      (rs: ResultSet, row: InternalRow, pos: Int) =>
+        row.update(pos, UTF8String.fromString(rs.getString(pos + 1)))
 
     case StringType if metadata.contains("rowid") =>
       (rs: ResultSet, row: InternalRow, pos: Int) =>

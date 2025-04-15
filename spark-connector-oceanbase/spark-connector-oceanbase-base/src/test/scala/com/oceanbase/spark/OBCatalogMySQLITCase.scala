@@ -264,12 +264,13 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.enable-spark-varchar-datatype", true.toString)
       .config("spark.sql.defaultCatalog", "ob")
       .getOrCreate()
+    insertTestData(ss, "products")
     ss.sql("create table test3 as select * from products")
     val showCreateTableTest3 = getShowCreateTable(s"$getSchemaName.test3")
-    println(showCreateTableTest3)
     Assertions.assertTrue(
       showCreateTableTest3.contains("varchar(255)")
         && showCreateTableTest3.contains("varchar(512)"))
+    queryAndVerifyTableData(ss, "test3", expected)
     ss.stop()
 
     dropTables("test1", "test2", "test3")
