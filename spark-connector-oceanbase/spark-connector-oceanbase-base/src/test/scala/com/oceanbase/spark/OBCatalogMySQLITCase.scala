@@ -210,6 +210,55 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testString2VarcharTableCreate(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.the-length-string-to-varchar", 2048)
+      .config("spark.sql.defaultCatalog", "ob")
+      .getOrCreate()
+    session.sql("""
+                  |CREATE TABLE test1(
+                  |  c1 String,
+                  |  c2 String
+                  |);
+                  |""".stripMargin)
+    val showCreateTable = getShowCreateTable(s"$getSchemaName.test1")
+    Assertions.assertTrue(showCreateTable.contains("varchar(2048)"))
+    session.stop()
+
+    val spark = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.enable-string-to-text", true.toString)
+      .config("spark.sql.defaultCatalog", "ob")
+      .getOrCreate()
+    spark.sql("set `spark.sql.catalog.ob.`=true;")
+    spark.sql("""
+                |CREATE TABLE test2(
+                |  c1 String,
+                |  c2 String
+                |);
+                |""".stripMargin)
+    val showCreateTableTest2 = getShowCreateTable(s"$getSchemaName.test2")
+    println(showCreateTableTest2)
+    Assertions.assertTrue(showCreateTableTest2.contains("text"))
+    spark.stop()
+
+    dropTables("test1", "test2")
+  }
+
+  @Test
   def testTruncateAndOverWriteTable(): Unit = {
     val session = SparkSession
       .builder()
