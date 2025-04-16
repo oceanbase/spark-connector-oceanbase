@@ -255,6 +255,30 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Integer> THE_LENGTH_STRING_TO_VARCHAR_TABLE_CREATE =
+            new ConfigBuilder("string-as-varchar-length")
+                    .doc(
+                            "Defines the length of VARCHAR type when mapping String types during table creation. Default: 1024.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .intConf()
+                    .createWithDefault(1024);
+
+    public static final ConfigEntry<Boolean> ENABLE_STRING_TO_TEXT =
+            new ConfigBuilder("enable-string-as-text")
+                    .doc(
+                            "When this option is true, the string type of spark will be converted to text type of OceanBase when creating a table.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
+    public static final ConfigEntry<Boolean> ENABLE_SPARK_VARCHAR_DATA_TYPE =
+            new ConfigBuilder("enable-spark-varchar-datatype")
+                    .doc(
+                            "When this option is true, the varchar type of OceanBase will be converted to spark's varchar type. Note that spark varchar type is an experimental feature.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -374,6 +398,18 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableRewriteQuerySql() {
         return get(JDBC_ENABLE_REWRITE_QUERY_SQL);
+    }
+
+    public Integer getLengthString2Varchar() {
+        return get(THE_LENGTH_STRING_TO_VARCHAR_TABLE_CREATE);
+    }
+
+    public Boolean getEnableString2Text() {
+        return get(ENABLE_STRING_TO_TEXT);
+    }
+
+    public Boolean getEnableSparkVarcharDataType() {
+        return get(ENABLE_SPARK_VARCHAR_DATA_TYPE);
     }
 
     public String getDbTable() {

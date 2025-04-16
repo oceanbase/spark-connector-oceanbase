@@ -325,6 +325,27 @@ select * from spark_catalog.default.orders;
                 <td>Spark读取OB时，Spark下发到OB的SQL会自动带上PARALLEL Hint。通过该参数可以调整其并行度，默认为1。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">1024</td>
+                <td>Int</td>
+                <td>通过Spark-SQL创建OceanBase表时，映射 Spark String 类型到 OceanBase VARCHAR 类型的长度。默认值：1024。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.enable-string-as-text</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>当该选项为 true 时，通过 Spark-SQL 创建 OceanBase 表时，spark 的 String 类型会转换为 OceanBase 的 text 类型。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.enable-spark-varchar-datatype</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>当该选项为 true 时，OceanBase 的 VARCHAR 类型将会被转换为 spark 的 VARCHAR 类型。需要注意的是，spark VARCHAR 类型是一个实验性的功能。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.defaultCatalog</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;"></td>
