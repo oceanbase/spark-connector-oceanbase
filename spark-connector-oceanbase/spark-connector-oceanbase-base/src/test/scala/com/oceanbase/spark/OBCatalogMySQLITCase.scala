@@ -219,7 +219,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.username", getUsername)
       .config("spark.sql.catalog.ob.password", getPassword)
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
-      .config("spark.sql.catalog.ob.the-length-string-to-varchar", 2048)
+      .config("spark.sql.catalog.ob.string-as-varchar-length", 2048)
       .config("spark.sql.defaultCatalog", "ob")
       .getOrCreate()
     session.sql("""
@@ -240,7 +240,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.username", getUsername)
       .config("spark.sql.catalog.ob.password", getPassword)
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
-      .config("spark.sql.catalog.ob.enable-string-to-text", true.toString)
+      .config("spark.sql.catalog.ob.enable-string-as-text", true.toString)
       .config("spark.sql.defaultCatalog", "ob")
       .getOrCreate()
     spark.sql("""

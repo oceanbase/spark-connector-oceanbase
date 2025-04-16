@@ -326,6 +326,27 @@ select * from spark_catalog.default.orders;
                 <td>The SQL statements sent by Spark to OB will automatically carry PARALLEL Hint. This parameter can be used to adjust the parallelism, and the default value is 1.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">1024</td>
+                <td>Int</td>
+                <td>Defines the length of VARCHAR type when mapping String types during table creation. Default: 1024.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.enable-string-as-text</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>When this option is true, the string type of spark will be converted to text type of OceanBase when creating a table.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.enable-spark-varchar-datatype</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>When this option is true, the varchar type of OceanBase will be converted to spark's varchar type. Note that spark varchar type is an experimental feature.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.defaultCatalog</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>

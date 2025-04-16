@@ -256,15 +256,15 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .createWithDefault(false);
 
     public static final ConfigEntry<Integer> THE_LENGTH_STRING_TO_VARCHAR_TABLE_CREATE =
-            new ConfigBuilder("the-length-string-to-varchar")
+            new ConfigBuilder("string-as-varchar-length")
                     .doc(
-                            "The length from String to Varchar when creating a table, the default value is 1024.")
+                            "Defines the length of VARCHAR type when mapping String types during table creation. Default: 1024.")
                     .version(ConfigConstants.VERSION_1_2_0)
                     .intConf()
                     .createWithDefault(1024);
 
     public static final ConfigEntry<Boolean> ENABLE_STRING_TO_TEXT =
-            new ConfigBuilder("enable-string-to-text")
+            new ConfigBuilder("enable-string-as-text")
                     .doc(
                             "When this option is true, the string type of spark will be converted to text type of OceanBase when creating a table.")
                     .version(ConfigConstants.VERSION_1_2_0)
