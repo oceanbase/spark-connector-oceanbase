@@ -194,6 +194,14 @@ under the License.
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
                         </artifactItem>
+                        <artifactItem>
+                            <groupId>com.oceanbase</groupId>
+                            <artifactId>spark-connector-oceanbase-3.5_${scala.binary.version}</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>spark-connector-oceanbase-3.5_${scala.binary.version}-${project.version}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
+                        </artifactItem>
 
                         <!-- OBKV-HBASE -->
                         <artifactItem>
@@ -233,6 +241,14 @@ under the License.
                             <artifactId>spark-connector-obkv-hbase-3.4_${scala.binary.version}</artifactId>
                             <version>${project.version}</version>
                             <destFileName>spark-connector-obkv-hbase-3.4_${scala.binary.version}-${project.version}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>com.oceanbase</groupId>
+                            <artifactId>spark-connector-obkv-hbase-3.5_${scala.binary.version}</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>spark-connector-obkv-hbase-3.5_${scala.binary.version}-${project.version}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
                         </artifactItem>

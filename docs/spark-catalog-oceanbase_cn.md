@@ -33,8 +33,8 @@ OceanBase Spark Connector 从 1.1 版本开始全面支持 Spark Catalog，这�
         </thead>
         <tbody>
             <tr>
-                <td>1.1</td>
-                <td style="word-wrap: break-word;">3.1 ~ 3.4</td>
+                <td>1.1 及以后的版本</td>
+                <td style="word-wrap: break-word;">3.1 ~ 3.5</td>
                 <td>
                   <ul>
                     <li>JDBC: 3.x, 4.x</li>
