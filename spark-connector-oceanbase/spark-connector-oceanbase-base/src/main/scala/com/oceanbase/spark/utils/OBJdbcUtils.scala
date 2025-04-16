@@ -23,7 +23,7 @@ import com.oceanbase.spark.dialect.OceanBaseDialect
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructField, StructType, TimestampType, VarcharType}
 import org.apache.spark.sql.types.DecimalType.{MAX_PRECISION, MAX_SCALE}
 
 import java.sql.{Connection, PreparedStatement, ResultSet, ResultSetMetaData, SQLException}
@@ -114,7 +114,7 @@ object OBJdbcUtils {
       statement.executeUpdate(sql)
     } catch {
       case exception: Exception =>
-        throw new RuntimeException(s"Failed to execute sql: $sql", exception.getCause)
+        throw new RuntimeException(s"Failed to execute sql: $sql", exception)
     } finally {
       statement.close()
     }
@@ -133,7 +133,7 @@ object OBJdbcUtils {
       }
     } catch {
       case exception: Exception =>
-        throw new RuntimeException(s"Failed to execute sql: $sql", exception.getCause)
+        throw new RuntimeException(s"Failed to execute sql: $sql", exception)
     } finally {
       statement.close()
     }
@@ -181,6 +181,14 @@ object OBJdbcUtils {
       (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
         stmt.setString(pos + 1, row.getUTF8String(pos).toString)
 
+    case t: VarcharType =>
+      (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
+        stmt.setString(pos + 1, row.getUTF8String(pos).toString)
+
+    case t: CharType =>
+      (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
+        stmt.setString(pos + 1, row.getUTF8String(pos).toString)
+
     case BinaryType =>
       (stmt: PreparedStatement, row: InternalRow, pos: Int) =>
         stmt.setBytes(pos + 1, row.getBinary(pos))
@@ -214,7 +222,8 @@ object OBJdbcUtils {
   def getSchema(
       resultSet: ResultSet,
       dialect: OceanBaseDialect,
-      alwaysNullable: Boolean = false): StructType = {
+      alwaysNullable: Boolean = false,
+      config: OceanBaseConfig): StructType = {
     val rsmd = resultSet.getMetaData
     val ncols = rsmd.getColumnCount
     val fields = new Array[StructField](ncols)
@@ -253,7 +262,7 @@ object OBJdbcUtils {
       val columnType =
         dialect
           .getCatalystType(dataType, typeName, fieldSize, metadata)
-          .getOrElse(OBJdbcUtils.getCatalystType(dataType, fieldSize, fieldScale, isSigned))
+          .getOrElse(OBJdbcUtils.getCatalystType(dataType, fieldSize, fieldScale, isSigned, config))
       fields(i) = StructField(columnName, columnType, nullable, metadata.build())
       i = i + 1
     }
@@ -269,7 +278,12 @@ object OBJdbcUtils {
    * @return
    *   The Catalyst type corresponding to sqlType.
    */
-  def getCatalystType(sqlType: Int, precision: Int, scale: Int, signed: Boolean): DataType = {
+  def getCatalystType(
+      sqlType: Int,
+      precision: Int,
+      scale: Int,
+      signed: Boolean,
+      config: OceanBaseConfig): DataType = {
     val answer = sqlType match {
       // scalastyle:off
       case java.sql.Types.ARRAY => null
@@ -280,6 +294,8 @@ object OBJdbcUtils {
       case java.sql.Types.BIT => BooleanType // @see JdbcDialect for quirks
       case java.sql.Types.BLOB => BinaryType
       case java.sql.Types.BOOLEAN => BooleanType
+      case java.sql.Types.CHAR if precision != 0 =>
+        if (config.getEnableSparkVarcharDataType) CharType(precision) else StringType
       case java.sql.Types.CHAR => StringType
       case java.sql.Types.CLOB => StringType
       case java.sql.Types.DATALINK => null
@@ -318,6 +334,8 @@ object OBJdbcUtils {
       case java.sql.Types.TIMESTAMP_WITH_TIMEZONE => null
       case java.sql.Types.TINYINT => IntegerType
       case java.sql.Types.VARBINARY => BinaryType
+      case java.sql.Types.VARCHAR if precision != 0 =>
+        if (config.getEnableSparkVarcharDataType) VarcharType(precision) else StringType
       case java.sql.Types.VARCHAR => StringType
       case _ =>
         throw new RuntimeException(s"Unsupported type: $sqlType ")

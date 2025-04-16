@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.SpecificInternalRow
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, GenericArrayData}
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader}
 import org.apache.spark.sql.sources.Filter
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, Metadata, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, Metadata, ShortType, StringType, StructType, TimestampType, VarcharType}
 import org.apache.spark.unsafe.types.UTF8String
 
 import java.sql.{PreparedStatement, ResultSet}
@@ -96,16 +96,26 @@ class OBJdbcReader(
         .map(p => s"($p)")
         .mkString(" AND ")
 
-    val whereClause: String = {
-      if (filterWhereClause.nonEmpty) {
+    val part: OBMySQLPartition = partition.asInstanceOf[OBMySQLPartition]
+    val whereClause = {
+      if (part.whereClause != null && filterWhereClause.nonEmpty) {
+        "WHERE " + s"($filterWhereClause)" + " AND " + s"(${part.whereClause})"
+      } else if (part.whereClause != null) {
+        "WHERE " + part.whereClause
+      } else if (filterWhereClause.nonEmpty) {
         "WHERE " + filterWhereClause
       } else {
         ""
       }
     }
-    val part: OBMySQLPartition = partition.asInstanceOf[OBMySQLPartition]
+
+    var hint = s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) */"
+    if (part.useHiddenPKColumn)
+      hint =
+        s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}), opt_param('hidden_column_visible', 'true') */"
+
     s"""
-       |SELECT /*+ PARALLEL(${config.getJdbcParallelHintDegree}) */ $columnStr FROM ${config.getDbTable} ${part.partitionClause}
+       |SELECT $hint $columnStr FROM ${config.getDbTable} ${part.partitionClause}
        |$whereClause ${part.limitOffsetClause}
        |""".stripMargin
   }
@@ -183,6 +193,14 @@ object OBJdbcReader extends SQLConfHelper {
 
     case ByteType =>
       (rs: ResultSet, row: InternalRow, pos: Int) => row.setByte(pos, rs.getByte(pos + 1))
+
+    case _: CharType =>
+      (rs: ResultSet, row: InternalRow, pos: Int) =>
+        row.update(pos, UTF8String.fromString(rs.getString(pos + 1)))
+
+    case _: VarcharType =>
+      (rs: ResultSet, row: InternalRow, pos: Int) =>
+        row.update(pos, UTF8String.fromString(rs.getString(pos + 1)))
 
     case StringType if metadata.contains("rowid") =>
       (rs: ResultSet, row: InternalRow, pos: Int) =>

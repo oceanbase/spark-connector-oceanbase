@@ -54,6 +54,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     insertTestData(session, "products")
     queryAndVerifyTableData(session, "products", expected)
 
+    insertTestData(session, "products_no_pri_key")
+    queryAndVerifyTableData(session, "products_no_pri_key", expected)
+
     session.stop()
   }
 
@@ -204,6 +207,73 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
         && showCreateTable.contains("REPLICA_NUM = 1"))
     dropTables("test1", "test2")
     session.stop()
+  }
+
+  @Test
+  def testString2VarcharTableCreate(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.string-as-varchar-length", 2048)
+      .config("spark.sql.defaultCatalog", "ob")
+      .getOrCreate()
+    session.sql("""
+                  |CREATE TABLE test1(
+                  |  c1 String,
+                  |  c2 String
+                  |);
+                  |""".stripMargin)
+    val showCreateTable = getShowCreateTable(s"$getSchemaName.test1")
+    Assertions.assertTrue(showCreateTable.contains("varchar(2048)"))
+    session.stop()
+
+    val spark = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.enable-string-as-text", true.toString)
+      .config("spark.sql.defaultCatalog", "ob")
+      .getOrCreate()
+    spark.sql("""
+                |CREATE TABLE test2(
+                |  c1 String,
+                |  c2 String
+                |);
+                |""".stripMargin)
+    val showCreateTableTest2 = getShowCreateTable(s"$getSchemaName.test2")
+    Assertions.assertTrue(showCreateTableTest2.contains("text"))
+    spark.stop()
+
+    val ss = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.enable-spark-varchar-datatype", true.toString)
+      .config("spark.sql.defaultCatalog", "ob")
+      .getOrCreate()
+    insertTestData(ss, "products")
+    ss.sql("create table test3 as select * from products")
+    val showCreateTableTest3 = getShowCreateTable(s"$getSchemaName.test3")
+    Assertions.assertTrue(
+      showCreateTableTest3.contains("varchar(255)")
+        && showCreateTableTest3.contains("varchar(512)"))
+    queryAndVerifyTableData(ss, "test3", expected)
+    ss.stop()
+
+    dropTables("test1", "test2", "test3")
   }
 
   @Test
