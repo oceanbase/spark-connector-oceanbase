@@ -357,7 +357,7 @@ object OceanBaseCatalog {
     OBJdbcUtils.withConnection(config) {
       conn =>
         OBJdbcUtils.executeQuery(conn, config, dialect.getSchemaQuery(config.getDbTable))(
-          rs => OBJdbcUtils.getSchema(rs, dialect))
+          rs => OBJdbcUtils.getSchema(rs, dialect, config = config))
     }
   }
 }
