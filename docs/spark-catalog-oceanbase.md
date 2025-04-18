@@ -347,6 +347,13 @@ select * from spark_catalog.default.orders;
                 <td>When this option is true, the varchar type of OceanBase will be converted to spark's varchar type. Note that spark varchar type is an experimental feature.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.enable-always-nullable</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">true</td>
+                <td>Boolean</td>
+                <td>Forces all fields to be marked as nullable during schema inference, regardless of the database metadata's nullability constraints. This provides a safety net for handling data sources with incomplete metadata or implicit null values.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.defaultCatalog</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>
