@@ -325,6 +325,13 @@ select * from spark_catalog.default.orders;
                 <td>Spark读取OB时，Spark下发到OB的SQL会自动带上PARALLEL Hint。通过该参数可以调整其并行度，默认为1。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.statistics-parallel-hint-degree</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">4</td>
+                <td>Int</td>
+                <td>通过向生成的 SQL 添加 /*+ PARALLEL(N) */ hint 来控制统计查询（例如 COUNT、MIN、MAX）的并行级别。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">1024</td>

@@ -239,6 +239,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .createWithDefault(1);
 
+    public static final ConfigEntry<Integer> JDBC_STATISTICS_PARALLEL_HINT_DEGREE =
+            new ConfigBuilder("jdbc.statistics-parallel-hint-degree")
+                    .doc(
+                            "Controls the parallelism level for statistical queries (e.g., COUNT, MIN, MAX) by adding /*+ PARALLEL(N) */ hint to generated SQL.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .intConf()
+                    .createWithDefault(4);
+
     public static final ConfigEntry<Long> JDBC_MAX_RECORDS_PER_PARTITION =
             new ConfigBuilder("jdbc.max-records-per-partition")
                     .doc(
@@ -438,6 +446,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcParallelHintDegree() {
         return get(JDBC_PARALLEL_HINT_DEGREE);
+    }
+
+    public Integer getJdbcStatsParallelHintDegree() {
+        return get(JDBC_STATISTICS_PARALLEL_HINT_DEGREE);
     }
 
     public Optional<Long> getJdbcMaxRecordsPrePartition() {
