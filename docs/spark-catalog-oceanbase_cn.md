@@ -318,7 +318,7 @@ select * from spark_catalog.default.orders;
                 <td>控制Spark读取OB时，最多多少条数据作为一个Spark分区。默认为空，此时Spark会根据数据量自动计算出一个合理的数值。注意：一般情况下不建议设置该参数。</td>
             </tr>
             <tr>
-                <td>spark.sql.catalog.your_catalog_name.parallel-hint-degree</td>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.parallel-hint-degree</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">1</td>
                 <td>Int</td>
