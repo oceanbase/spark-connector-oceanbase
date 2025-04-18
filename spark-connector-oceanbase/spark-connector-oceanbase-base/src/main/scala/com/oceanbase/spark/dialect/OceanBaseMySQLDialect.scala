@@ -75,7 +75,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
           case ("compression", value) => Some(s"COMPRESSION = '$value'")
           case ("primary_key", value) =>
             primaryKey = s", PRIMARY KEY($value)"
-            StringUtils.EMPTY
+            Some(StringUtils.EMPTY)
           case (k, _) =>
             logWarning(s"Ignored unsupported table property: $k")
             None
