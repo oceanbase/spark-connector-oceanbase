@@ -319,7 +319,7 @@ select * from spark_catalog.default.orders;
                 <td>Controls the maximum number of data that can be used as a Spark partition when Spark reads OBs. The default is empty, and Spark will automatically calculate a reasonable value based on the amount of data. Note: It is generally not recommended to set this parameter.</td>
             </tr>
             <tr>
-                <td>spark.sql.catalog.your_catalog_name.parallel-hint-degree</td>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.parallel-hint-degree</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">1</td>
                 <td>Int</td>
