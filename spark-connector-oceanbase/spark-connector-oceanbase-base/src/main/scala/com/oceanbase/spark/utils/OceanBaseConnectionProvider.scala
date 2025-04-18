@@ -43,6 +43,7 @@ object OceanBaseConnectionProvider extends Logging {
       val properties = new Properties()
       properties.put("user", oceanBaseConfig.getUsername)
       properties.put("password", oceanBaseConfig.getPassword)
+      properties.put("rewriteBatchedStatements", "true")
       DriverRegistry.get(driver).connect(oceanBaseConfig.getURL, properties)
 //      val connection = DriverManager.getConnection(
 //        oceanBaseConfig.getURL,
