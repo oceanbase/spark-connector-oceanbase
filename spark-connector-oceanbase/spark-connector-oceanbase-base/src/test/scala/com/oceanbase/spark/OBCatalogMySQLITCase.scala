@@ -271,9 +271,15 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       showCreateTableTest3.contains("varchar(255)")
         && showCreateTableTest3.contains("varchar(512)"))
     queryAndVerifyTableData(ss, "test3", expected)
+    // Verify the column length under Chinese characters.
+    ss.sql("create table test4(name varchar(3));")
+    val showCreateTableTest4 = getShowCreateTable(s"$getSchemaName.test4")
+    Assertions.assertTrue(showCreateTableTest4.contains("varchar(3)"))
+    ss.sql("insert into test4 values('你好时');").show()
+    queryAndVerifyTableData(ss, "test4", util.Arrays.asList("你好时"))
     ss.stop()
 
-    dropTables("test1", "test2", "test3")
+    dropTables("test1", "test2", "test3", "test4")
   }
 
   @Test

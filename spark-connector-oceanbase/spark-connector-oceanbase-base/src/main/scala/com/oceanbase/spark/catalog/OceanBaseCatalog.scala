@@ -357,7 +357,12 @@ object OceanBaseCatalog {
     OBJdbcUtils.withConnection(config) {
       conn =>
         OBJdbcUtils.executeQuery(conn, config, dialect.getSchemaQuery(config.getDbTable))(
-          rs => OBJdbcUtils.getSchema(rs, dialect, config = config))
+          rs =>
+            OBJdbcUtils.getSchema(
+              rs,
+              dialect,
+              alwaysNullable = config.getEnableAlwaysNullable,
+              config = config))
     }
   }
 }

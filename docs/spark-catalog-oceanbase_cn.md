@@ -346,6 +346,13 @@ select * from spark_catalog.default.orders;
                 <td>当该选项为 true 时，OceanBase 的 VARCHAR 类型将会被转换为 spark 的 VARCHAR 类型。需要注意的是，spark VARCHAR 类型是一个实验性的功能。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.enable-always-nullable</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">true</td>
+                <td>Boolean</td>
+                <td>在模式推断过程中强制将所有字段标记为可空，忽略数据库元数据中的非空约束。用于处理元数据不完整或包含隐性空值的数据源。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.defaultCatalog</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;"></td>

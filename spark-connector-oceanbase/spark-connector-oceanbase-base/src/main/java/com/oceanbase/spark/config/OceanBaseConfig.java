@@ -279,6 +279,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> ENABLE_ALWAYS_NULLABLE =
+            new ConfigBuilder("enable-always-nullable")
+                    .doc(
+                            "Forces all fields to be marked as nullable during schema inference, regardless of the database metadata's nullability constraints. This provides a safety net for handling data sources with incomplete metadata or implicit null values.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .booleanConf()
+                    .createWithDefault(true);
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -410,6 +418,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableSparkVarcharDataType() {
         return get(ENABLE_SPARK_VARCHAR_DATA_TYPE);
+    }
+
+    public Boolean getEnableAlwaysNullable() {
+        return get(ENABLE_ALWAYS_NULLABLE);
     }
 
     public String getDbTable() {
