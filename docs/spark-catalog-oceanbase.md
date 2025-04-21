@@ -326,6 +326,13 @@ select * from spark_catalog.default.orders;
                 <td>The SQL statements sent by Spark to OB will automatically carry PARALLEL Hint. This parameter can be used to adjust the parallelism, and the default value is 1.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.statistics-parallel-hint-degree</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">4</td>
+                <td>Int</td>
+                <td>Controls the parallelism level for statistical queries (e.g., COUNT, MIN, MAX) by adding /*+ PARALLEL(N) */ hint to generated SQL.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">1024</td>

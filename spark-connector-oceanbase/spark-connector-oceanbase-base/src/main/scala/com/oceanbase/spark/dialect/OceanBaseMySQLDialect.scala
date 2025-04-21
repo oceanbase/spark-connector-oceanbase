@@ -61,9 +61,10 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
         }
         .mkString(",\n  ")
       val tableComment = Option(config.getTableComment) match {
-        case comment if comment.nonEmpty => s"COMMENT '$comment'"
+        case Some(comment) => s"COMMENT '$comment'"
         case _ => StringUtils.EMPTY
       }
+      var primaryKey = ""
       val tableOption = properties.asScala
         .map(tuple => (tuple._1.toLowerCase, tuple._2))
         .flatMap {
@@ -72,6 +73,9 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
           case ("primary_zone", value) => Some(s"PRIMARY_ZONE = '$value'")
           case ("replica_num", value) => Some(s"REPLICA_NUM = $value")
           case ("compression", value) => Some(s"COMPRESSION = '$value'")
+          case ("primary_key", value) =>
+            primaryKey = s", PRIMARY KEY($value)"
+            None
           case (k, _) =>
             logWarning(s"Ignored unsupported table property: $k")
             None
@@ -80,6 +84,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       s"""
          |CREATE TABLE $tableName (
          |  $columnClause
+         |  $primaryKey
          |) $tableOption $tableComment
          |$partitionClause;
          |""".stripMargin.trim
