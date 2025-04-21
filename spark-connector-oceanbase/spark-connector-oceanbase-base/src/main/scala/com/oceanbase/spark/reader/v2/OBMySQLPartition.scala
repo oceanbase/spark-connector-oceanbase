@@ -86,20 +86,20 @@ object OBMySQLPartition {
       } else {
         if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
           // For non-partition table
-          computeSparkPartInfoForIntPriKeyNonPartTable(config, finalIntPriKey.columnName)
+          computeWherePartInfoForNonPartTable(config, finalIntPriKey.columnName)
         } else {
           // For partition table
-          computeSparkPartInfoForPartTable(config, obPartInfos, finalIntPriKey.columnName)
+          computeWherePartInfoForPartTable(config, obPartInfos, finalIntPriKey.columnName)
         }
       }
 
     } else { // non-primary key table
       if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
         // For non-partition table
-        computeSparkPartInfoForIntPriKeyNonPartTable(config, HIDDEN_PK_INCREMENT)
+        computeWherePartInfoForNonPartTable(config, HIDDEN_PK_INCREMENT)
       } else {
         // For partition table
-        computeSparkPartInfoForPartTable(config, obPartInfos, HIDDEN_PK_INCREMENT)
+        computeWherePartInfoForPartTable(config, obPartInfos, HIDDEN_PK_INCREMENT)
       }
     }
   }
@@ -109,14 +109,14 @@ object OBMySQLPartition {
       obPartInfos: Array[OBPartInfo]) = {
     if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
       // For non-partition table
-      computeForNonPartTable(config)
+      computeOffsetLimitPartInfoForNonPartTable(config)
     } else {
       // For partition table
-      computeForPartTable(config, obPartInfos)
+      computeForOffsetLimitPartInfoForPartTable(config, obPartInfos)
     }
   }
 
-  private val calLimit: Long => Long = {
+  private val calPartitionSize: Long => Long = {
     case count if count <= 100000 => 10000
     case count if count > 100000 && count <= 10000000 => 100000
     case count if count > 10000000 && count <= 100000000 => 200000
@@ -157,13 +157,14 @@ object OBMySQLPartition {
     arrayBuilder.result()
   }
 
-  private def computeForNonPartTable(config: OceanBaseConfig): Array[InputPartition] = {
+  private def computeOffsetLimitPartInfoForNonPartTable(
+      config: OceanBaseConfig): Array[InputPartition] = {
     val count: Long = obtainCount(config, EMPTY_STRING)
     require(count >= 0, "Total must be a positive number")
     computeQueryPart(count, EMPTY_STRING, config).asInstanceOf[Array[InputPartition]]
   }
 
-  private def computeForPartTable(
+  private def computeForOffsetLimitPartInfoForPartTable(
       config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo]): Array[InputPartition] = {
     val arr = new ArrayBuffer[OBMySQLPartition]()
@@ -213,7 +214,7 @@ object OBMySQLPartition {
       count: Long,
       partitionClause: String,
       config: OceanBaseConfig): Array[OBMySQLPartition] = {
-    val step = config.getJdbcMaxRecordsPrePartition.orElse(calLimit(count))
+    val step = config.getJdbcMaxRecordsPrePartition.orElse(calPartitionSize(count))
     require(count >= 0, "Total must be a positive number")
 
     // Note: Now when count is 0, skip the spark query and return directly.
@@ -231,8 +232,8 @@ object OBMySQLPartition {
       .toArray
   }
 
-  // ========== Int Primary Key Section ==========
-  private def computeSparkPartInfoForPartTable(
+  // ========== Int Primary Key Section: WHERE partition way ==========
+  private def computeWherePartInfoForPartTable(
       config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String): Array[InputPartition] = {
@@ -245,7 +246,7 @@ object OBMySQLPartition {
         }
         val keyTableInfo = obtainIntPriKeyTableInfo(config, partitionName, priKeyColumnName)
         val partitions =
-          computeIntPriKeySparkPart(keyTableInfo, partitionName, priKeyColumnName, config)
+          computeWhereSparkPart(keyTableInfo, partitionName, priKeyColumnName, config)
         arr ++= partitions
       })
     arr.zipWithIndex.map {
@@ -271,7 +272,7 @@ object OBMySQLPartition {
    * @return
    *   Array of optimized MySQL partitions
    */
-  private def computeIntPriKeySparkPart(
+  private def computeWhereSparkPart(
       keyTableInfo: IntPriKeyTableInfo,
       partitionClause: String,
       priKeyColumnName: String,
@@ -281,7 +282,8 @@ object OBMySQLPartition {
       return Array.empty[OBMySQLPartition]
     }
     // Calculate desired rows per partition based on configuration
-    val desiredRowsPerPartition = calLimit(keyTableInfo.count)
+    val desiredRowsPerPartition =
+      config.getJdbcMaxRecordsPrePartition.orElse(calPartitionSize(keyTableInfo.count))
     // Calculate number of partitions (rounded up with minimum 1)
     val numPartitions =
       Math.ceil(keyTableInfo.count.toDouble / desiredRowsPerPartition).toInt.max(1)
@@ -309,12 +311,12 @@ object OBMySQLPartition {
     }.toArray
   }
 
-  private def computeSparkPartInfoForIntPriKeyNonPartTable(
+  private def computeWherePartInfoForNonPartTable(
       config: OceanBaseConfig,
       priKeyColumnName: String): Array[InputPartition] = {
     val priKeyColumnInfo = obtainIntPriKeyTableInfo(config, EMPTY_STRING, priKeyColumnName)
     if (priKeyColumnInfo.count <= 0) Array.empty
-    computeIntPriKeySparkPart(priKeyColumnInfo, EMPTY_STRING, priKeyColumnName, config)
+    computeWhereSparkPart(priKeyColumnInfo, EMPTY_STRING, priKeyColumnName, config)
       .asInstanceOf[Array[InputPartition]]
   }
 
@@ -327,9 +329,14 @@ object OBMySQLPartition {
         {
           val statement = conn.createStatement()
           val tableName = config.getDbTable
+          var hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+          if (priKeyColumnName.equals(HIDDEN_PK_INCREMENT))
+            hint =
+              s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}), opt_param('hidden_column_visible', 'true') */"
+
           val sql =
             s"""
-              SELECT /*+ opt_param('hidden_column_visible', 'true') */
+              SELECT $hint
                 count(1) AS cnt, min($priKeyColumnName), max($priKeyColumnName)
               FROM $tableName $partName
              """

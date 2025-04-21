@@ -189,22 +189,25 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     //   1. column comment test
     //   2. table comment test
     //   3. table options test
-    session.sql("""
-                  |CREATE TABLE test2(
-                  |  user_id BIGINT COMMENT 'test_for_key',
-                  |  name VARCHAR(255)
-                  |)
-                  |PARTITIONED BY (bucket(16, user_id))
-                  |COMMENT 'test_for_table_create'
-                  |TBLPROPERTIES('replica_num' = 2, COMPRESSION = 'zstd_1.0');
-                  |""".stripMargin)
+    session.sql(
+      """
+        |CREATE TABLE test2(
+        |  user_id BIGINT COMMENT 'test_for_key',
+        |  name VARCHAR(255)
+        |)
+        |PARTITIONED BY (bucket(16, user_id))
+        |COMMENT 'test_for_table_create'
+        |TBLPROPERTIES('replica_num' = 2, COMPRESSION = 'zstd_1.0', primary_key = 'user_id, name');
+        |""".stripMargin)
     val showCreateTable = getShowCreateTable(s"$getSchemaName.test2")
+    println(showCreateTable)
     Assertions.assertTrue(
       showCreateTable.contains("test_for_key")
         && showCreateTable.contains("test_for_table_create")
         && showCreateTable.contains("partition by key(`user_id`)")
         && showCreateTable.contains("COMPRESSION = 'zstd_1.0'")
-        && showCreateTable.contains("REPLICA_NUM = 1"))
+        && showCreateTable.contains("REPLICA_NUM = 1")
+        && showCreateTable.contains("PRIMARY KEY (`user_id`, `name`)"))
     dropTables("test1", "test2")
     session.stop()
   }
