@@ -263,6 +263,21 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> JDBC_ENABLE_PUSH_DOWN_LIMIT =
+            new ConfigBuilder("jdbc.enable-pushdown-limit")
+                    .doc("Whether to enable pushdown of LIMIT clause to OceanBase.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .booleanConf()
+                    .createWithDefault(true);
+
+    public static final ConfigEntry<Boolean> JDBC_ENABLE_PUSH_DOWN_TOP_N =
+            new ConfigBuilder("jdbc.enable-pushdown-top-n")
+                    .doc(
+                            "Whether to enable pushdown of ORDER BY ... LIMIT N (Top-N) queries to OceanBase. This configuration only takes effect when 'jdbc.enable-pushdown-limit' is true.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .booleanConf()
+                    .createWithDefault(true);
+
     public static final ConfigEntry<Integer> THE_LENGTH_STRING_TO_VARCHAR_TABLE_CREATE =
             new ConfigBuilder("string-as-varchar-length")
                     .doc(
@@ -414,6 +429,14 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableRewriteQuerySql() {
         return get(JDBC_ENABLE_REWRITE_QUERY_SQL);
+    }
+
+    public Boolean getEnablePushdownLimit() {
+        return get(JDBC_ENABLE_PUSH_DOWN_LIMIT);
+    }
+
+    public Boolean getEnablePushdownTopN() {
+        return get(JDBC_ENABLE_PUSH_DOWN_TOP_N);
     }
 
     public Integer getLengthString2Varchar() {

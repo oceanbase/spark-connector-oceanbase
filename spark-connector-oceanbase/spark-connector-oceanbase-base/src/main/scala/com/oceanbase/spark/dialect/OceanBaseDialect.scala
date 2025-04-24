@@ -134,6 +134,11 @@ abstract class OceanBaseDialect extends Logging with Serializable {
     sql
   }
 
+  /** returns the LIMIT clause for the SELECT statement */
+  def getLimitClause(limit: Integer): String = {
+    if (limit > 0) s"LIMIT $limit" else ""
+  }
+
   def getJDBCType(dt: DataType): Option[JdbcType] = None
 
   /** Creates a schema. */

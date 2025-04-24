@@ -22,9 +22,9 @@ import com.oceanbase.spark.dialect.OceanBaseDialect
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.ExprUtils.compileFilter
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.connector.expressions.NamedReference
+import org.apache.spark.sql.connector.expressions.{NamedReference, SortOrder}
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
-import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReader, PartitionReaderFactory, Scan, ScanBuilder, SupportsPushDownAggregates, SupportsPushDownFilters, SupportsPushDownRequiredColumns, SupportsRuntimeFiltering}
+import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReader, PartitionReaderFactory, Scan, ScanBuilder, SupportsPushDownAggregates, SupportsPushDownFilters, SupportsPushDownLimit, SupportsPushDownRequiredColumns, SupportsPushDownTopN, SupportsRuntimeFiltering}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 
@@ -33,9 +33,13 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
   with SupportsPushDownFilters
   with SupportsPushDownRequiredColumns
   with SupportsPushDownAggregates
+  with SupportsPushDownLimit
+  with SupportsPushDownTopN
   with Logging {
   private var finalSchema = schema
   private var pushedFilter = Array.empty[Filter]
+  private var pushDownLimit = 0
+  private var sortOrders: Array[SortOrder] = Array.empty[SortOrder]
 
   /** TODO: support org.apache.spark.sql.connector.read.SupportsPushDownV2Filters */
   override def pushFilters(filters: Array[Filter]): Array[Filter] = {
@@ -56,11 +60,33 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
     false
   }
 
+  override def pushLimit(limit: Int): Boolean = {
+    if (config.getEnablePushdownLimit) {
+      pushDownLimit = limit
+      return true
+    }
+    false
+  }
+
+  override def pushTopN(orders: Array[SortOrder], limit: Int): Boolean = {
+    if (config.getEnablePushdownLimit && config.getEnablePushdownTopN) {
+      pushDownLimit = limit
+      sortOrders = orders
+      return true
+    }
+    false
+  }
+
+  // Always partially pushdown.
+  override def isPartiallyPushed: Boolean = true
+
   override def build(): Scan =
     OBJdbcBatchScan(
       finalSchema: StructType,
       config: OceanBaseConfig,
       pushedFilter: Array[Filter],
+      pushDownLimit: Int,
+      sortOrders: Array[SortOrder],
       dialect: OceanBaseDialect)
 }
 
@@ -68,6 +94,8 @@ case class OBJdbcBatchScan(
     schema: StructType,
     config: OceanBaseConfig,
     pushedFilter: Array[Filter],
+    pushDownLimit: Int,
+    pushDownTopNSortOrders: Array[SortOrder],
     dialect: OceanBaseDialect)
   extends Scan
   with SupportsRuntimeFiltering {
@@ -82,6 +110,8 @@ case class OBJdbcBatchScan(
       schema: StructType,
       config: OceanBaseConfig,
       pushedFilter: Array[Filter],
+      pushDownLimit: Int,
+      pushDownTopNSortOrders: Array[SortOrder],
       dialect: OceanBaseDialect)
 
   override def filterAttributes(): Array[NamedReference] = Array.empty
@@ -95,6 +125,8 @@ class OBJdbcBatch(
     schema: StructType,
     config: OceanBaseConfig,
     pushedFilter: Array[Filter],
+    pushDownLimit: Int,
+    pushDownTopNSortOrders: Array[SortOrder],
     dialect: OceanBaseDialect)
   extends Batch {
   private lazy val inputPartitions: Array[InputPartition] =
@@ -106,6 +138,8 @@ class OBJdbcBatch(
     schema: StructType,
     config: OceanBaseConfig,
     pushedFilter: Array[Filter],
+    pushDownLimit: Int,
+    pushDownTopNSortOrders: Array[SortOrder],
     dialect: OceanBaseDialect)
 }
 
@@ -113,6 +147,8 @@ class OBJdbcReaderFactory(
     schema: StructType,
     config: OceanBaseConfig,
     pushedFilter: Array[Filter],
+    pushDownLimit: Int,
+    pushDownTopNSortOrders: Array[SortOrder],
     dialect: OceanBaseDialect)
   extends PartitionReaderFactory {
 
@@ -122,5 +158,7 @@ class OBJdbcReaderFactory(
       config: OceanBaseConfig,
       partition: InputPartition,
       pushedFilter: Array[Filter],
+      pushDownLimit: Int,
+      pushDownTopNSortOrders: Array[SortOrder],
       dialect: OceanBaseDialect)
 }

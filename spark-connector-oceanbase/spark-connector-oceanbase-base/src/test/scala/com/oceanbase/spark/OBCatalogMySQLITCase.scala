@@ -346,6 +346,73 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testLimitAndTopNPushDown(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+
+    import scala.collection.JavaConverters._
+    // Case limit
+    val actual = session
+      .sql(s"select * from products limit 3")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    val expected: util.List[String] = util.Arrays.asList(
+      "101,scooter,Small 2-wheel scooter,3.1400000000",
+      "102,car battery,12V car battery,8.1000000000",
+      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000"
+    )
+    assertEqualsInAnyOrder(expected, actual)
+
+    // Case top N
+    val actual1 = session
+      .sql(s"select * from products order by id desc nulls first limit 3")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    val expected1: util.List[String] = util.Arrays.asList(
+      "109,spare tire,24 inch spare tire,22.2000000000",
+      "108,jacket,water resistent black wind breaker,0.1000000000",
+      "107,rocks,box of assorted rocks,5.3000000000"
+    )
+    assertEqualsInAnyOrder(expected1, actual1)
+
+    val actual2 = session
+      .sql(s"select * from products order by id desc nulls first, name asc nulls last limit 3")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    println(actual2)
+    val expected2: util.List[String] = util.Arrays.asList(
+      "109,spare tire,24 inch spare tire,22.2000000000",
+      "108,jacket,water resistent black wind breaker,0.1000000000",
+      "107,rocks,box of assorted rocks,5.3000000000"
+    )
+    assertEqualsInAnyOrder(expected2, actual2)
+
+    session.stop()
+  }
+
   private def queryAndVerifyTableData(
       session: SparkSession,
       tableName: String,
