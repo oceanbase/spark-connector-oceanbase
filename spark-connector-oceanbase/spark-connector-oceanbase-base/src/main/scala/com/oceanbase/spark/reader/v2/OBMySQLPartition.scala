@@ -79,40 +79,51 @@ object OBMySQLPartition {
         if (config.getEnableRewriteQuerySql) {
           // TODO: Rewriting query SQL through inner join to optimize deep paging performance.
           // https://www.oceanbase.com/docs/enterprise-oceanbase-database-cn-10000000000884779
-          legacyLimitOffsetPartition(config, obPartInfos)
+          limitOffsetPartitionWay(config, obPartInfos)
         } else {
-          legacyLimitOffsetPartition(config, obPartInfos)
+          limitOffsetPartitionWay(config, obPartInfos)
         }
       } else {
-        if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
-          // For non-partition table
-          computeWherePartInfoForNonPartTable(config, finalIntPriKey.columnName)
+        if (finalIntPriKey.extra.contains(AUTO_INCREMENT)) {
+          wherePartitionWay(config, obPartInfos, finalIntPriKey.columnName)
+        } else if (!config.getEnableOnlyAutoIncUseWherePartition) {
+          val info = obtainIntPriKeyTableInfo(config, EMPTY_STRING, finalIntPriKey.columnName)
+          val priKeyDepth = info.max - info.min
+          // Check the uniformity of the integer primary key value distribution.
+          if ((priKeyDepth >= info.count * 2) || (priKeyDepth * 2 < info.count)) {
+            limitOffsetPartitionWay(config, obPartInfos)
+          } else {
+            wherePartitionWay(config, obPartInfos, finalIntPriKey.columnName)
+          }
         } else {
-          // For partition table
-          computeWherePartInfoForPartTable(config, obPartInfos, finalIntPriKey.columnName)
+          limitOffsetPartitionWay(config, obPartInfos)
         }
       }
-
     } else { // non-primary key table
-      if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
-        // For non-partition table
-        computeWherePartInfoForNonPartTable(config, HIDDEN_PK_INCREMENT)
-      } else {
-        // For partition table
-        computeWherePartInfoForPartTable(config, obPartInfos, HIDDEN_PK_INCREMENT)
-      }
+      wherePartitionWay(config, obPartInfos, HIDDEN_PK_INCREMENT)
     }
   }
 
-  private def legacyLimitOffsetPartition(
-      config: OceanBaseConfig,
-      obPartInfos: Array[OBPartInfo]) = {
+  private def limitOffsetPartitionWay(config: OceanBaseConfig, obPartInfos: Array[OBPartInfo]) = {
     if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
       // For non-partition table
       computeOffsetLimitPartInfoForNonPartTable(config)
     } else {
       // For partition table
       computeForOffsetLimitPartInfoForPartTable(config, obPartInfos)
+    }
+  }
+
+  private def wherePartitionWay(
+      config: OceanBaseConfig,
+      obPartInfos: Array[OBPartInfo],
+      priKeyColumnName: String) = {
+    if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
+      // For non-partition table
+      computeWherePartInfoForNonPartTable(config, priKeyColumnName)
+    } else {
+      // For partition table
+      computeWherePartInfoForPartTable(config, obPartInfos, priKeyColumnName)
     }
   }
 
@@ -196,7 +207,8 @@ object OBMySQLPartition {
         {
           val statement = conn.createStatement()
           val tableName = config.getDbTable
-          val sql = s"SELECT count(1) AS cnt FROM $tableName $partName"
+          val sql =
+            s"SELECT /*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */ count(1) AS cnt FROM $tableName $partName"
           try {
             val rs = statement.executeQuery(sql)
             if (rs.next())
