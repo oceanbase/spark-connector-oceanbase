@@ -200,7 +200,6 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
         |TBLPROPERTIES('replica_num' = 2, COMPRESSION = 'zstd_1.0', primary_key = 'user_id, name');
         |""".stripMargin)
     val showCreateTable = getShowCreateTable(s"$getSchemaName.test2")
-    println(showCreateTable)
     Assertions.assertTrue(
       showCreateTable.contains("test_for_key")
         && showCreateTable.contains("test_for_table_create")
