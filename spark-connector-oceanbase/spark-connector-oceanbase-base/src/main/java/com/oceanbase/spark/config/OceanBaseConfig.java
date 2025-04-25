@@ -263,6 +263,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> ENABLE_ONLY_AUTO_INC_USE_WHERE_PARTITION =
+            new ConfigBuilder("jdbc.enable-only-auto-inc-use-where-partition")
+                    .doc(
+                            "Only auto-increment primary key columns are allowed to use the where partitioning method.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final ConfigEntry<Integer> THE_LENGTH_STRING_TO_VARCHAR_TABLE_CREATE =
             new ConfigBuilder("string-as-varchar-length")
                     .doc(
@@ -414,6 +422,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableRewriteQuerySql() {
         return get(JDBC_ENABLE_REWRITE_QUERY_SQL);
+    }
+
+    public Boolean getEnableOnlyAutoIncUseWherePartition() {
+        return get(ENABLE_ONLY_AUTO_INC_USE_WHERE_PARTITION);
     }
 
     public Integer getLengthString2Varchar() {
