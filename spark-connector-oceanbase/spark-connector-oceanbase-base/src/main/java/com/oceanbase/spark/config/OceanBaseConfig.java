@@ -263,7 +263,6 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
-
     public static final ConfigEntry<Boolean> JDBC_ENABLE_PUSH_DOWN_LIMIT =
             new ConfigBuilder("jdbc.enable-pushdown-limit")
                     .doc("Whether to enable pushdown of LIMIT clause to OceanBase.")
@@ -445,7 +444,7 @@ public class OceanBaseConfig extends Config implements Serializable {
     }
 
     public Boolean getEnablePushdownTopN() {
-        return get(JDBC_ENABLE_PUSH_DOWN_TOP_N)
+        return get(JDBC_ENABLE_PUSH_DOWN_TOP_N);
     }
 
     public Boolean getEnableOnlyAutoIncUseWherePartition() {
