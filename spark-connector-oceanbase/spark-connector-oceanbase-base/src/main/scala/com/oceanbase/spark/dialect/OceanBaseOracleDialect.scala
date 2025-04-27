@@ -83,6 +83,15 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
   }
 
+  /**
+   * returns the LIMIT clause for the SELECT statement
+   *
+   * Oracle mode not supported
+   */
+  override def getLimitClause(limit: Integer): String = {
+    ""
+  }
+
   override def compileValue(value: Any): Any = value match {
     // The JDBC drivers support date literals in SQL statements written in the
     // format: {d 'yyyy-mm-dd'} and timestamp literals in SQL statements written
