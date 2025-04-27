@@ -33,9 +33,7 @@ import org.apache.spark.sql.connector.read.{
   ScanBuilder,
   SupportsPushDownAggregates,
   SupportsPushDownFilters,
-  SupportsPushDownLimit,
   SupportsPushDownRequiredColumns,
-  SupportsPushDownTopN,
   SupportsRuntimeFiltering
 }
 import org.apache.spark.sql.sources.Filter
