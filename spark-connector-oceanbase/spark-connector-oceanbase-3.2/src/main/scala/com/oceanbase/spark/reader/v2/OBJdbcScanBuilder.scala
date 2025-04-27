@@ -77,9 +77,6 @@ case class OBJdbcScanBuilder(
     false
   }
 
-  // Always partially pushdown.
-  override def isPartiallyPushed: Boolean = true
-
   override def build(): Scan =
     OBJdbcBatchScan(
       finalSchema: StructType,
