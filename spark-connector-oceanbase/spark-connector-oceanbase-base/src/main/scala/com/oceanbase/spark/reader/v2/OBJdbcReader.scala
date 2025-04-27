@@ -26,6 +26,7 @@ import org.apache.spark.sql.ExprUtils.compileFilter
 import org.apache.spark.sql.catalyst.{InternalRow, SQLConfHelper}
 import org.apache.spark.sql.catalyst.expressions.SpecificInternalRow
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, GenericArrayData}
+import org.apache.spark.sql.connector.expressions.{NullOrdering, SortDirection, SortOrder}
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, Metadata, ShortType, StringType, StructType, TimestampType, VarcharType}
@@ -40,6 +41,8 @@ class OBJdbcReader(
     config: OceanBaseConfig,
     partition: InputPartition,
     pushedFilter: Array[Filter],
+    pushDownLimit: Int,
+    pushDownTopNSortOrders: Array[SortOrder],
     dialect: OceanBaseDialect)
   extends PartitionReader[InternalRow]
   with SQLConfHelper
@@ -109,6 +112,13 @@ class OBJdbcReader(
       }
     }
 
+    val myLimitClause: String = {
+      if (part.limitOffsetClause == null || part.limitOffsetClause.isEmpty)
+        dialect.getLimitClause(pushDownLimit)
+      else
+        ""
+    }
+
     var hint = s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) */"
     if (part.useHiddenPKColumn)
       hint =
@@ -116,9 +126,55 @@ class OBJdbcReader(
 
     s"""
        |SELECT $hint $columnStr FROM ${config.getDbTable} ${part.partitionClause}
-       |$whereClause ${part.limitOffsetClause}
+       |$whereClause $getOrderByClause ${part.limitOffsetClause} $myLimitClause
        |""".stripMargin
   }
+
+  /**
+   * Mapping between original SQL requirements and MySQL implementations:
+   * ---------------------------------------------------------------------------------------------------
+   * \| Original Requirement | MySQL Implementation | Resulting Order |
+   * ---------------------------------------------------------------------------------------------------
+   * | ORDER BY id ASC NULLS FIRST  | ORDER BY id ASC (default behavior)  | NULLs first → ASC non-nulls  |
+   * |:-----------------------------|:------------------------------------|:-----------------------------|
+   * | ORDER BY id ASC NULLS LAST   | ORDER BY id IS NULL, id ASC         | ASC non-nulls → NULLs last   |
+   * | ORDER BY id DESC NULLS FIRST | ORDER BY id IS NULL DESC, id DESC   | NULLs first → DESC non-nulls |
+   * | ORDER BY id DESC NULLS LAST  | ORDER BY id DESC (default behavior) | DESC non-nulls → NULLs last  |
+   * ---------------------------------------------------------------------------------------------------
+   *
+   * @return
+   *   MySQL-compatible ORDER BY clause
+   */
+  private def getOrderByClause: String = {
+    if (pushDownTopNSortOrders.nonEmpty) {
+      val mysqlOrderBy = pushDownTopNSortOrders
+        .map {
+          sortOrder =>
+            // Parse sort field name, direction, and null ordering rules (based on Spark's SortOrder)
+            val field = dialect.quoteIdentifier(sortOrder.expression().describe())
+
+            // Generate sorting expressions according to MySQL's null handling characteristics
+            (sortOrder.direction(), sortOrder.nullOrdering()) match {
+              // Scenario: ASC + NULLS_LAST - Add IS NULL helper sort
+              case (SortDirection.ASCENDING, NullOrdering.NULLS_LAST) =>
+                s"$field IS NULL, $field ASC" // Prioritize non-NULL values
+              // Scenario: DESC + NULLS_FIRST - Add IS NULL DESC helper sort
+              case (SortDirection.DESCENDING, NullOrdering.NULLS_FIRST) =>
+                s"$field IS NULL DESC, $field DESC" // Prioritize NULL values
+              // Default sorting behavior for other cases
+              case _ => s"$field ${sortOrder.direction().toString}"
+            }
+        }
+        .mkString(", ")
+
+      // Info output of generated ORDER BY clause
+      logInfo(s"Generated ORDER BY clause: $mysqlOrderBy")
+      s" ORDER BY $mysqlOrderBy"
+    } else {
+      ""
+    }
+  }
+
 }
 
 object OBJdbcReader extends SQLConfHelper {

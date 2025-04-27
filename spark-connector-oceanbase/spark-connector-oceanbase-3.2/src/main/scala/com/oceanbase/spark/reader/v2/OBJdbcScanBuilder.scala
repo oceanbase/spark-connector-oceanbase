@@ -24,17 +24,18 @@ import org.apache.spark.sql.ExprUtils.compileFilter
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.expressions.{NamedReference, SortOrder}
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
-import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReader, PartitionReaderFactory, Scan, ScanBuilder, SupportsPushDownAggregates, SupportsPushDownFilters, SupportsPushDownLimit, SupportsPushDownRequiredColumns, SupportsPushDownTopN, SupportsRuntimeFiltering}
+import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReader, PartitionReaderFactory, Scan, ScanBuilder, SupportsPushDownAggregates, SupportsPushDownFilters, SupportsPushDownRequiredColumns, SupportsRuntimeFiltering}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 
-case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialect: OceanBaseDialect)
-  extends ScanBuilder
+case class OBJdbcScanBuilder(
+    schema: StructType,
+    config: OceanBaseConfig,
+    dialect: OceanBaseDialect
+) extends ScanBuilder
   with SupportsPushDownFilters
   with SupportsPushDownRequiredColumns
   with SupportsPushDownAggregates
-  with SupportsPushDownLimit
-  with SupportsPushDownTopN
   with Logging {
   private var finalSchema = schema
   private var pushedFilter = Array.empty[Filter]
@@ -43,7 +44,8 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
 
   /** TODO: support org.apache.spark.sql.connector.read.SupportsPushDownV2Filters */
   override def pushFilters(filters: Array[Filter]): Array[Filter] = {
-    val (pushed, unSupported) = filters.partition(f => compileFilter(f, dialect).isDefined)
+    val (pushed, unSupported) =
+      filters.partition(f => compileFilter(f, dialect).isDefined)
     this.pushedFilter = pushed
     unSupported
   }
@@ -52,33 +54,15 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
 
   override def pruneColumns(requiredSchema: StructType): Unit = {
     val requiredCols = requiredSchema.map(_.name)
-    this.finalSchema = StructType(finalSchema.filter(field => requiredCols.contains(field.name)))
+    this.finalSchema = StructType(
+      finalSchema.filter(field => requiredCols.contains(field.name))
+    )
   }
 
   override def pushAggregation(aggregation: Aggregation): Boolean = {
     // TODO: support aggregation push down
     false
   }
-
-  override def pushLimit(limit: Int): Boolean = {
-    if (config.getEnablePushdownLimit) {
-      pushDownLimit = limit
-      return true
-    }
-    false
-  }
-
-  override def pushTopN(orders: Array[SortOrder], limit: Int): Boolean = {
-    if (config.getEnablePushdownLimit && config.getEnablePushdownTopN) {
-      pushDownLimit = limit
-      sortOrders = orders
-      return true
-    }
-    false
-  }
-
-  // Always partially pushdown.
-  override def isPartiallyPushed: Boolean = true
 
   override def build(): Scan =
     OBJdbcBatchScan(
@@ -87,7 +71,8 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
       pushedFilter: Array[Filter],
       pushDownLimit: Int,
       sortOrders: Array[SortOrder],
-      dialect: OceanBaseDialect)
+      dialect: OceanBaseDialect
+    )
 }
 
 case class OBJdbcBatchScan(
@@ -96,8 +81,8 @@ case class OBJdbcBatchScan(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
-    dialect: OceanBaseDialect)
-  extends Scan
+    dialect: OceanBaseDialect
+) extends Scan
   with SupportsRuntimeFiltering {
 
   // TODO: support spark runtime filter feat.
@@ -112,7 +97,8 @@ case class OBJdbcBatchScan(
       pushedFilter: Array[Filter],
       pushDownLimit: Int,
       pushDownTopNSortOrders: Array[SortOrder],
-      dialect: OceanBaseDialect)
+      dialect: OceanBaseDialect
+    )
 
   override def filterAttributes(): Array[NamedReference] = Array.empty
 
@@ -127,20 +113,22 @@ class OBJdbcBatch(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
-    dialect: OceanBaseDialect)
-  extends Batch {
+    dialect: OceanBaseDialect
+) extends Batch {
   private lazy val inputPartitions: Array[InputPartition] =
     OBMySQLPartition.columnPartition(config, dialect)
 
   override def planInputPartitions(): Array[InputPartition] = inputPartitions
 
-  override def createReaderFactory(): PartitionReaderFactory = new OBJdbcReaderFactory(
-    schema: StructType,
-    config: OceanBaseConfig,
-    pushedFilter: Array[Filter],
-    pushDownLimit: Int,
-    pushDownTopNSortOrders: Array[SortOrder],
-    dialect: OceanBaseDialect)
+  override def createReaderFactory(): PartitionReaderFactory =
+    new OBJdbcReaderFactory(
+      schema: StructType,
+      config: OceanBaseConfig,
+      pushedFilter: Array[Filter],
+      pushDownLimit: Int,
+      pushDownTopNSortOrders: Array[SortOrder],
+      dialect: OceanBaseDialect
+    )
 }
 
 class OBJdbcReaderFactory(
@@ -149,10 +137,12 @@ class OBJdbcReaderFactory(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
-    dialect: OceanBaseDialect)
-  extends PartitionReaderFactory {
+    dialect: OceanBaseDialect
+) extends PartitionReaderFactory {
 
-  override def createReader(partition: InputPartition): PartitionReader[InternalRow] =
+  override def createReader(
+      partition: InputPartition
+  ): PartitionReader[InternalRow] =
     new OBJdbcReader(
       schema: StructType,
       config: OceanBaseConfig,
@@ -160,5 +150,6 @@ class OBJdbcReaderFactory(
       pushedFilter: Array[Filter],
       pushDownLimit: Int,
       pushDownTopNSortOrders: Array[SortOrder],
-      dialect: OceanBaseDialect)
+      dialect: OceanBaseDialect
+    )
 }
