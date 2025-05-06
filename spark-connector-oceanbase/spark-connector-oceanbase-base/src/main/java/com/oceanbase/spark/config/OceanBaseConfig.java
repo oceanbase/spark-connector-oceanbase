@@ -16,6 +16,8 @@
 
 package com.oceanbase.spark.config;
 
+import com.oceanbase.spark.dialect.OceanBaseDialect;
+
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Map;
@@ -278,13 +280,21 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(true);
 
-    public static final ConfigEntry<Boolean> ENABLE_ONLY_AUTO_INC_USE_WHERE_PARTITION =
-            new ConfigBuilder("jdbc.enable-only-auto-inc-use-where-partition")
+    public static final ConfigEntry<Boolean> DISABLE_PK_TABLE_USE_WHERE_PARTITION =
+            new ConfigBuilder("jdbc.disable-pk-table-use-where-partition")
                     .doc(
-                            "Only auto-increment primary key columns are allowed to use the where partitioning method.")
+                            "When true, primary key tables will be prohibited from using WHERE clause partitioning.")
                     .version(ConfigConstants.VERSION_1_2_0)
                     .booleanConf()
                     .createWithDefault(false);
+
+    public static final ConfigEntry<String> SPECIFY_PK_TABLE_PARTITION_COLUMN =
+            new ConfigBuilder("jdbc.%s.partition-column")
+                    .doc(
+                            "You can manually specify the primary key table partition column, and by default, one will be automatically selected from the primary key columns.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .stringConf()
+                    .create();
 
     public static final ConfigEntry<Integer> THE_LENGTH_STRING_TO_VARCHAR_TABLE_CREATE =
             new ConfigBuilder("string-as-varchar-length")
@@ -447,8 +457,8 @@ public class OceanBaseConfig extends Config implements Serializable {
         return get(JDBC_ENABLE_PUSH_DOWN_TOP_N);
     }
 
-    public Boolean getEnableOnlyAutoIncUseWherePartition() {
-        return get(ENABLE_ONLY_AUTO_INC_USE_WHERE_PARTITION);
+    public Boolean getDisableIntPkTableUseWherePartition() {
+        return get(DISABLE_PK_TABLE_USE_WHERE_PARTITION);
     }
 
     public Integer getLengthString2Varchar() {
@@ -489,5 +499,16 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Optional<Long> getJdbcMaxRecordsPrePartition() {
         return Optional.ofNullable(get(JDBC_MAX_RECORDS_PER_PARTITION));
+    }
+
+    public Optional<String> getJdbcReaderPartitionColumn(OceanBaseDialect dialect) {
+        String configPartCol =
+                String.format(
+                        SPECIFY_PK_TABLE_PARTITION_COLUMN.getKey(),
+                        dialect.unQuoteIdentifier(getDbTable()));
+        return getProperties().entrySet().stream()
+                .filter(entry -> entry.getKey().contains(configPartCol))
+                .map(entry -> dialect.quoteIdentifier(entry.getValue()))
+                .findFirst();
     }
 }

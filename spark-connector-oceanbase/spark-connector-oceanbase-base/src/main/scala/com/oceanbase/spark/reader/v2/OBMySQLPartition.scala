@@ -22,6 +22,7 @@ import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.sql.connector.read.InputPartition
 
+import java.sql.Connection
 import java.util.Objects
 
 import scala.collection.mutable
@@ -33,6 +34,7 @@ case class OBMySQLPartition(
     limitOffsetClause: String,
     whereClause: String,
     useHiddenPKColumn: Boolean = false,
+    unevenlyWhereValue: Seq[Object] = Seq[Object](),
     idx: Int)
   extends InputPartition {}
 
@@ -45,85 +47,96 @@ object OBMySQLPartition {
   private val HIDDEN_PK_INCREMENT = "__pk_increment"
 
   def columnPartition(config: OceanBaseConfig, dialect: OceanBaseDialect): Array[InputPartition] = {
-    // Determine whether a partition table.
-    val obPartInfos: Array[OBPartInfo] = obtainPartInfo(config)
-    require(obPartInfos.nonEmpty, "Failed to obtain partition info of table")
+    // In this method, create and close the connection uniformly to reuse the connection.
+    OBJdbcUtils.withConnection(config) {
+      connection =>
+        {
+          // Determine whether a partition table.
+          val obPartInfos: Array[OBPartInfo] = obtainPartInfo(connection, config)
+          require(obPartInfos.nonEmpty, "Failed to obtain partition info of table")
 
-    // Check key and non-primary key tables
-    val priKeyColInfos = dialect.getPriKeyInfo(config.getSchemaName, config.getTableName, config)
-    if (null != priKeyColInfos && priKeyColInfos.nonEmpty) {
-      // primary key table => OceanBase: All parts of a PRIMARY KEY must be NOT NULL
-      var finalIntPriKey: PriKeyColumnInfo = null
+          // Check key and non-primary key tables
+          val priKeyColInfos =
+            dialect.getPriKeyInfo(connection, config.getSchemaName, config.getTableName, config)
+          if (null != priKeyColInfos && priKeyColInfos.nonEmpty) {
+            val finalIntPriKey: PriKeyColumnInfo = getIntPriKeyColumn(priKeyColInfos)
 
-      // 1. find all int columns
-      val intKeys = priKeyColInfos.filter(priKey => INT_DATE_TYPE_SEQ.contains(priKey.dataType))
-      // 2. check auto_increment
-      val autoIncrementSeq = intKeys.filter(priKey => priKey.extra.contains(AUTO_INCREMENT)).toSeq
-      if (autoIncrementSeq.nonEmpty) {
-        finalIntPriKey = autoIncrementSeq.head
-      } else {
-        if (intKeys.length == 1) {
-          finalIntPriKey = intKeys.head
-        } else if (intKeys.length >= 2) {
-          val bigintKeys = intKeys.filter(priKey => priKey.dataType.equals("bigint")).toSeq
-          if (bigintKeys.nonEmpty) {
-            finalIntPriKey = bigintKeys.head
-          } else {
-            finalIntPriKey = intKeys.head
+            // No primary key column of int type
+            val configPartitionColumn = config.getJdbcReaderPartitionColumn(dialect)
+            if (config.getDisableIntPkTableUseWherePartition) {
+              limitOffsetPartitionWay(connection, config, obPartInfos)
+            } else if (null == finalIntPriKey) {
+              // No-int pK table
+              val priKeyColumnName = configPartitionColumn.orElse(priKeyColInfos.head.columnName)
+              whereUnevenlySizedPartitionWay(connection, config, obPartInfos, priKeyColumnName)
+            } else {
+              val info = obtainIntPriKeyTableInfo(
+                connection,
+                config,
+                EMPTY_STRING,
+                finalIntPriKey.columnName)
+              val priKeyDepth = info.max - info.min
+              // Check the uniformity of the integer primary key value distribution. TODO：Refine logic of Check the uniformity
+              if ((priKeyDepth >= info.count * 2) || (priKeyDepth * 2 <= info.count)) {
+                whereUnevenlySizedPartitionWay(
+                  connection,
+                  config,
+                  obPartInfos,
+                  configPartitionColumn.orElse(finalIntPriKey.columnName))
+              } else {
+                whereEvenlySizedPartitionWay(
+                  connection,
+                  config,
+                  obPartInfos,
+                  finalIntPriKey.columnName)
+              }
+            }
+          } else { // non-primary key table
+            whereEvenlySizedPartitionWay(connection, config, obPartInfos, HIDDEN_PK_INCREMENT)
           }
         }
-      }
-
-      // No primary key column of int type
-      if (null == finalIntPriKey) {
-        if (config.getEnableRewriteQuerySql) {
-          // TODO: Rewriting query SQL through inner join to optimize deep paging performance.
-          // https://www.oceanbase.com/docs/enterprise-oceanbase-database-cn-10000000000884779
-          limitOffsetPartitionWay(config, obPartInfos)
-        } else {
-          limitOffsetPartitionWay(config, obPartInfos)
-        }
-      } else {
-        if (finalIntPriKey.extra.contains(AUTO_INCREMENT)) {
-          wherePartitionWay(config, obPartInfos, finalIntPriKey.columnName)
-        } else if (!config.getEnableOnlyAutoIncUseWherePartition) {
-          val info = obtainIntPriKeyTableInfo(config, EMPTY_STRING, finalIntPriKey.columnName)
-          val priKeyDepth = info.max - info.min
-          // Check the uniformity of the integer primary key value distribution.
-          if ((priKeyDepth >= info.count * 2) || (priKeyDepth * 2 < info.count)) {
-            limitOffsetPartitionWay(config, obPartInfos)
-          } else {
-            wherePartitionWay(config, obPartInfos, finalIntPriKey.columnName)
-          }
-        } else {
-          limitOffsetPartitionWay(config, obPartInfos)
-        }
-      }
-    } else { // non-primary key table
-      wherePartitionWay(config, obPartInfos, HIDDEN_PK_INCREMENT)
     }
   }
 
-  private def limitOffsetPartitionWay(config: OceanBaseConfig, obPartInfos: Array[OBPartInfo]) = {
+  private def limitOffsetPartitionWay(
+      connection: Connection,
+      config: OceanBaseConfig,
+      obPartInfos: Array[OBPartInfo]) = {
     if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
       // For non-partition table
-      computeOffsetLimitPartInfoForNonPartTable(config)
+      computeOffsetLimitPartInfoForNonPartTable(connection, config)
     } else {
       // For partition table
-      computeForOffsetLimitPartInfoForPartTable(config, obPartInfos)
+      computeForOffsetLimitPartInfoForPartTable(connection, config, obPartInfos)
     }
   }
 
-  private def wherePartitionWay(
+  private def whereEvenlySizedPartitionWay(
+      connection: Connection,
       config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String) = {
     if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
       // For non-partition table
-      computeWherePartInfoForNonPartTable(config, priKeyColumnName)
+      computeWherePartInfoForNonPartTable(connection, config, priKeyColumnName)
     } else {
       // For partition table
-      computeWherePartInfoForPartTable(config, obPartInfos, priKeyColumnName)
+      computeWherePartInfoForPartTable(connection, config, obPartInfos, priKeyColumnName)
+    }
+  }
+
+  private def whereUnevenlySizedPartitionWay(
+      connection: Connection,
+      config: OceanBaseConfig,
+      obPartInfos: Array[OBPartInfo],
+      priKeyColumnName: String) = {
+
+    if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
+      // For non-partition table
+      computeUnevenlyWherePartInfoForNonPartTable(connection, config, priKeyColumnName)
+    } else {
+      // For partition table
+      computeUnevenlyWherePartInfoForPartTable(connection, config, obPartInfos, priKeyColumnName)
     }
   }
 
@@ -135,47 +148,70 @@ object OBMySQLPartition {
     case _ => 500000
   }
 
-  private def obtainPartInfo(config: OceanBaseConfig): Array[OBPartInfo] = {
-    val arrayBuilder = new mutable.ArrayBuilder.ofRef[OBPartInfo]
-    OBJdbcUtils.withConnection(config) {
-      conn =>
-        {
-          val statement = conn.createStatement()
-          val sql =
-            s"""
-               |select
-               |  TABLE_SCHEMA, TABLE_NAME, PARTITION_NAME, SUBPARTITION_NAME
-               |from
-               |  information_schema.partitions
-               |where
-               |      TABLE_SCHEMA = '${config.getSchemaName}'
-               |  and TABLE_NAME = '${config.getTableName}';
-               |""".stripMargin
-          try {
-            val rs = statement.executeQuery(sql)
-            while (rs.next()) {
-              arrayBuilder += OBPartInfo(
-                rs.getString(1),
-                rs.getString(2),
-                rs.getString(3),
-                rs.getString(4))
-            }
-          } finally {
-            statement.close()
-          }
+  private def getIntPriKeyColumn(priKeyColInfos: ArrayBuffer[PriKeyColumnInfo]) = {
+    // primary key table => OceanBase: All parts of a PRIMARY KEY must be NOT NULL
+    var finalIntPriKey: PriKeyColumnInfo = null
+
+    // 1. find all int columns
+    val intKeys = priKeyColInfos.filter(priKey => INT_DATE_TYPE_SEQ.contains(priKey.dataType))
+    // 2. check auto_increment
+    val autoIncrementSeq = intKeys.filter(priKey => priKey.extra.contains(AUTO_INCREMENT)).toSeq
+    if (autoIncrementSeq.nonEmpty) {
+      finalIntPriKey = autoIncrementSeq.head
+    } else {
+      if (intKeys.length == 1) {
+        finalIntPriKey = intKeys.head
+      } else if (intKeys.length >= 2) {
+        val bigintKeys = intKeys.filter(priKey => priKey.dataType.equals("bigint")).toSeq
+        if (bigintKeys.nonEmpty) {
+          finalIntPriKey = bigintKeys.head
+        } else {
+          finalIntPriKey = intKeys.head
         }
+      }
     }
+    finalIntPriKey
+  }
+
+  private def obtainPartInfo(conn: Connection, config: OceanBaseConfig): Array[OBPartInfo] = {
+    val arrayBuilder = new mutable.ArrayBuilder.ofRef[OBPartInfo]
+    val statement = conn.createStatement()
+    val sql =
+      s"""
+         |select
+         |  TABLE_SCHEMA, TABLE_NAME, PARTITION_NAME, SUBPARTITION_NAME
+         |from
+         |  information_schema.partitions
+         |where
+         |      TABLE_SCHEMA = '${config.getSchemaName}'
+         |  and TABLE_NAME = '${config.getTableName}';
+         |""".stripMargin
+    try {
+      val rs = statement.executeQuery(sql)
+      while (rs.next()) {
+        arrayBuilder += OBPartInfo(
+          rs.getString(1),
+          rs.getString(2),
+          rs.getString(3),
+          rs.getString(4))
+      }
+    } finally {
+      statement.close()
+    }
+
     arrayBuilder.result()
   }
 
   private def computeOffsetLimitPartInfoForNonPartTable(
+      connection: Connection,
       config: OceanBaseConfig): Array[InputPartition] = {
-    val count: Long = obtainCount(config, EMPTY_STRING)
+    val count: Long = obtainCount(connection, config, EMPTY_STRING)
     require(count >= 0, "Total must be a positive number")
     computeQueryPart(count, EMPTY_STRING, config).asInstanceOf[Array[InputPartition]]
   }
 
   private def computeForOffsetLimitPartInfoForPartTable(
+      connection: Connection,
       config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo]): Array[InputPartition] = {
     val arr = new ArrayBuffer[OBMySQLPartition]()
@@ -185,7 +221,7 @@ object OBMySQLPartition {
           case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
           case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
         }
-        val count = obtainCount(config, partitionName)
+        val count = obtainCount(connection, config, partitionName)
         val partitions = computeQueryPart(count, partitionName, config)
         arr ++= partitions
       })
@@ -197,28 +233,24 @@ object OBMySQLPartition {
           partInfo.limitOffsetClause,
           whereClause = null,
           useHiddenPKColumn = false,
-          index)
+          idx = index)
     }.toArray
   }
 
-  private def obtainCount(config: OceanBaseConfig, partName: String) = {
-    OBJdbcUtils.withConnection(config) {
-      conn =>
-        {
-          val statement = conn.createStatement()
-          val tableName = config.getDbTable
-          val sql =
-            s"SELECT /*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */ count(1) AS cnt FROM $tableName $partName"
-          try {
-            val rs = statement.executeQuery(sql)
-            if (rs.next())
-              rs.getLong(1)
-            else
-              throw new RuntimeException(s"Failed to obtain count of $tableName.")
-          } finally {
-            statement.close()
-          }
-        }
+  private def obtainCount(connection: Connection, config: OceanBaseConfig, partName: String) = {
+
+    val statement = connection.createStatement()
+    val tableName = config.getDbTable
+    val sql =
+      s"SELECT /*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */ count(1) AS cnt FROM $tableName $partName"
+    try {
+      val rs = statement.executeQuery(sql)
+      if (rs.next())
+        rs.getLong(1)
+      else
+        throw new RuntimeException(s"Failed to obtain count of $tableName.")
+    } finally {
+      statement.close()
     }
   }
 
@@ -244,8 +276,9 @@ object OBMySQLPartition {
       .toArray
   }
 
-  // ========== Int Primary Key Section: WHERE partition way ==========
+  // ========== Evenly Sized Where Partition Section ==========
   private def computeWherePartInfoForPartTable(
+      connection: Connection,
       config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String): Array[InputPartition] = {
@@ -256,7 +289,8 @@ object OBMySQLPartition {
           case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
           case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
         }
-        val keyTableInfo = obtainIntPriKeyTableInfo(config, partitionName, priKeyColumnName)
+        val keyTableInfo =
+          obtainIntPriKeyTableInfo(connection, config, partitionName, priKeyColumnName)
         val partitions =
           computeWhereSparkPart(keyTableInfo, partitionName, priKeyColumnName, config)
         arr ++= partitions
@@ -268,7 +302,7 @@ object OBMySQLPartition {
           limitOffsetClause = EMPTY_STRING,
           whereClause = partInfo.whereClause,
           useHiddenPKColumn = partInfo.useHiddenPKColumn,
-          index)
+          idx = index)
     }.toArray
   }
 
@@ -324,49 +358,312 @@ object OBMySQLPartition {
   }
 
   private def computeWherePartInfoForNonPartTable(
+      connection: Connection,
       config: OceanBaseConfig,
       priKeyColumnName: String): Array[InputPartition] = {
-    val priKeyColumnInfo = obtainIntPriKeyTableInfo(config, EMPTY_STRING, priKeyColumnName)
+    val priKeyColumnInfo =
+      obtainIntPriKeyTableInfo(connection, config, EMPTY_STRING, priKeyColumnName)
     if (priKeyColumnInfo.count <= 0) Array.empty
     computeWhereSparkPart(priKeyColumnInfo, EMPTY_STRING, priKeyColumnName, config)
       .asInstanceOf[Array[InputPartition]]
   }
 
   private def obtainIntPriKeyTableInfo(
+      connection: Connection,
       config: OceanBaseConfig,
       partName: String,
       priKeyColumnName: String) = {
-    OBJdbcUtils.withConnection(config) {
-      conn =>
-        {
-          val statement = conn.createStatement()
-          val tableName = config.getDbTable
-          var hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
-          if (priKeyColumnName.equals(HIDDEN_PK_INCREMENT))
-            hint =
-              s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}), opt_param('hidden_column_visible', 'true') */"
+    val statement = connection.createStatement()
+    val tableName = config.getDbTable
+    var hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+    if (priKeyColumnName.equals(HIDDEN_PK_INCREMENT))
+      hint =
+        s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}), opt_param('hidden_column_visible', 'true') */"
 
-          val sql =
-            s"""
+    val sql =
+      s"""
               SELECT $hint
                 count(1) AS cnt, min($priKeyColumnName), max($priKeyColumnName)
               FROM $tableName $partName
              """
-          try {
-            val rs = statement.executeQuery(sql)
-            if (rs.next())
-              IntPriKeyTableInfo(rs.getLong(1), rs.getLong(2), rs.getLong(3))
-            else
-              throw new RuntimeException(s"Failed to obtain count of $tableName.")
-          } finally {
-            statement.close()
-          }
-        }
+    try {
+      val rs = statement.executeQuery(sql)
+      if (rs.next())
+        IntPriKeyTableInfo(rs.getLong(1), rs.getLong(2), rs.getLong(3))
+      else
+        throw new RuntimeException(s"Failed to obtain count of $tableName.")
+    } finally {
+      statement.close()
+
     }
   }
 
   private case class IntPriKeyTableInfo(count: Long, min: Long, max: Long)
 
+  // ========== Unevenly Sized Where Partition Section ==========
+  private def computeUnevenlyWherePartInfoForNonPartTable(
+      conn: Connection,
+      config: OceanBaseConfig,
+      priKeyColumnName: String): Array[InputPartition] = {
+    val unevenlyPriKeyTableInfo =
+      obtainUnevenlyPriKeyTableInfo(conn, config, EMPTY_STRING, priKeyColumnName)
+    if (unevenlyPriKeyTableInfo.count <= 0)
+      Array.empty
+    else
+      computeUnevenlyWhereSparkPart(
+        conn,
+        unevenlyPriKeyTableInfo,
+        EMPTY_STRING,
+        priKeyColumnName,
+        config)
+        .asInstanceOf[Array[InputPartition]]
+  }
+
+  private def computeUnevenlyWherePartInfoForPartTable(
+      conn: Connection,
+      config: OceanBaseConfig,
+      obPartInfos: Array[OBPartInfo],
+      priKeyColumnName: String): Array[InputPartition] = {
+    val arr = new ArrayBuffer[OBMySQLPartition]()
+    obPartInfos.foreach(
+      obPartInfo => {
+        val partitionName = obPartInfo.subPartName match {
+          case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
+          case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
+        }
+        val unevenlyPriKeyTableInfo =
+          obtainUnevenlyPriKeyTableInfo(conn, config, partitionName, priKeyColumnName)
+        val partitions =
+          computeUnevenlyWhereSparkPart(
+            conn,
+            unevenlyPriKeyTableInfo,
+            partitionName,
+            priKeyColumnName,
+            config)
+        arr ++= partitions
+      })
+
+    arr.zipWithIndex.map {
+      case (partInfo, index) =>
+        OBMySQLPartition(
+          partInfo.partitionClause,
+          limitOffsetClause = EMPTY_STRING,
+          whereClause = partInfo.whereClause,
+          useHiddenPKColumn = partInfo.useHiddenPKColumn,
+          unevenlyWhereValue = partInfo.unevenlyWhereValue,
+          idx = index
+        )
+    }.toArray
+  }
+
+  /**
+   * Computes Spark partitions for unevenly primary key tables
+   *
+   * @param keyTableInfo
+   *   Table information containing min/max IDs and row count
+   * @param partitionClause
+   *   Original partition clause (if exists)
+   * @param config
+   *   OceanBase configuration
+   * @return
+   *   Array of optimized MySQL partitions
+   */
+  private def computeUnevenlyWhereSparkPart(
+      conn: Connection,
+      keyTableInfo: UnevenlyPriKeyTableInfo,
+      partitionClause: String,
+      priKeyColumnName: String,
+      config: OceanBaseConfig): Array[OBMySQLPartition] = {
+    // Return empty array if table has no rows
+    if (keyTableInfo.count <= 0) {
+      return Array.empty[OBMySQLPartition]
+    }
+    // Calculate desired rows per partition based on configuration
+    val desiredRowsPerPartition =
+      config.getJdbcMaxRecordsPrePartition.orElse(calPartitionSize(keyTableInfo.count))
+    var previousChunkEnd = keyTableInfo.min
+    var chunkEnd = nextChunkEnd(
+      conn,
+      desiredRowsPerPartition,
+      previousChunkEnd,
+      keyTableInfo.max,
+      partitionClause,
+      priKeyColumnName,
+      config)
+    val arrayBuffer = ArrayBuffer[OBMySQLPartition]()
+    var idx = 0
+    if (Objects.nonNull(chunkEnd)) {
+      val whereClause = s"($priKeyColumnName < ?)"
+      arrayBuffer += OBMySQLPartition(
+        partitionClause = partitionClause,
+        limitOffsetClause = EMPTY_STRING,
+        whereClause = whereClause,
+        unevenlyWhereValue = Seq(chunkEnd),
+        idx = idx)
+    }
+    while (Objects.nonNull(chunkEnd)) {
+      previousChunkEnd = chunkEnd
+      chunkEnd = nextChunkEnd(
+        conn,
+        desiredRowsPerPartition,
+        previousChunkEnd,
+        keyTableInfo.max,
+        partitionClause,
+        priKeyColumnName,
+        config)
+      if (Objects.nonNull(chunkEnd)) {
+        val whereClause =
+          s"($priKeyColumnName >= ? AND $priKeyColumnName < ?)"
+        idx = idx + 1
+        arrayBuffer += OBMySQLPartition(
+          partitionClause = partitionClause,
+          limitOffsetClause = EMPTY_STRING,
+          whereClause = whereClause,
+          unevenlyWhereValue = Seq(previousChunkEnd, chunkEnd),
+          idx = idx)
+      }
+    }
+    if (Objects.isNull(chunkEnd)) {
+      val whereClause = s"($priKeyColumnName >= ?)"
+      idx = idx + 1
+      arrayBuffer += OBMySQLPartition(
+        partitionClause = partitionClause,
+        limitOffsetClause = EMPTY_STRING,
+        whereClause = whereClause,
+        unevenlyWhereValue = Seq(previousChunkEnd),
+        idx = idx)
+    }
+    arrayBuffer.toArray
+  }
+
+  private def nextChunkEnd(
+      conn: Connection,
+      chunkSize: Long,
+      previousChunkEnd: Object,
+      max: Object,
+      partitionClause: String,
+      priKeyColumnName: String,
+      config: OceanBaseConfig): Object = {
+    var chunkEnd: Object =
+      queryNextChunkMax(
+        conn,
+        chunkSize,
+        previousChunkEnd,
+        partitionClause,
+        priKeyColumnName,
+        config)
+    if (Objects.isNull(chunkEnd)) return chunkEnd
+    if (Objects.equals(previousChunkEnd, chunkEnd)) {
+      // we don't allow equal chunk start and end,
+      // should query the next one larger than chunkEnd
+      chunkEnd = queryMin(conn, chunkEnd, partitionClause, priKeyColumnName, config)
+
+      // queryMin will return null when the chunkEnd is the max value,// queryMin will return null when the chunkEnd is the max value,
+      // this will happen when the mysql table ignores the capitalization.// this will happen when the mysql table ignores the capitalization.
+      // see more detail at the test MySqlConnectorITCase#testReadingWithMultiMaxValue.// see more detail at the test MySqlConnectorITCase#testReadingWithMultiMaxValue.
+      // In the test, the max value of order_id will return 'e' and when we get the chunkEnd =// In the test, the max value of order_id will return 'e' and when we get the chunkEnd =
+      // 'E',// 'E',
+      // this method will return 'E' and will not return null.// this method will return 'E' and will not return null.
+      // When this method is invoked next time, queryMin will return null here.// When this method is invoked next time, queryMin will return null here.
+      // So we need return null when we reach the max value here.// So we need return null when we reach the max value here.
+      if (chunkEnd == null) return null
+    }
+    if (compare(chunkEnd, max) >= 0) null
+    else chunkEnd
+  }
+
+  private def queryNextChunkMax(
+      conn: Connection,
+      chunkSize: Long,
+      includedLowerBound: Object,
+      partitionClause: String,
+      priKeyColumnName: String,
+      config: OceanBaseConfig): Object = {
+    val tableName = config.getDbTable
+    val hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+    val sql =
+      s"""
+              SELECT
+                $hint MAX($priKeyColumnName) AS chunk_high
+              FROM
+                (
+                  SELECT * FROM $tableName $partitionClause WHERE $priKeyColumnName > ? ORDER BY $priKeyColumnName ASC LIMIT $chunkSize
+                );
+             """
+    val statement = conn.prepareStatement(sql)
+    try {
+      statement.setObject(1, includedLowerBound)
+      val rs = statement.executeQuery()
+      if (rs.next())
+        rs.getObject(1)
+      else
+        throw new RuntimeException("Failed to query next chunk max.")
+    } finally {
+      statement.close()
+    }
+  }
+
+  private def queryMin(
+      conn: Connection,
+      includedLowerBound: Object,
+      partitionClause: String,
+      priKeyColumnName: String,
+      config: OceanBaseConfig): Object = {
+    val tableName = config.getDbTable
+    val hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+    val sql =
+      s"""
+              SELECT $hint
+                MIN($priKeyColumnName)
+              FROM $tableName $partitionClause
+                WHERE $priKeyColumnName > ?
+             """
+    val statement = conn.prepareStatement(sql)
+    try {
+      statement.setObject(1, includedLowerBound)
+      val rs = statement.executeQuery()
+      if (rs.next())
+        rs.getObject(1)
+      else
+        throw new RuntimeException("Failed to query next chunk max.")
+    } finally {
+      statement.close()
+    }
+  }
+
+  private def obtainUnevenlyPriKeyTableInfo(
+      conn: Connection,
+      config: OceanBaseConfig,
+      partName: String,
+      priKeyColumnName: String) = {
+    val statement = conn.createStatement()
+    val tableName = config.getDbTable
+    val hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+    val sql =
+      s"""
+              SELECT $hint
+                count(1) AS cnt, min($priKeyColumnName), max($priKeyColumnName)
+              FROM $tableName $partName
+             """
+    try {
+      val rs = statement.executeQuery(sql)
+      if (rs.next())
+        UnevenlyPriKeyTableInfo(rs.getLong(1), rs.getObject(2), rs.getObject(3))
+      else
+        throw new RuntimeException(s"Failed to obtain count of $tableName.")
+    } finally {
+      statement.close()
+    }
+  }
+
+  private def compare(obj1: Any, obj2: Any): Int = (obj1, obj2) match {
+    case (c1: Comparable[_], c2) if c1.getClass == c2.getClass =>
+      c1.asInstanceOf[Comparable[Any]].compareTo(c2)
+    case _ =>
+      obj1.toString.compareTo(obj2.toString)
+  }
+
+  private case class UnevenlyPriKeyTableInfo(count: Long, min: Object, max: Object)
 }
 
 case class OBPartInfo(tableSchema: String, tableName: String, partName: String, subPartName: String)

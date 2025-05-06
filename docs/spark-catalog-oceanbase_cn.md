@@ -332,6 +332,20 @@ select * from spark_catalog.default.orders;
                 <td>通过向生成的 SQL 添加 /*+ PARALLEL(N) */ hint 来控制统计查询（例如 COUNT、MIN、MAX）的并行级别。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.disable-pk-table-use-where-partition</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>如果为true，则将禁止主键表使用 where 子句进行分区。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.{database}.{table}.partition-column</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>您可以手动指定主键表分区列，否则将默认自动从主键列中选择一个。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">1024</td>

@@ -55,6 +55,13 @@ public class OceanBaseUserInfo implements Serializable {
         this.tenant = tenant;
     }
 
+    /**
+     * Parses the user information from the OceanBase configuration. Supports multiple username
+     * formats: - user@tenant#cluster - cluster:tenant:user - user@tenant - only user
+     *
+     * @param oceanBaseConfig The OceanBase configuration containing the username.
+     * @return A new OceanBaseUserInfo object with the parsed information.
+     */
     public static OceanBaseUserInfo parse(OceanBaseConfig oceanBaseConfig) {
         final String username = oceanBaseConfig.getUsername();
         final String sepUserAtTenant = "@";
