@@ -38,3 +38,12 @@ CREATE TABLE products_full_pri_key
   weight      DECIMAL(20, 10),
   primary key(id, name, description, weight)
 );
+
+CREATE TABLE products_no_int_pri_key
+(
+  id          VARCHAR(255)      NOT NULL ,
+  name        VARCHAR(255) NOT NULL,
+  description VARCHAR(512),
+  weight      DECIMAL(20, 10),
+  primary key(id, name)
+);

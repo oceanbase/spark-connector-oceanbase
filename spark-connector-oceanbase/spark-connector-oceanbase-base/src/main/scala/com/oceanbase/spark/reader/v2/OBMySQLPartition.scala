@@ -18,12 +18,12 @@ package com.oceanbase.spark.reader.v2
 
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.{OceanBaseDialect, PriKeyColumnInfo}
-import com.oceanbase.spark.utils.OBJdbcUtils
+import com.oceanbase.spark.utils.{ConfigUtils, OBJdbcUtils}
 
 import org.apache.spark.sql.connector.read.InputPartition
 
 import java.sql.Connection
-import java.util.Objects
+import java.util.{Objects, Optional}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -62,7 +62,13 @@ object OBMySQLPartition {
             val finalIntPriKey: PriKeyColumnInfo = getIntPriKeyColumn(priKeyColInfos)
 
             // No primary key column of int type
-            val configPartitionColumn = config.getJdbcReaderPartitionColumn(dialect)
+            var configPartitionColumn = config.getJdbcReaderPartitionColumn(dialect)
+            // Find the specified partition column in the spark runtime configuration.
+            val partColConfig = String.format(
+              OceanBaseConfig.SPECIFY_PK_TABLE_PARTITION_COLUMN.getKey,
+              dialect.unQuoteIdentifier(config.getDbTable))
+            configPartitionColumn = Optional.ofNullable(
+              configPartitionColumn.orElse(ConfigUtils.findFromRuntimeConf(partColConfig)))
             if (config.getDisableIntPkTableUseWherePartition) {
               limitOffsetPartitionWay(connection, config, obPartInfos)
             } else if (null == finalIntPriKey) {
@@ -425,6 +431,7 @@ object OBMySQLPartition {
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String): Array[InputPartition] = {
     val arr = new ArrayBuffer[OBMySQLPartition]()
+    // TODO: Supports parallel data partitioning across multiple partitions.
     obPartInfos.foreach(
       obPartInfo => {
         val partitionName = obPartInfo.subPartName match {
