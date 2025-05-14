@@ -20,13 +20,18 @@ import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.{OceanBaseDialect, PriKeyColumnInfo}
 import com.oceanbase.spark.utils.{ConfigUtils, OBJdbcUtils}
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.connector.read.InputPartition
 
 import java.sql.Connection
 import java.util.{Objects, Optional}
+import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
 
 /** Data corresponding to one partition of a JDBCLimitRDD. */
 case class OBMySQLPartition(
@@ -38,7 +43,7 @@ case class OBMySQLPartition(
     idx: Int)
   extends InputPartition {}
 
-object OBMySQLPartition {
+object OBMySQLPartition extends Logging {
 
   private val EMPTY_STRING = ""
   private val PARTITION_QUERY_FORMAT = "PARTITION(%s)"
@@ -430,25 +435,32 @@ object OBMySQLPartition {
       config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String): Array[InputPartition] = {
-    val arr = new ArrayBuffer[OBMySQLPartition]()
-    // TODO: Supports parallel data partitioning across multiple partitions.
-    obPartInfos.foreach(
+    val startTime = System.nanoTime()
+    val futures = obPartInfos.map(
       obPartInfo => {
-        val partitionName = obPartInfo.subPartName match {
-          case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
-          case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
+        Future {
+          val partitionName = obPartInfo.subPartName match {
+            case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
+            case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
+          }
+          val unevenlyPriKeyTableInfo =
+            obtainUnevenlyPriKeyTableInfo(conn, config, partitionName, priKeyColumnName)
+          val partitions =
+            computeUnevenlyWhereSparkPart(
+              conn,
+              unevenlyPriKeyTableInfo,
+              partitionName,
+              priKeyColumnName,
+              config)
+          partitions
         }
-        val unevenlyPriKeyTableInfo =
-          obtainUnevenlyPriKeyTableInfo(conn, config, partitionName, priKeyColumnName)
-        val partitions =
-          computeUnevenlyWhereSparkPart(
-            conn,
-            unevenlyPriKeyTableInfo,
-            partitionName,
-            priKeyColumnName,
-            config)
-        arr ++= partitions
       })
+    val arr = futures.flatMap(
+      future => {
+        Await.result(future, Duration(10, TimeUnit.MINUTES))
+      })
+    val endTime = System.nanoTime()
+    logInfo(s"Time cost: ${(endTime - startTime) / 1000000} ms")
 
     arr.zipWithIndex.map {
       case (partInfo, index) =>
