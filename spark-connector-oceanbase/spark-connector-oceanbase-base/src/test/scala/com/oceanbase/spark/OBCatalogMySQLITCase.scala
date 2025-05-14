@@ -87,7 +87,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     val expectedTableList = Seq(
       "[test,products,false]",
       "[test,products_no_pri_key,false]",
-      "[test,products_full_pri_key,false]").toList.asJava
+      "[test,products_full_pri_key,false]",
+      "[test,products_no_int_pri_key,false]").toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
     // test create/drop namespace
