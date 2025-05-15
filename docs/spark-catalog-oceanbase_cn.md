@@ -332,6 +332,13 @@ select * from spark_catalog.default.orders;
                 <td>通过向生成的 SQL 添加 /*+ PARALLEL(N) */ hint 来控制统计查询（例如 COUNT、MIN、MAX）的并行级别。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.query-timeout-hint-degree</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">-1</td>
+                <td>Int</td>
+                <td>通过向生成的 SQL 添加 /*+ query_timeout(n) */ hint 来控制查询超时时间。通过该参数可以设置超时时间，单位为微妙。默认为-1，表示不添加该Hint。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.disable-pk-table-use-where-partition</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">false</td>
