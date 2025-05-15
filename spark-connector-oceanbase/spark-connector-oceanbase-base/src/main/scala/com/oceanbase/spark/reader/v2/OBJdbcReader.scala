@@ -126,10 +126,18 @@ class OBJdbcReader(
         ""
     }
 
-    var hint = s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) */"
-    if (part.useHiddenPKColumn)
-      hint =
-        s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}), opt_param('hidden_column_visible', 'true') */"
+    val useHiddenPKColumnHint = if (part.useHiddenPKColumn) {
+      s", opt_param('hidden_column_visible', 'true') "
+    } else {
+      ""
+    }
+    val queryTimeoutHint = if (config.getQueryTimeoutHintDegree > 0) {
+      s", query_timeout(${config.getQueryTimeoutHintDegree}) "
+    } else {
+      ""
+    }
+    val hint =
+      s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) $useHiddenPKColumnHint $queryTimeoutHint */"
 
     s"""
        |SELECT $hint $columnStr FROM ${config.getDbTable} ${part.partitionClause}

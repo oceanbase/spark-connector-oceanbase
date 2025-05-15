@@ -241,6 +241,15 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .createWithDefault(1);
 
+    // https://www.oceanbase.com/docs/enterprise-oceanbase-database-cn-10000000000881388
+    public static final ConfigEntry<Integer> JDBC_QUERY_TIMEOUT_HINT_DEGREE =
+            new ConfigBuilder("jdbc.query-timeout-hint-degree")
+                    .doc(
+                            "The SQL statements sent by Spark to OB will automatically carry query_timeout Hint. Set this parameter to specify the timeout in microseconds. The default is -1, which means query_timeout hint is not set.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .intConf()
+                    .createWithDefault(-1);
+
     public static final ConfigEntry<Integer> JDBC_STATISTICS_PARALLEL_HINT_DEGREE =
             new ConfigBuilder("jdbc.statistics-parallel-hint-degree")
                     .doc(
@@ -491,6 +500,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcParallelHintDegree() {
         return get(JDBC_PARALLEL_HINT_DEGREE);
+    }
+
+    public Integer getQueryTimeoutHintDegree() {
+        return get(JDBC_QUERY_TIMEOUT_HINT_DEGREE);
     }
 
     public Integer getJdbcStatsParallelHintDegree() {
