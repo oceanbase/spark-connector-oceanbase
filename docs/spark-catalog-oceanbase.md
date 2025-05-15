@@ -333,6 +333,13 @@ select * from spark_catalog.default.orders;
                 <td>Controls the parallelism level for statistical queries (e.g., COUNT, MIN, MAX) by adding /*+ PARALLEL(N) */ hint to generated SQL.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.query-timeout-hint-degree</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">-1</td>
+                <td>Int</td>
+                <td>Control the query timeout by adding /*+ query_timeout(N) */ hint to the generated SQL. This parameter can be used to specify the timeout in microseconds. The default value is -1, which means that the hint is not added.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.disable-pk-table-use-where-partition</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">false</td>
