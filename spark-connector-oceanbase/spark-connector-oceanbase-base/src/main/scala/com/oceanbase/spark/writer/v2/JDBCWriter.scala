@@ -99,7 +99,8 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
   }
 
   private def getInsertSql: String = {
-    val priKeyColInfos = dialect.getPriKeyInfo(config.getSchemaName, config.getTableName, config)
+    val priKeyColInfos =
+      dialect.getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
     val tableName = config.getDbTable
     if (null != priKeyColInfos && priKeyColInfos.nonEmpty) {
       dialect.getUpsertIntoStatement(tableName, schema, priKeyColInfos)

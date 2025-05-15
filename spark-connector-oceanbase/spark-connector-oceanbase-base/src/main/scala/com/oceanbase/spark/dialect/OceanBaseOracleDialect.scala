@@ -34,6 +34,10 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     s""""$colName""""
   }
 
+  override def unQuoteIdentifier(colName: String): String = {
+    colName.replace("\"", "")
+  }
+
   override def createTable(
       conn: Connection,
       tableName: String,
@@ -66,6 +70,7 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     "Not currently supported in oracle mode")
 
   override def getPriKeyInfo(
+      connection: Connection,
       schemaName: String,
       tableName: String,
       config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {

@@ -32,7 +32,11 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
   @AfterEach
   def afterEach(): Unit = {
-    dropTables("products", "products_no_pri_key", "products_full_pri_key")
+    dropTables(
+      "products",
+      "products_no_pri_key",
+      "products_full_pri_key",
+      "products_no_int_pri_key")
   }
 
   val TEST_TABLE_PRODUCTS = "products"

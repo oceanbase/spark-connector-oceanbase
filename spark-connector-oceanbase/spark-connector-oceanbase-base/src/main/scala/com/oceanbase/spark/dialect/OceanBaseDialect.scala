@@ -159,7 +159,12 @@ abstract class OceanBaseDialect extends Logging with Serializable {
     s"""`$colName`"""
   }
 
+  def unQuoteIdentifier(colName: String): String = {
+    colName.replace("`", "")
+  }
+
   def getPriKeyInfo(
+      connection: Connection,
       schemaName: String,
       tableName: String,
       config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo]

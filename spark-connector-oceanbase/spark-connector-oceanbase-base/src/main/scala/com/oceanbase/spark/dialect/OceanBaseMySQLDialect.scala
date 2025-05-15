@@ -178,6 +178,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
   }
 
   def getPriKeyInfo(
+      connection: Connection,
       schemaName: String,
       tableName: String,
       config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
@@ -192,26 +193,23 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
          |  and TABLE_NAME = '$tableName';
          |""".stripMargin
 
-    OBJdbcUtils.withConnection(config) {
-      val arrayBuffer = ArrayBuffer[PriKeyColumnInfo]()
-      conn =>
-        OBJdbcUtils.executeQuery(conn, config, sql) {
-          rs =>
-            {
-              while (rs.next()) {
-                val columnKey = rs.getString(3)
-                if (null != columnKey && columnKey.equals("PRI")) {
-                  arrayBuffer += PriKeyColumnInfo(
-                    quoteIdentifier(rs.getString(1)),
-                    rs.getString(2),
-                    columnKey,
-                    rs.getString(4),
-                    rs.getString(5))
-                }
-              }
+    val arrayBuffer = ArrayBuffer[PriKeyColumnInfo]()
+    OBJdbcUtils.executeQuery(connection, config, sql) {
+      rs =>
+        {
+          while (rs.next()) {
+            val columnKey = rs.getString(3)
+            if (null != columnKey && columnKey.equals("PRI")) {
+              arrayBuffer += PriKeyColumnInfo(
+                quoteIdentifier(rs.getString(1)),
+                rs.getString(2),
+                columnKey,
+                rs.getString(4),
+                rs.getString(5))
             }
+          }
+          arrayBuffer
         }
-        arrayBuffer
     }
   }
 

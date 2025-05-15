@@ -54,6 +54,13 @@ class OBJdbcReader(
   private lazy val stmt: PreparedStatement =
     conn.prepareStatement(buildQuerySql(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
   private lazy val rs: ResultSet = {
+    partition match {
+      case part: OBMySQLPartition =>
+        part.unevenlyWhereValue.zipWithIndex.foreach {
+          case (value, index) => stmt.setObject(index + 1, value)
+        }
+      case _ =>
+    }
     stmt.setFetchSize(config.getJdbcFetchSize)
     stmt.setQueryTimeout(config.getJdbcQueryTimeout)
     stmt.executeQuery()

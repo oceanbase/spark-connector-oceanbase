@@ -33,7 +33,11 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
   @AfterEach
   def afterEach(): Unit = {
-    dropTables("products", "products_no_pri_key", "products_full_pri_key")
+    dropTables(
+      "products",
+      "products_no_pri_key",
+      "products_full_pri_key",
+      "products_no_int_pri_key")
   }
 
   val OB_CATALOG_CLASS = "com.oceanbase.spark.catalog.OceanBaseCatalog"
@@ -83,7 +87,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     val expectedTableList = Seq(
       "[test,products,false]",
       "[test,products_no_pri_key,false]",
-      "[test,products_full_pri_key,false]").toList.asJava
+      "[test,products_full_pri_key,false]",
+      "[test,products_no_int_pri_key,false]").toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
     // test create/drop namespace
@@ -408,6 +413,29 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "107,rocks,box of assorted rocks,5.3000000000"
     )
     assertEqualsInAnyOrder(expected2, actual2)
+
+    session.stop()
+  }
+
+  @Test
+  def testUnevenlyRead(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.jdbc.max-records-per-partition", "2")
+      .config(
+        s"spark.sql.catalog.ob.jdbc.$getSchemaName.products_no_int_pri_key.partition-column",
+        "name")
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products_no_int_pri_key")
+    queryAndVerifyTableData(session, "products_no_int_pri_key", expected)
 
     session.stop()
   }
