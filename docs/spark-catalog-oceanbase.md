@@ -333,6 +333,20 @@ select * from spark_catalog.default.orders;
                 <td>Controls the parallelism level for statistical queries (e.g., COUNT, MIN, MAX) by adding /*+ PARALLEL(N) */ hint to generated SQL.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.disable-pk-table-use-where-partition</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>When true, primary key tables will be prohibited from using WHERE clause partitioning.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.{database}.{table}.partition-column</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>You can manually specify the primary key table partition column, and by default, one will be automatically selected from the primary key columns.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">1024</td>
