@@ -64,7 +64,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
   @Test
   def testSqlDirectLoadWrite(): Unit = {
-    val session = SparkSession.builder().master("local[1]").getOrCreate()
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
 
     session.sql(s"""
                    |CREATE TEMPORARY VIEW test_sink
@@ -91,7 +91,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
   @Test
   def testDirectLoadWithEmptySparkPartition(): Unit = {
-    val session = SparkSession.builder().master("local[1]").getOrCreate()
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
     session.sql(s"""
                    |CREATE TEMPORARY VIEW test_sink
                    |USING oceanbase
@@ -124,7 +124,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
   @Test
   def testDataFrameDirectLoadWrite(): Unit = {
-    val session = SparkSession.builder().master("local[1]").getOrCreate()
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
     val df = session
       .createDataFrame(
         Seq(
