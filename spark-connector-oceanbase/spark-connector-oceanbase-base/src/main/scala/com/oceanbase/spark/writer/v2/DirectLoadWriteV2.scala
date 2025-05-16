@@ -87,7 +87,9 @@ class DirectLoadWriteV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
 
   override def abort(): Unit = {}
 
-  override def close(): Unit = {}
+  override def close(): Unit = {
+    directLoader.close()
+  }
 }
 
 object DirectLoadWriteV2 {

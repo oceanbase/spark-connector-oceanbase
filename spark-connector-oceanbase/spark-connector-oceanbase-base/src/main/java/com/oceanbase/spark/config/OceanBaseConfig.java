@@ -112,7 +112,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .version(ConfigConstants.VERSION_1_1_0)
                     .intConf()
                     .checkValue(port -> port > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-                    .createWithDefault(8);
+                    .createWithDefault(1);
 
     public static final ConfigEntry<String> DIRECT_LOAD_EXECUTION_ID =
             new ConfigBuilder("direct-load.execution-id")
