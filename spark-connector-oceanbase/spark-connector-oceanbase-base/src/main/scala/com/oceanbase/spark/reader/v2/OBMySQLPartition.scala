@@ -253,7 +253,8 @@ object OBMySQLPartition extends Logging {
     val statement = connection.createStatement()
     val tableName = config.getDbTable
     val sql =
-      s"SELECT /*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */ count(1) AS cnt FROM $tableName $partName"
+      s"SELECT /*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) ${queryTimeoutHint(
+          config)} */ count(1) AS cnt FROM $tableName $partName"
     try {
       val rs = statement.executeQuery(sql)
       if (rs.next())
@@ -386,10 +387,12 @@ object OBMySQLPartition extends Logging {
       priKeyColumnName: String) = {
     val statement = connection.createStatement()
     val tableName = config.getDbTable
-    var hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
-    if (priKeyColumnName.equals(HIDDEN_PK_INCREMENT))
-      hint =
-        s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}), opt_param('hidden_column_visible', 'true') */"
+    val useHiddenPKColHint =
+      if (priKeyColumnName.equals(HIDDEN_PK_INCREMENT))
+        s", opt_param('hidden_column_visible', 'true') "
+      else EMPTY_STRING
+    val hint =
+      s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) $useHiddenPKColHint ${queryTimeoutHint(config)} */"
 
     val sql =
       s"""
@@ -599,7 +602,8 @@ object OBMySQLPartition extends Logging {
       priKeyColumnName: String,
       config: OceanBaseConfig): Object = {
     val tableName = config.getDbTable
-    val hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+    val hint =
+      s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) ${queryTimeoutHint(config)} */"
     val sql =
       s"""
               SELECT
@@ -629,7 +633,8 @@ object OBMySQLPartition extends Logging {
       priKeyColumnName: String,
       config: OceanBaseConfig): Object = {
     val tableName = config.getDbTable
-    val hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+    val hint =
+      s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) ${queryTimeoutHint(config)} */"
     val sql =
       s"""
               SELECT $hint
@@ -657,7 +662,8 @@ object OBMySQLPartition extends Logging {
       priKeyColumnName: String) = {
     val statement = conn.createStatement()
     val tableName = config.getDbTable
-    val hint = s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) */"
+    val hint =
+      s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) ${queryTimeoutHint(config)} */"
     val sql =
       s"""
               SELECT $hint
@@ -680,6 +686,14 @@ object OBMySQLPartition extends Logging {
       c1.asInstanceOf[Comparable[Any]].compareTo(c2)
     case _ =>
       obj1.toString.compareTo(obj2.toString)
+  }
+
+  def queryTimeoutHint(config: OceanBaseConfig): String = if (
+    config.getQueryTimeoutHintDegree > 0
+  ) {
+    s", query_timeout(${config.getQueryTimeoutHintDegree}) "
+  } else {
+    ""
   }
 
   private case class UnevenlyPriKeyTableInfo(count: Long, min: Object, max: Object)
