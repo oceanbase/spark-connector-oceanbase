@@ -125,7 +125,7 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "table-name"="htable",
                    |  "username"="$getUsername#$getClusterName",
                    |  "password"="$getPassword",
-                   |  "schema"="${OBKVHBaseConnectorITCase.schemaWithSingleQuotes}"
+                   |  "schema"="${OBKVHBaseConnectorITCase.multiCFSchemaSql}"
                    |);
                    |""".stripMargin)
     session.sql("""
@@ -135,14 +135,14 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
     session.stop()
 
     import scala.collection.JavaConverters._
-    val expected1 = List(
-      "16891,address,40 Ellis St.",
-      "16891,phone,674-555-0110",
-      "16891,personalName,John Jackson",
-      "16891,personalPhone,121.11").asJava
+    val expected1 = List("16891,address,40 Ellis St.", "16891,phone,674-555-0110").asJava
 
     val actual1 = queryHTable("htable$family1", rowConverter)
     assertEqualsInAnyOrder(expected1, actual1)
+
+    val expected2 = List("16891,personalName,John Jackson", "16891,personalPhone,121.11").asJava
+    val actual2 = queryHTable("htable$family2", rowConverter)
+    assertEqualsInAnyOrder(expected2, actual2)
   }
 
   protected def queryHTable(
@@ -211,6 +211,17 @@ object OBKVHBaseConnectorITCase {
       |    'phone': {'cf': 'family1','col': 'phone','type': 'string'},
       |    'personalName': {'cf': 'family1','col': 'personalName','type': 'string'},
       |    'personalPhone': {'cf': 'family1','col': 'personalPhone','type': 'double'}
+      |}
+      |""".stripMargin
+
+  val multiCFSchemaSql: String =
+    """
+      |{
+      |    'rowkey': {'cf': 'rowkey','col': 'rowkey','type': 'string'},
+      |    'address': {'cf': 'family1','col': 'address','type': 'string'},
+      |    'phone': {'cf': 'family1','col': 'phone','type': 'string'},
+      |    'personalName': {'cf': 'family2','col': 'personalName','type': 'string'},
+      |    'personalPhone': {'cf': 'family2','col': 'personalPhone','type': 'double'}
       |}
       |""".stripMargin
 }
