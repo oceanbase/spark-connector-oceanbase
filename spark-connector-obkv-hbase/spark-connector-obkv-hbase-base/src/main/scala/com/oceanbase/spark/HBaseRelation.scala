@@ -112,7 +112,14 @@ object HBaseRelation {
   private val COLUMN_TYPE = "type"
 
   private var rowKey = ""
-  val columnFamilyMap: mutable.Map[String, (String, String)] =
+
+  /**
+   * Mapping DataFrame's schema to User-defined schema
+   *
+   * "address": {"cf": "family1","col": "officeAddress","type": "string"} [address, (officeAddress,
+   * family1)] [user define obkv-hbase col name, (dataframe schema col name, family name)]
+   */
+  private val columnFamilyMap: mutable.Map[String, (String, String)] =
     mutable.LinkedHashMap.empty[String, (String, String)]
 
   def parseCatalog(catalogJson: String): StructType = {

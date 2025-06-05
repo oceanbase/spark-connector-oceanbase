@@ -16,12 +16,13 @@
 
 package com.oceanbase.spark
 
-import com.oceanbase.spark.OceanBaseMySQLTestBase.{constructConfigUrlForODP, createSysUser, getConfigServerAddress, getSysParameter}
+import com.oceanbase.spark.OceanBaseMySQLTestBase.{constructConfigUrlForODP, createSysUser, getConfigServerAddress}
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
 
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Test}
+import org.junit.jupiter.api.condition.{DisabledOnOs, OS}
 
 import java.sql.ResultSet
 import java.util
@@ -82,6 +83,44 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "odp-mode" = "true",
                    |  "odp-ip"= "${OceanBaseMySQLTestBase.ODP.getHost}",
                    |  "odp-port" = "${OceanBaseMySQLTestBase.ODP.getRpcPort}",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="htable",
+                   |  "username"="$getUsername#$getClusterName",
+                   |  "password"="$getPassword",
+                   |  "schema"="${OBKVHBaseConnectorITCase.schemaWithSingleQuotes}"
+                   |);
+                   |""".stripMargin)
+    session.sql("""
+                  |INSERT INTO test_sink
+                  |SELECT * FROM content;
+                  |""".stripMargin)
+    session.stop()
+
+    import scala.collection.JavaConverters._
+    val expected1 = List(
+      "16891,address,40 Ellis St.",
+      "16891,phone,674-555-0110",
+      "16891,personalName,John Jackson",
+      "16891,personalPhone,121.11").asJava
+
+    val actual1 = queryHTable("htable$family1", rowConverter)
+    assertEqualsInAnyOrder(expected1, actual1)
+  }
+
+  @Test
+  @DisabledOnOs(Array[OS](OS.MAC))
+  def testDirectSqlSink(): Unit = {
+    val session = SparkSession.builder.master("local[*]").getOrCreate
+    val newContact =
+      ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
+    session.createDataFrame(Seq(newContact)).createOrReplaceTempView("content")
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING `obkv-hbase`
+                   |OPTIONS(
+                   |  "url" = "${OceanBaseMySQLTestBase.getSysParameter("obconfig_url")}",
+                   |  "sys.username" = "$getSysUsername",
+                   |  "sys.password" =  "$getSysPassword",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="htable",
                    |  "username"="$getUsername#$getClusterName",
