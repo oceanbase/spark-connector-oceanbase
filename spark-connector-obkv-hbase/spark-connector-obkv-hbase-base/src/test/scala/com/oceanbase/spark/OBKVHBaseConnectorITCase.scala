@@ -108,7 +108,9 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
-  @DisabledOnOs(Array[OS](OS.MAC))
+  @DisabledOnOs(
+    Array[OS](OS.MAC),
+    disabledReason = "Currently it can only be successfully run on the GitHub CI environment")
   def testDirectSqlSink(): Unit = {
     val session = SparkSession.builder.master("local[*]").getOrCreate
     val newContact =

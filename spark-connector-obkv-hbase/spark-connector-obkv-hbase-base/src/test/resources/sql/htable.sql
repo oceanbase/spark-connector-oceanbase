@@ -11,6 +11,8 @@
 -- specific language governing permissions and limitations
 -- under the License.
 
+CREATE TABLEGROUP IF NOT EXISTS htable;
+
 CREATE TABLE `htable$family1`
 (
   `K` varbinary(1024) NOT NULL,
@@ -18,7 +20,7 @@ CREATE TABLE `htable$family1`
   `T` bigint(20)      NOT NULL,
   `V` varbinary(1024) DEFAULT NULL,
   PRIMARY KEY (`K`, `Q`, `T`)
-);
+)TABLEGROUP =  htable;
 
 CREATE TABLE `htable$family2`
 (
@@ -27,4 +29,4 @@ CREATE TABLE `htable$family2`
   `T` bigint(20)      NOT NULL,
   `V` varbinary(1024) DEFAULT NULL,
   PRIMARY KEY (`K`, `Q`, `T`)
-);
+) TABLEGROUP =  htable;
