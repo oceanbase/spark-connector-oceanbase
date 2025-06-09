@@ -252,6 +252,9 @@ insert into table test.orders
 select * from spark_catalog.default.orders;
 ```
 
+旁路导入注意事项：
+- 旁路导入任务期间会**锁表**，锁表期间不能写入数据、不能进行DDL变更，但可以进行数据查询。
+
 ## 配置
 
 ### 通用配置项
@@ -309,6 +312,20 @@ select * from spark_catalog.default.orders;
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
                 <td>设置该OceanBase Catalog默认 schema。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.fetch-size</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">100</td>
+                <td>Int</td>
+                <td>JDBC 读取时抓取大小，决定每次数据库往返获取的数据行数。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.batch-size</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">1024</td>
+                <td>Int</td>
+                <td>JDBC 写入批处理大小，决定每次数据库往返批量插入的数据行数。</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.max-records-per-partition</td>
@@ -455,13 +472,6 @@ select * from spark_catalog.default.orders;
                 <td>旁路导入任务最大可容忍的错误行数目。</td>
             </tr>
             <tr>
-                <td>spark.sql.catalog.your_catalog_name.direct-load.dup-action</td>
-                <td>否</td>
-                <td>REPLACE</td>
-                <td>String</td>
-                <td>旁路导入任务中主键重复时的处理策略。可以是 <code>STOP_ON_DUP</code>（本次导入失败），<code>REPLACE</code>（替换）或 <code>IGNORE</code>（忽略）。</td>
-            </tr>
-            <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.timeout</td>
                 <td>否</td>
                 <td>7d</td>
@@ -494,6 +504,13 @@ select * from spark_catalog.default.orders;
                     <li><code>inc_replace</code>: 特殊replace模式的增量旁路导入，不会进行主键冲突检查，直接覆盖旧数据（相当于replace的效果），direct-load.dup-action参数会被忽略，observer-4.3.2及以上支持。</li>
                 </ul>
                 </td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.dup-action</td>
+                <td>否</td>
+                <td>REPLACE</td>
+                <td>String</td>
+                <td>旁路导入任务中主键重复时的处理策略。可以是 <code>STOP_ON_DUP</code>（本次导入失败），<code>REPLACE</code>（替换）或 <code>IGNORE</code>（忽略）。</td>
             </tr>
         </tbody>
     </table>
