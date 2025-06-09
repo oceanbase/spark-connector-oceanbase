@@ -312,6 +312,20 @@ select * from spark_catalog.default.orders;
                 <td>Set the default schema for the OceanBase Catalog.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.fetch-size</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">100</td>
+                <td>Int</td>
+                <td>The JDBC fetch size, which determines how many rows to fetch per round trip.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.batch-size</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">1024</td>
+                <td>Int</td>
+                <td>The JDBC writing batch size, which determines how many rows to insert per round trip.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.max-records-per-partition</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>

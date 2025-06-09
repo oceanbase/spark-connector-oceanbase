@@ -311,6 +311,20 @@ select * from spark_catalog.default.orders;
                 <td>设置该OceanBase Catalog默认 schema。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.fetch-size</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">100</td>
+                <td>Int</td>
+                <td>JDBC 读取时抓取大小，决定每次数据库往返获取的数据行数。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.batch-size</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">1024</td>
+                <td>Int</td>
+                <td>JDBC 写入批处理大小，决定每次数据库往返批量插入的数据行数。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.max-records-per-partition</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;"></td>
