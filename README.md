@@ -8,11 +8,11 @@ English | [简体中文](README_CN.md)
 
 This repository contains connectors as following:
 
-|             Connector              |                                                                             Description                                                                             |                     Document                      |
-|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
-| Spark Connector: OceanBase         | This Connector uses the JDBC driver or the [direct load](https://en.oceanbase.com/docs/common-oceanbase-database-10000000001375568) API to write data to OceanBase. | [Read & Write](docs/spark-connector-oceanbase.md) |
-| Spark Connector: OBKV HBase        | This Connector uses the [OBKV HBase API](https://github.com/oceanbase/obkv-hbase-client-java) to write data to OceanBase.                                           | [Write](docs/spark-connector-obkv-hbase.md)       |
-| Spark Connector: OceanBase Catalog | OceanBase Spark Catalog allows users to access and operate the OceanBase database in a more concise and consistent way.                                             | [Catalog](docs/spark-catalog-oceanbase.md)        |
+|             Connector              |                                                                             Description                                                                             |                         Document                          |                         Note                         |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|------------------------------------------------------|
+| Spark Connector: OceanBase Catalog | OceanBase Spark Catalog allows users to access and operate the OceanBase database in a more concise and consistent way.                                             | [Catalog & Read & Write](docs/spark-catalog-oceanbase.md) | Supports Spark 3.x and above                         |
+| Spark Connector: OBKV HBase        | This Connector uses the [OBKV HBase API](https://github.com/oceanbase/obkv-hbase-client-java) to write data to OceanBase.                                           | [Write](docs/spark-connector-obkv-hbase.md)               |                                                      |
+| Spark Connector: OceanBase         | This Connector uses the JDBC driver or the [direct load](https://en.oceanbase.com/docs/common-oceanbase-database-10000000001375568) API to write data to OceanBase. | [Read & Write](docs/spark-connector-oceanbase.md)         | Gradually deprecated, recommended only for Spark 2.x |
 
 ## Community
 

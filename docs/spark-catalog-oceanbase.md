@@ -253,6 +253,12 @@ insert into table test.orders
 select * from spark_catalog.default.orders;
 ```
 
+Precautions for direct-load:
+
+- Table locking will occur during the direct-load job. While the table is locked:
+  - Data write operations and DDL changes are prohibited.
+  - Data queries are allowed.
+
 ## Configuration
 
 ### General configuration
@@ -310,6 +316,20 @@ select * from spark_catalog.default.orders;
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
                 <td>Set the default schema for the OceanBase Catalog.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.fetch-size</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">100</td>
+                <td>Int</td>
+                <td>The JDBC fetch size, which determines how many rows to fetch per round trip.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.batch-size</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">1024</td>
+                <td>Int</td>
+                <td>The JDBC writing batch size, which determines how many rows to insert per round trip.</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.max-records-per-partition</td>
@@ -456,12 +476,6 @@ select * from spark_catalog.default.orders;
                 <td>Maximum tolerable number of error rows.</td>
             </tr>
             <tr>
-                <td>spark.sql.catalog.your_catalog_name.direct-load.dup-action</td>
-                <td>No</td>
-                <td>REPLACE</td>
-                <td>String</td>
-                <td>Action when there is duplicated record of direct-load task. Can be <code>STOP_ON_DUP</code>, <code>REPLACE</code> or <code>IGNORE</code>.</td>            </tr>
-            <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.timeout</td>
                 <td>No</td>
                 <td>7d</td>
@@ -494,6 +508,13 @@ select * from spark_catalog.default.orders;
                     <li><code>inc_replace</code>: special replace mode incremental direct-load, no primary key conflict check will be performed, directly overwrite the old data (equivalent to the effect of replace), direct-load.dup-action parameter will be ignored, observer-4.3.2 and above support.</li>
                 </ul>
                 </td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.dup-action</td>
+                <td>No</td>
+                <td>REPLACE</td>
+                <td>String</td>
+                <td>Action when there is duplicated record of direct-load task. Can be <code>STOP_ON_DUP</code>, <code>REPLACE</code> or <code>IGNORE</code>.</td>
             </tr>
         </tbody>
     </table>
