@@ -370,6 +370,13 @@ select * from spark_catalog.default.orders;
                 <td>您可以手动指定主键表分区列，否则将默认自动从主键列中选择一个。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.enable-autocommit</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>使用 jdbc 写入时，是否启用 autocommit 进行事务自动提交。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">1024</td>

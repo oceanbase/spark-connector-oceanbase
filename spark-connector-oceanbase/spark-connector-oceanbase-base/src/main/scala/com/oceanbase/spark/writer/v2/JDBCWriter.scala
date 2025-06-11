@@ -64,7 +64,11 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
 
     var committed = false
     try {
-      conn.setAutoCommit(false)
+      if (config.getJdbcEnableAutoCommit) {
+        conn.setAutoCommit(true)
+      } else {
+        conn.setAutoCommit(false)
+      }
       conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED)
       val statement = conn.prepareStatement(sql)
       try {
@@ -86,13 +90,15 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
       } finally {
         statement.close()
       }
-      conn.commit()
-      committed = true
+      if (!config.getJdbcEnableAutoCommit) {
+        conn.commit()
+        committed = true
+      }
     } catch {
       case ex: SQLException =>
         throw new RuntimeException(s"Failed to execute batch with sql: $sql", ex)
     } finally {
-      if (!committed) {
+      if (!config.getJdbcEnableAutoCommit && !committed) {
         conn.rollback()
       }
     }

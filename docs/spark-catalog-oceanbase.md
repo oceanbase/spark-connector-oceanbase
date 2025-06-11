@@ -374,6 +374,13 @@ Precautions for direct-load:
                 <td>You can manually specify the primary key table partition column, and by default, one will be automatically selected from the primary key columns.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.enable-autocommit</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>When using jdbc to write, whether to enable autocommit for automatic transaction commit.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">1024</td>

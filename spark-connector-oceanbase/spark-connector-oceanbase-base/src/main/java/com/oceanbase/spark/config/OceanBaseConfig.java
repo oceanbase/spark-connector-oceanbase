@@ -225,6 +225,13 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(1024);
 
+    public static final ConfigEntry<Boolean> JDBC_ENABLE_AUTOCOMMIT =
+            new ConfigBuilder("jdbc.enable-autocommit")
+                    .doc("Declare whether to enable autocommit when writing data using JDBC.")
+                    .version(ConfigConstants.VERSION_1_3_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_PREDICATE =
             new ConfigBuilder("jdbc.push-down-predicate")
                     .doc(
@@ -444,6 +451,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcBatchSize() {
         return get(JDBC_BATCH_SIZE);
+    }
+
+    public Boolean getJdbcEnableAutoCommit() {
+        return get(JDBC_ENABLE_AUTOCOMMIT);
     }
 
     public Integer getJdbcQueryTimeout() {
