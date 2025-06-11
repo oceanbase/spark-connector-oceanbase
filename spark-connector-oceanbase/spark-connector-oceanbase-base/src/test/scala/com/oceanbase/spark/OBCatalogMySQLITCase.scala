@@ -65,6 +65,29 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testJdbcInsetWithAutoCommit(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.enable-autocommit", true.toString)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+    queryAndVerifyTableData(session, "products", expected)
+
+    insertTestData(session, "products_no_pri_key")
+    queryAndVerifyTableData(session, "products_no_pri_key", expected)
+
+    session.stop()
+  }
+
+  @Test
   def testCatalogOp(): Unit = {
     val session = SparkSession
       .builder()
