@@ -30,4 +30,5 @@ public interface ConfigConstants {
     String VERSION_1_0_0 = "1.0";
     String VERSION_1_1_0 = "1.1";
     String VERSION_1_2_0 = "1.2";
+    String VERSION_1_3_0 = "1.3";
 }
