@@ -213,6 +213,32 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     }
   }
 
+  def getUniqueKeyInfo(
+      connection: Connection,
+      schemaName: String,
+      tableName: String,
+      config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
+    val sql =
+      s"""
+         |show index from ${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)} where non_unique = 0;
+         |""".stripMargin
+    val arrayBuffer = ArrayBuffer[PriKeyColumnInfo]()
+    OBJdbcUtils.executeQuery(connection, config, sql) {
+      rs =>
+        {
+          while (rs.next()) {
+            arrayBuffer += PriKeyColumnInfo(
+              quoteIdentifier(rs.getString("Column_name")),
+              StringUtils.EMPTY,
+              StringUtils.EMPTY,
+              StringUtils.EMPTY,
+              StringUtils.EMPTY)
+          }
+          arrayBuffer
+        }
+    }
+  }
+
   def getInsertIntoStatement(tableName: String, schema: StructType): String = {
     val columnClause =
       schema.fieldNames.map(columnName => quoteIdentifier(columnName)).mkString(", ")
@@ -228,7 +254,8 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       schema: StructType,
       priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String = {
     val uniqueKeys = priKeyColumnInfo.map(_.columnName).toSet
-    val nonUniqueFields = schema.fieldNames.filterNot(uniqueKeys.contains)
+    val nonUniqueFields =
+      schema.fieldNames.filterNot(fieldName => uniqueKeys.contains(quoteIdentifier(fieldName)))
 
     val baseInsert = {
       val columns = schema.fieldNames.map(quoteIdentifier).mkString(", ")

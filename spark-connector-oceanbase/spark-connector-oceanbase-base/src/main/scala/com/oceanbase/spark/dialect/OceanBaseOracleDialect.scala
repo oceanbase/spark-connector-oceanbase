@@ -77,6 +77,14 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
   }
 
+  override def getUniqueKeyInfo(
+      connection: Connection,
+      schemaName: String,
+      tableName: String,
+      config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
+    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+  }
+
   override def getInsertIntoStatement(tableName: String, schema: StructType): String = {
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
   }
