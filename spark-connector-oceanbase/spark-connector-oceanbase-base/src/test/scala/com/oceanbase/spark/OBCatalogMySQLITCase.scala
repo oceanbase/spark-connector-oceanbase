@@ -37,7 +37,10 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products",
       "products_no_pri_key",
       "products_full_pri_key",
-      "products_no_int_pri_key")
+      "products_no_int_pri_key",
+      "products_unique_key",
+      "products_full_unique_key"
+    )
   }
 
   val OB_CATALOG_CLASS = "com.oceanbase.spark.catalog.OceanBaseCatalog"
@@ -111,7 +114,10 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products,false]",
       "[test,products_no_pri_key,false]",
       "[test,products_full_pri_key,false]",
-      "[test,products_no_int_pri_key,false]").toList.asJava
+      "[test,products_no_int_pri_key,false]",
+      "[test,products_unique_key,false]",
+      "[test,products_full_unique_key,false]"
+    ).toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
     // test create/drop namespace
@@ -463,6 +469,69 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testUpsertUniqueKey(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products_unique_key")
+    queryAndVerifyTableData(session, "products_unique_key", expected)
+
+    insertTestData(session, "products_full_unique_key")
+    queryAndVerifyTableData(session, "products_full_unique_key", expected)
+    session.stop()
+  }
+
+  @Test
+  def testUpsertUniqueKeyWithNullValue(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[1]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestDataWithNullValue(session, "products_unique_key")
+    val expectedWithNullValue: util.List[String] = util.Arrays.asList(
+      "null,null,Small 2-wheel scooter,3.1400000000",
+      "102,car battery,12V car battery,8.1000000000",
+      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
+      "104,hammer,12oz carpenter's hammer,0.7500000000",
+      "null,null,14oz carpenter's hammer,0.8750000000",
+      "106,hammer,box of assorted rocks,null",
+      "108,jacket,null,0.1000000000",
+      "109,spare tire,24 inch spare tire,22.2000000000"
+    )
+    queryAndVerifyTableData(session, "products_unique_key", expectedWithNullValue)
+
+    insertTestDataWithNullValue(session, "products_full_unique_key")
+    val expectedWithNullValue1: util.List[String] = util.Arrays.asList(
+      "null,null,Small 2-wheel scooter,3.1400000000",
+      "102,car battery,12V car battery,8.1000000000",
+      "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000",
+      "104,hammer,12oz carpenter's hammer,0.7500000000",
+      "null,null,14oz carpenter's hammer,0.8750000000",
+      "106,hammer,box of assorted rocks,null",
+      "106,hammer,16oz carpenter's hammer,1.0000000000",
+      "108,jacket,null,0.1000000000",
+      "109,spare tire,24 inch spare tire,22.2000000000"
+    )
+    queryAndVerifyTableData(session, "products_full_unique_key", expectedWithNullValue1)
+    session.stop()
+  }
+
   private def queryAndVerifyTableData(
       session: SparkSession,
       tableName: String,
@@ -491,6 +560,22 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
          |(106, 'hammer', '16oz carpenter\\'s hammer', 1.0),
          |(107, 'rocks', 'box of assorted rocks', 5.3),
          |(108, 'jacket', 'water resistent black wind breaker', 0.1),
+         |(109, 'spare tire', '24 inch spare tire', 22.2);
+         |""".stripMargin)
+  }
+
+  private def insertTestDataWithNullValue(session: SparkSession, tableName: String): Unit = {
+    session.sql(
+      s"""
+         |INSERT INTO $getSchemaName.$tableName VALUES
+         |(null, null, 'Small 2-wheel scooter', 3.14),
+         |(102, 'car battery', '12V car battery', 8.1),
+         |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
+         |(104, 'hammer', '12oz carpenter\\'s hammer', 0.75),
+         |(null, null, '14oz carpenter\\'s hammer', 0.875),
+         |(106, 'hammer', '16oz carpenter\\'s hammer', 1.0),
+         |(106, 'hammer', 'box of assorted rocks', null),
+         |(108, 'jacket', null, 0.1),
          |(109, 'spare tire', '24 inch spare tire', 22.2);
          |""".stripMargin)
   }

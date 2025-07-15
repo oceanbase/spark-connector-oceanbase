@@ -9,12 +9,12 @@ By using Spark Catalog, users can access and operate OceanBase databases in a mo
 
 - Currently only supports OceanBase MySQL mode.
 - Supports Spark adaptive partitioning and parallel reading of OceanBase (via JDBC).
-  - Predicate pushdown support
-- Supports writing OceanBase through bypass import
+  - Predicate pushdown support.
+- Supports writing OceanBase through direct load.
 - Supports writing OceanBase through JDBC.
   - For primary key tables, supports writing in upsert mode.
-    - MySQL mode is based on: INSERT ... ON DUPLICATE KEY UPDATE syntax
-  - For non-primary key tables, write through insert into
+    - MySQL mode is based on: `INSERT INTO ... ON DUPLICATE KEY UPDATE` syntax.
+  - For non-primary key tables, write through `INSERT INTO`.
 - Supports managing databases and tables in OceanBase through Spark-SQL, including: show databases, show tables, drop table, drop database and other syntax support.
   - Supports CTAS syntax to create and write OceanBase tables.
 
