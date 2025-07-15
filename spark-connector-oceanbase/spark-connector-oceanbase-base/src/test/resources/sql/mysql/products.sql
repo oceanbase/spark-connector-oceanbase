@@ -47,3 +47,24 @@ CREATE TABLE products_no_int_pri_key
   weight      DECIMAL(20, 10),
   primary key(id, name)
 );
+
+CREATE TABLE products_unique_key
+(
+  id          INTEGER ,
+  name        VARCHAR(255),
+  description VARCHAR(512),
+  weight      DECIMAL(20, 10),
+  unique index unique_idx(id, name)
+) partition by key(id)
+(partition `p0`,
+ partition `p1`,
+ partition `p2`);
+
+CREATE TABLE products_full_unique_key
+(
+  id          INTEGER ,
+  name        VARCHAR(255) ,
+  description VARCHAR(512),
+  weight      DECIMAL(20, 10),
+  unique index unique_idx(id, name, description, weight)
+);

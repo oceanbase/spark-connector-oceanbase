@@ -10,11 +10,11 @@ OceanBase Spark Connector 从 1.1 版本开始全面支持 Spark Catalog，这�
 - 目前仅支持OceanBase MySQL模式。
 - 支持Spark自适应分区并行读取OceanBase（基于JDBC）。
   - 谓词下推支持
-- 支持通过旁路导入的方式写OceanBase
+- 支持通过旁路导入的方式写OceanBase。
 - 支持通过JDBC的方式写OceanBase。
   - 对于主键表，支持以upsert的方式写入。
-    - MySQL模式基于：INSERT ... ON DUPLICATE KEY UPDATE 语法
-  - 对于非主键表，则通过insert into写入
+    - MySQL模式基于：`INSERT INTO ... ON DUPLICATE KEY UPDATE` 语法。
+  - 对于非主键表，则通过 `INSERT INTO` 写入。
 - 支持通过Spark-SQL管理OceanBase中的数据库和表，包括：show databases、show tables、drop table、drop database等语法支持。
   - 支持CTAS语法创建和写入OceanBase表。
 
