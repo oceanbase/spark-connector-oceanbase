@@ -36,7 +36,9 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
       "products",
       "products_no_pri_key",
       "products_full_pri_key",
-      "products_no_int_pri_key")
+      "products_no_int_pri_key",
+      "products_unique_key",
+      "products_full_unique_key")
   }
 
   val TEST_TABLE_PRODUCTS = "products"
