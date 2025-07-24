@@ -240,6 +240,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_AGGREGATE =
+            new ConfigBuilder("jdbc.push-down-aggregate")
+                    .doc(
+                            "The option to enable or disable aggregate push-down into the JDBC data source.")
+                    .version(ConfigConstants.VERSION_1_3_0)
+                    .booleanConf()
+                    .createWithDefault(true);
+
     public static final ConfigEntry<Integer> JDBC_PARALLEL_HINT_DEGREE =
             new ConfigBuilder("jdbc.parallel-hint-degree")
                     .doc(
@@ -507,6 +515,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getPushDownPredicate() {
         return get(JDBC_PUSH_DOWN_PREDICATE);
+    }
+
+    public Boolean getPushDownAggregate() {
+        return get(JDBC_PUSH_DOWN_AGGREGATE);
     }
 
     public Integer getJdbcParallelHintDegree() {

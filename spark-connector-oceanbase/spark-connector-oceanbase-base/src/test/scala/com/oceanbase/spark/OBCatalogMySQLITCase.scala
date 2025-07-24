@@ -532,6 +532,37 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testAggregatePushdown(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+
+    import scala.collection.JavaConverters._
+    val expect = Seq(
+      "1,102,8.1000000000",
+      "3,104,1.0000000000",
+      "1,109,22.2000000000",
+      "1,103,0.8000000000",
+      "1,108,0.1000000000",
+      "1,101,3.1400000000",
+      "1,107,5.3000000000").toList.asJava
+    queryAndVerify(
+      session,
+      "select count(id), min(id), max(weight) from products group by name",
+      expect)
+    session.stop()
+  }
+
   private def queryAndVerifyTableData(
       session: SparkSession,
       tableName: String,
@@ -539,6 +570,22 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     import scala.collection.JavaConverters._
     val actual = session
       .sql(s"select * from $tableName")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+  }
+
+  private def queryAndVerify(
+      session: SparkSession,
+      sql: String,
+      expected: util.List[String]): Unit = {
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql(sql)
       .collect()
       .map(
         _.toString().drop(1).dropRight(1)
