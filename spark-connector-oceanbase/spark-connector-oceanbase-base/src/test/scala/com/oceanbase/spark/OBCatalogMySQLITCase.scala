@@ -548,6 +548,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     insertTestData(session, "products")
 
     import scala.collection.JavaConverters._
+    // case 1
     val expect = Seq(
       "1,102,8.1000000000",
       "3,104,1.0000000000",
@@ -560,6 +561,25 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       session,
       "select count(id), min(id), max(weight) from products group by name",
       expect)
+
+    // case 2
+    /**
+     * The sql generated and push-down to oceanbase:
+     *
+     * SELECT /*+ PARALLEL(1) */ `name`,MIN(`id`),MAX(`weight`) FROM `test`.`products` WHERE (`id`
+     * >= 101 AND `id` < 110) GROUP BY `name`
+     *
+     * In this case, tested and find: spark will not push down topN, but will push down aggregate
+     */
+    val expect1 = Seq(
+      "spare tire,109,22.2000000000",
+      "scooter,101,3.1400000000",
+      "rocks,107,5.3000000000").toList.asJava
+    queryAndVerify(
+      session,
+      "select name, min(id), max(weight) from products group by name order by name desc limit 3",
+      expect1)
+
     session.stop()
   }
 
@@ -592,6 +612,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       )
       .toList
       .asJava
+    println(actual)
     assertEqualsInAnyOrder(expected, actual)
   }
 
