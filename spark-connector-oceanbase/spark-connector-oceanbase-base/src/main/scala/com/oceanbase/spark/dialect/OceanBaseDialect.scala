@@ -16,15 +16,20 @@
 
 package com.oceanbase.spark.dialect
 
+import com.oceanbase.spark.catalog.OceanBaseCatalogException
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 
 import org.apache.commons.lang3.StringUtils
+import org.apache.spark.annotation.Since
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.CatalystTypeConverters
 import org.apache.spark.sql.catalyst.util.{DateFormatter, DateTimeUtils, TimestampFormatter}
 import org.apache.spark.sql.connector.catalog.TableChange
 import org.apache.spark.sql.connector.catalog.TableChange.{AddColumn, DeleteColumn, RenameColumn, UpdateColumnNullability, UpdateColumnType}
-import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.connector.expressions.{Expression, Literal, NamedReference, Transform}
+import org.apache.spark.sql.connector.util.V2ExpressionSQLBuilder
+import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType}
 
@@ -34,6 +39,7 @@ import java.time.{Instant, LocalDate}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
+import scala.util.control.NonFatal
 
 /** This is for better compatibility with earlier versions of Spark. */
 abstract class OceanBaseDialect extends Logging with Serializable {
@@ -199,6 +205,98 @@ abstract class OceanBaseDialect extends Logging with Serializable {
     getJDBCType(dt)
       .orElse(getCommonJDBCType(dt))
       .getOrElse(throw new RuntimeException(s"cannotGetJdbcTypeError $dt"))
+  }
+
+  protected class JDBCSQLBuilder extends V2ExpressionSQLBuilder {
+    override def visitLiteral(literal: Literal[_]): String = {
+      Option(literal.value())
+        .map(
+          v => compileValue(CatalystTypeConverters.convertToScala(v, literal.dataType())).toString)
+        .getOrElse(super.visitLiteral(literal))
+    }
+
+    override def visitNamedReference(namedRef: NamedReference): String = {
+      if (namedRef.fieldNames().length > 1) {
+        throw OceanBaseCatalogException("Filter push down: " + namedRef.toString)
+      }
+      quoteIdentifier(namedRef.fieldNames.head)
+    }
+
+    override def visitCast(l: String, dataType: DataType): String = {
+      val databaseTypeDefinition =
+        getJDBCType(dataType).map(_.databaseTypeDefinition).getOrElse(dataType.typeName)
+      s"CAST($l AS $databaseTypeDefinition)"
+    }
+
+    override def visitSQLFunction(funcName: String, inputs: Array[String]): String = {
+      if (isSupportedFunction(funcName)) {
+        s"""${dialectFunctionName(funcName)}(${inputs.mkString(", ")})"""
+      } else {
+        // The framework will catch the error and give up the push-down.
+        // Please see `JdbcDialect.compileExpression(expr: Expression)` for more details.
+        throw new UnsupportedOperationException(
+          s"${this.getClass.getSimpleName} does not support function: $funcName")
+      }
+    }
+
+    override def visitAggregateFunction(
+        funcName: String,
+        isDistinct: Boolean,
+        inputs: Array[String]): String = {
+      if (isSupportedFunction(funcName)) {
+        super.visitAggregateFunction(dialectFunctionName(funcName), isDistinct, inputs)
+      } else {
+        throw new UnsupportedOperationException(
+          s"${this.getClass.getSimpleName} does not support aggregate function: $funcName");
+      }
+    }
+
+    protected def dialectFunctionName(funcName: String): String = funcName
+
+    override def visitOverlay(inputs: Array[String]): String = {
+      if (isSupportedFunction("OVERLAY")) {
+        super.visitOverlay(inputs)
+      } else {
+        throw new UnsupportedOperationException(
+          s"${this.getClass.getSimpleName} does not support function: OVERLAY")
+      }
+    }
+
+    override def visitTrim(direction: String, inputs: Array[String]): String = {
+      if (isSupportedFunction("TRIM")) {
+        super.visitTrim(direction, inputs)
+      } else {
+        throw new UnsupportedOperationException(
+          s"${this.getClass.getSimpleName} does not support function: TRIM")
+      }
+    }
+  }
+
+  /**
+   * Returns whether the database supports function.
+   * @param funcName
+   *   Upper-cased function name
+   * @return
+   *   True if the database supports function.
+   */
+  def isSupportedFunction(funcName: String): Boolean = false
+
+  /**
+   * Converts V2 expression to String representing a SQL expression.
+   * @param expr
+   *   The V2 expression to be converted.
+   * @return
+   *   Converted value.
+   */
+  def compileExpression(expr: Expression): Option[String] = {
+    val jdbcSQLBuilder = new JDBCSQLBuilder()
+    try {
+      Some(jdbcSQLBuilder.build(expr))
+    } catch {
+      case NonFatal(e) =>
+        logWarning("Error occurs while compiling V2 expression", e)
+        None
+    }
   }
 
   /**

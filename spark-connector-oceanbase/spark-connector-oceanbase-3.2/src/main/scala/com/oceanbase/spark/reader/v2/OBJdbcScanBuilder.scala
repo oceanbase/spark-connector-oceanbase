@@ -150,6 +150,9 @@ class OBJdbcReaderFactory(
       pushedFilter: Array[Filter],
       pushDownLimit: Int,
       pushDownTopNSortOrders: Array[SortOrder],
+      // Spark 3.2 not support aggregate push down
+      requiredColumns = Array.empty,
+      pushedGroupBys = None,
       dialect: OceanBaseDialect
     )
 }

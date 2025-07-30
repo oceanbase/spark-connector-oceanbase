@@ -18,6 +18,7 @@ package com.oceanbase.spark.reader.v2
 
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
+import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.ExprUtils.compileFilter
@@ -27,6 +28,8 @@ import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReader, PartitionReaderFactory, Scan, ScanBuilder, SupportsPushDownAggregates, SupportsPushDownFilters, SupportsPushDownLimit, SupportsPushDownRequiredColumns, SupportsPushDownTopN, SupportsRuntimeFiltering}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
+
+import scala.util.control.NonFatal
 
 case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialect: OceanBaseDialect)
   extends ScanBuilder
@@ -54,10 +57,42 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
     val requiredCols = requiredSchema.map(_.name)
     this.finalSchema = StructType(finalSchema.filter(field => requiredCols.contains(field.name)))
   }
+  private var pushedAggregateList: Array[String] = Array()
+
+  private var pushedGroupBys: Option[Array[String]] = None
 
   override def pushAggregation(aggregation: Aggregation): Boolean = {
-    // TODO: support aggregation push down
-    false
+    if (!config.getPushDownAggregate) return false
+
+    val compiledAggs = aggregation.aggregateExpressions.flatMap(dialect.compileExpression(_))
+    if (compiledAggs.length != aggregation.aggregateExpressions.length) return false
+
+    val compiledGroupBys = aggregation.groupByExpressions.flatMap(dialect.compileExpression)
+    if (compiledGroupBys.length != aggregation.groupByExpressions.length) return false
+
+    // The column names here are already quoted and can be used to build sql string directly.
+    // e.g. "DEPT","NAME",MAX("SALARY"),MIN("BONUS") =>
+    // SELECT "DEPT","NAME",MAX("SALARY"),MIN("BONUS") FROM "test"."employee"
+    //   GROUP BY "DEPT", "NAME"
+    val selectList = compiledGroupBys ++ compiledAggs
+    val groupByClause = if (compiledGroupBys.isEmpty) {
+      ""
+    } else {
+      "GROUP BY " + compiledGroupBys.mkString(",")
+    }
+
+    val aggQuery =
+      s"SELECT ${selectList.mkString(",")} FROM ${config.getDbTable} WHERE 1=0 $groupByClause"
+    try {
+      finalSchema = OBJdbcUtils.getQueryOutputSchema(aggQuery, config, dialect)
+      pushedAggregateList = selectList
+      pushedGroupBys = Some(compiledGroupBys)
+      true
+    } catch {
+      case NonFatal(e) =>
+        logError("Failed to push down aggregation to JDBC", e)
+        false
+    }
   }
 
   override def pushLimit(limit: Int): Boolean = {
@@ -80,14 +115,23 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
   // Always partially pushdown.
   override def isPartiallyPushed: Boolean = true
 
-  override def build(): Scan =
+  override def build(): Scan = {
+    val columnList = if (pushedGroupBys.isEmpty) {
+      finalSchema.map(_.name).toArray
+    } else {
+      pushedAggregateList
+    }
     OBJdbcBatchScan(
       finalSchema: StructType,
       config: OceanBaseConfig,
       pushedFilter: Array[Filter],
       pushDownLimit: Int,
       sortOrders: Array[SortOrder],
-      dialect: OceanBaseDialect)
+      columnList: Array[String],
+      pushedGroupBys: Option[Array[String]],
+      dialect: OceanBaseDialect
+    )
+  }
 }
 
 case class OBJdbcBatchScan(
@@ -96,6 +140,8 @@ case class OBJdbcBatchScan(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
+    requiredColumns: Array[String],
+    pushedGroupBys: Option[Array[String]],
     dialect: OceanBaseDialect)
   extends Scan
   with SupportsRuntimeFiltering {
@@ -112,6 +158,8 @@ case class OBJdbcBatchScan(
       pushedFilter: Array[Filter],
       pushDownLimit: Int,
       pushDownTopNSortOrders: Array[SortOrder],
+      requiredColumns: Array[String],
+      pushedGroupBys: Option[Array[String]],
       dialect: OceanBaseDialect)
 
   override def filterAttributes(): Array[NamedReference] = Array.empty
@@ -127,6 +175,8 @@ class OBJdbcBatch(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
+    requiredColumns: Array[String],
+    pushedGroupBys: Option[Array[String]],
     dialect: OceanBaseDialect)
   extends Batch {
   private lazy val inputPartitions: Array[InputPartition] =
@@ -140,6 +190,8 @@ class OBJdbcBatch(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
+    requiredColumns: Array[String],
+    pushedGroupBys: Option[Array[String]],
     dialect: OceanBaseDialect)
 }
 
@@ -149,6 +201,8 @@ class OBJdbcReaderFactory(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
+    requiredColumns: Array[String],
+    pushedGroupBys: Option[Array[String]],
     dialect: OceanBaseDialect)
   extends PartitionReaderFactory {
 
@@ -160,5 +214,7 @@ class OBJdbcReaderFactory(
       pushedFilter: Array[Filter],
       pushDownLimit: Int,
       pushDownTopNSortOrders: Array[SortOrder],
+      requiredColumns: Array[String],
+      pushedGroupBys: Option[Array[String]],
       dialect: OceanBaseDialect)
 }

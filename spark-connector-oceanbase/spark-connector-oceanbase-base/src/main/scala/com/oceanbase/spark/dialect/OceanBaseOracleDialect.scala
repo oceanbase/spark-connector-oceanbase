@@ -19,7 +19,7 @@ package com.oceanbase.spark.dialect
 import com.oceanbase.spark.config.OceanBaseConfig
 
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.connector.expressions.{Expression, Transform}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{BooleanType, ByteType, DataType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType}
 
@@ -28,6 +28,7 @@ import java.util
 import java.util.TimeZone
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.control.NonFatal
 
 class OceanBaseOracleDialect extends OceanBaseDialect {
   override def quoteIdentifier(colName: String): String = {
@@ -172,5 +173,51 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     // TODO: support timezone types when users are not using the JVM timezone, which
     // is the default value of SESSION_LOCAL_TIMEZONE
     timeZone == TimeZone.getDefault
+  }
+
+  private val distinctUnsupportedAggregateFunctions =
+    Set(
+      "VAR_POP",
+      "VAR_SAMP",
+      "STDDEV_POP",
+      "STDDEV_SAMP",
+      "COVAR_POP",
+      "COVAR_SAMP",
+      "CORR",
+      "REGR_INTERCEPT",
+      "REGR_R2",
+      "REGR_SLOPE",
+      "REGR_SXY")
+
+  private val supportedAggregateFunctions =
+    Set("MAX", "MIN", "SUM", "COUNT", "AVG") ++ distinctUnsupportedAggregateFunctions
+  private val supportedFunctions = supportedAggregateFunctions
+
+  override def isSupportedFunction(funcName: String): Boolean =
+    supportedFunctions.contains(funcName)
+
+  class OracleSQLBuilder extends JDBCSQLBuilder {
+    override def visitAggregateFunction(
+        funcName: String,
+        isDistinct: Boolean,
+        inputs: Array[String]): String =
+      if (isDistinct && distinctUnsupportedAggregateFunctions.contains(funcName)) {
+        throw new UnsupportedOperationException(
+          s"${this.getClass.getSimpleName} does not " +
+            s"support aggregate function: $funcName with DISTINCT");
+      } else {
+        super.visitAggregateFunction(funcName, isDistinct, inputs)
+      }
+  }
+
+  override def compileExpression(expr: Expression): Option[String] = {
+    val oracleSQLBuilder = new OracleSQLBuilder()
+    try {
+      Some(oracleSQLBuilder.build(expr))
+    } catch {
+      case NonFatal(e) =>
+        logWarning("Error occurs while compiling V2 expression", e)
+        None
+    }
   }
 }

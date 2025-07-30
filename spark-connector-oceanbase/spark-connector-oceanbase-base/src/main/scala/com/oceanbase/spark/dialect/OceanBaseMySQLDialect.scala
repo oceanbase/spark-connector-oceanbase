@@ -22,14 +22,15 @@ import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.ExprUtils
-import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.connector.expressions.{Expression, NullOrdering, SortDirection, Transform}
 import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
 
 import java.sql.{Connection, Types}
 
 import scala.collection.JavaConverters.mapAsScalaMapConverter
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer;
+import scala.collection.mutable.ArrayBuffer
+import scala.util.control.NonFatal;
 
 class OceanBaseMySQLDialect extends OceanBaseDialect {
 
@@ -295,5 +296,72 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     } else if (sqlType == Types.BIT && typeName.equals("TINYINT")) {
       Option(BooleanType)
     } else None
+  }
+
+  private val distinctUnsupportedAggregateFunctions =
+    Set("VAR_POP", "VAR_SAMP", "STDDEV_POP", "STDDEV_SAMP")
+
+  // See https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html
+  private val supportedAggregateFunctions =
+    Set("MAX", "MIN", "SUM", "COUNT", "AVG") ++ distinctUnsupportedAggregateFunctions
+  private val supportedFunctions = supportedAggregateFunctions
+
+  override def isSupportedFunction(funcName: String): Boolean =
+    supportedFunctions.contains(funcName)
+
+  class MySQLSQLBuilder extends JDBCSQLBuilder {
+    override def visitSortOrder(
+        sortKey: String,
+        sortDirection: SortDirection,
+        nullOrdering: NullOrdering): String = {
+      (sortDirection, nullOrdering) match {
+        case (SortDirection.ASCENDING, NullOrdering.NULLS_FIRST) =>
+          s"$sortKey $sortDirection"
+        case (SortDirection.ASCENDING, NullOrdering.NULLS_LAST) =>
+          s"CASE WHEN $sortKey IS NULL THEN 1 ELSE 0 END, $sortKey $sortDirection"
+        case (SortDirection.DESCENDING, NullOrdering.NULLS_FIRST) =>
+          s"CASE WHEN $sortKey IS NULL THEN 0 ELSE 1 END, $sortKey $sortDirection"
+        case (SortDirection.DESCENDING, NullOrdering.NULLS_LAST) =>
+          s"$sortKey $sortDirection"
+      }
+    }
+
+    override def visitStartsWith(l: String, r: String): String = {
+      val value = r.substring(1, r.length() - 1)
+      s"$l LIKE '${escapeSpecialCharsForLikePattern(value)}%' ESCAPE '\\\\'"
+    }
+
+    override def visitEndsWith(l: String, r: String): String = {
+      val value = r.substring(1, r.length() - 1)
+      s"$l LIKE '%${escapeSpecialCharsForLikePattern(value)}' ESCAPE '\\\\'"
+    }
+
+    override def visitContains(l: String, r: String): String = {
+      val value = r.substring(1, r.length() - 1)
+      s"$l LIKE '%${escapeSpecialCharsForLikePattern(value)}%' ESCAPE '\\\\'"
+    }
+
+    override def visitAggregateFunction(
+        funcName: String,
+        isDistinct: Boolean,
+        inputs: Array[String]): String =
+      if (isDistinct && distinctUnsupportedAggregateFunctions.contains(funcName)) {
+        throw new UnsupportedOperationException(
+          s"${this.getClass.getSimpleName} does not " +
+            s"support aggregate function: $funcName with DISTINCT");
+      } else {
+        super.visitAggregateFunction(funcName, isDistinct, inputs)
+      }
+  }
+
+  override def compileExpression(expr: Expression): Option[String] = {
+    val mysqlSQLBuilder = new MySQLSQLBuilder()
+    try {
+      Some(mysqlSQLBuilder.build(expr))
+    } catch {
+      case NonFatal(e) =>
+        logWarning("Error occurs while compiling V2 expression", e)
+        None
+    }
   }
 }

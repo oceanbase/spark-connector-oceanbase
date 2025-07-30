@@ -347,4 +347,28 @@ object OBJdbcUtils {
     }
     answer
   }
+
+  def getQueryOutputSchema(
+      query: String,
+      config: OceanBaseConfig,
+      dialect: OceanBaseDialect): StructType = {
+
+    OBJdbcUtils.withConnection(config) {
+      conn =>
+        {
+          val statement = conn.prepareStatement(query)
+          try {
+            statement.setQueryTimeout(config.getJdbcQueryTimeout)
+            val rs = statement.executeQuery()
+            try {
+              OBJdbcUtils.getSchema(rs, dialect, alwaysNullable = true, config)
+            } finally {
+              rs.close()
+            }
+          } finally {
+            statement.close()
+          }
+        }
+    }
+  }
 }
