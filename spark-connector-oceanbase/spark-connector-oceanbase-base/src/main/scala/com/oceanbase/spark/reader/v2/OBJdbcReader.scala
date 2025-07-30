@@ -43,6 +43,8 @@ class OBJdbcReader(
     pushedFilter: Array[Filter],
     pushDownLimit: Int,
     pushDownTopNSortOrders: Array[SortOrder],
+    requiredColumns: Array[String],
+    pushedGroupBys: Option[Array[String]],
     dialect: OceanBaseDialect)
   extends PartitionReader[InternalRow]
   with SQLConfHelper
@@ -97,7 +99,10 @@ class OBJdbcReader(
   }
 
   private def buildQuerySql(): String = {
-    val columns = schema.map(col => dialect.quoteIdentifier(col.name)).toArray
+    var columns = schema.map(col => dialect.quoteIdentifier(col.name)).toArray
+    if (requiredColumns != null && requiredColumns.nonEmpty) {
+      columns = requiredColumns;
+    }
     val columnStr: String = if (columns.isEmpty) "1" else columns.mkString(",")
 
     val filterWhereClause: String =
@@ -114,6 +119,16 @@ class OBJdbcReader(
         "WHERE " + part.whereClause
       } else if (filterWhereClause.nonEmpty) {
         "WHERE " + filterWhereClause
+      } else {
+        ""
+      }
+    }
+
+    /** A GROUP BY clause representing pushed-down grouping columns. */
+    val getGroupByClause: String = {
+      if (pushedGroupBys.nonEmpty && pushedGroupBys.get.nonEmpty) {
+        // The GROUP BY columns should already be quoted by the caller side.
+        s"GROUP BY ${pushedGroupBys.get.mkString(", ")}"
       } else {
         ""
       }
@@ -141,7 +156,7 @@ class OBJdbcReader(
 
     s"""
        |SELECT $hint $columnStr FROM ${config.getDbTable} ${part.partitionClause}
-       |$whereClause $getOrderByClause ${part.limitOffsetClause} $myLimitClause
+       |$whereClause $getGroupByClause $getOrderByClause ${part.limitOffsetClause} $myLimitClause
        |""".stripMargin
   }
 
