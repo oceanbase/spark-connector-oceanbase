@@ -102,6 +102,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .stringConf()
                     .create();
 
+    public static final ConfigEntry<Integer> DIRECT_LOAD_WRITE_THREAD_NUM =
+            new ConfigBuilder("direct-load.write-thread-num")
+                    .doc("The number of threads to use when direct-load client are writing.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .intConf()
+                    .checkValue(port -> port > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(1);
+
     public static final ConfigEntry<String> DIRECT_LOAD_EXECUTION_ID =
             new ConfigBuilder("direct-load.execution-id")
                     .doc("The execution id")
@@ -225,6 +233,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public String getDirectLoadUserName() {
         return get(DIRECT_LOAD_USERNAME);
+    }
+
+    public int getDirectLoadWriteThreadNum() {
+        return get(DIRECT_LOAD_WRITE_THREAD_NUM);
     }
 
     public int getBatchSize() {
