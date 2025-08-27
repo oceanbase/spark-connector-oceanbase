@@ -8,6 +8,7 @@ pom.xml.versionsBackup
 pom.xml.next
 release.properties
 .flattened-pom.xml
+dependency-reduced-pom.xml
 
 ### IntelliJ IDEA ###
 .idea/*
