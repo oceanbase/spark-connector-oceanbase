@@ -239,7 +239,7 @@ public class OceanBaseConfig extends Config implements Serializable {
         return get(DIRECT_LOAD_WRITE_THREAD_NUM);
     }
 
-    public int getBatchSize() {
+    public int getDirectLoadBatchSize() {
         return get(DIRECT_LOAD_BATCH_SIZE);
     }
 
