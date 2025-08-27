@@ -81,7 +81,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "direct-load.enabled"=true,
                    |  "direct-load.host"="$getHost",
                    |  "direct-load.rpc-port"=$getRpcPort,
-                   |  "direct-load.username"="${getUsername.split("@").head}",
+                   |  "direct-load.username"="$getUsername",
                    |  "direct-load.write-thread-num"="1"
                    |);
                    |""".stripMargin)

@@ -24,15 +24,15 @@ public class DirectLoadUtils {
 
     public static DirectLoader buildDirectLoaderFromSetting(OceanBaseConfig oceanBaseConfig) {
         try {
-            OceanBaseUserInfo userInfo = OceanBaseUserInfo.parse(oceanBaseConfig);
+            OceanBaseUserInfo userInfo = OceanBaseUserInfo.parse(oceanBaseConfig.getUsername());
             String directLoadUserName = oceanBaseConfig.getDirectLoadUserName();
-            if (directLoadUserName == null || directLoadUserName.isEmpty()) {
-                directLoadUserName = userInfo.getUser();
+            if (directLoadUserName != null && !directLoadUserName.isEmpty()) {
+                userInfo = OceanBaseUserInfo.parse(directLoadUserName);
             }
             return new DirectLoaderBuilder()
                     .host(oceanBaseConfig.getDirectLoadHost())
                     .port(oceanBaseConfig.getDirectLoadPort())
-                    .user(directLoadUserName)
+                    .user(userInfo.getUser())
                     .password(oceanBaseConfig.getPassword())
                     .tenant(userInfo.getTenant())
                     .schema(oceanBaseConfig.getSchemaName())
