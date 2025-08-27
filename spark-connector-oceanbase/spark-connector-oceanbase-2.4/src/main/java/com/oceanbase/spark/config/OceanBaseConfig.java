@@ -131,7 +131,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .doc("The timeout for direct-load task.")
                     .version(ConfigConstants.VERSION_1_0_0)
                     .longConf()
-                    .createWithDefault(70000L);
+                    .createWithDefault(7 * 24 * 60 * 60 * 1000L);
 
     public static final ConfigEntry<Long> DIRECT_LOAD_HEARTBEAT_TIMEOUT =
             new ConfigBuilder("direct-load.heartbeat-timeout")
@@ -145,7 +145,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .doc("Client heartbeat interval in direct-load task")
                     .version(ConfigConstants.VERSION_1_0_0)
                     .longConf()
-                    .createWithDefault(10L);
+                    .createWithDefault(10000L);
 
     public static final ConfigEntry<String> DIRECT_LOAD_LOAD_METHOD =
             new ConfigBuilder("direct-load.load-method")
