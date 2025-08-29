@@ -29,7 +29,11 @@ object ConfigUtils {
     }
   }
 
+  var passwordKeeper: String = _
   def getCredentialFromAlias(alias: String): String = {
+    if (passwordKeeper != null) {
+      return passwordKeeper
+    }
     val providers =
       CredentialProviderFactory.getProviders(SparkSession.active.sparkContext.hadoopConfiguration)
     if (providers == null || providers.isEmpty) {
@@ -49,6 +53,7 @@ object ConfigUtils {
     if (credential == null) {
       throw new RuntimeException(s"Alias '$alias' not found in credential provider.")
     }
+    passwordKeeper = credential
     credential
   }
 }

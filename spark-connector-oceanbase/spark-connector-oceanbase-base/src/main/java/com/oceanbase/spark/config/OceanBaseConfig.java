@@ -378,12 +378,7 @@ public class OceanBaseConfig extends Config implements Serializable {
         return get(USERNAME);
     }
 
-    private String passwordKeep = null;
-
     public String getPassword() {
-        if (passwordKeep != null) {
-            return passwordKeep;
-        }
         String password = get(PASSWORD);
         if (StringUtils.isNotBlank(password) && password.startsWith("alias:")) {
             try {
@@ -396,7 +391,6 @@ public class OceanBaseConfig extends Config implements Serializable {
                         e);
             }
         }
-        passwordKeep = password;
         return password;
     }
 
