@@ -377,7 +377,9 @@ public class OceanBaseConfig extends Config implements Serializable {
     public String getUsername() {
         return get(USERNAME);
     }
+
     private static String passwordKeep = null;
+
     public String getPassword() {
         if (passwordKeep != null) {
             return passwordKeep;
