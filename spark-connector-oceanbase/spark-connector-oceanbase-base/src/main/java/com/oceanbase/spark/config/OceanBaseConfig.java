@@ -58,7 +58,6 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .doc("The schema name or database name")
                     .version(ConfigConstants.VERSION_1_0_0)
                     .stringConf()
-                    .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
                     .create();
 
     public static final ConfigEntry<String> TABLE_NAME =
@@ -378,8 +377,11 @@ public class OceanBaseConfig extends Config implements Serializable {
     public String getUsername() {
         return get(USERNAME);
     }
-
+    private static String passwordKeep = null;
     public String getPassword() {
+        if (passwordKeep != null) {
+            return passwordKeep;
+        }
         String password = get(PASSWORD);
         if (StringUtils.isNotBlank(password) && password.startsWith("alias:")) {
             try {
@@ -392,6 +394,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                         e);
             }
         }
+        passwordKeep = password;
         return password;
     }
 
