@@ -583,6 +583,50 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testCredentialAliasPassword(): Unit = {
+    import org.apache.hadoop.conf.Configuration
+    import org.apache.hadoop.security.alias.CredentialProviderFactory
+    import java.io.File
+    import java.nio.file.Files
+
+    // Create temporary credential provider storage
+    val tempDir = Files.createTempDirectory("test-credentials")
+    val keystoreFile = new File(tempDir.toFile, "test.jceks")
+    val keystorePath = s"jceks://file${keystoreFile.getAbsolutePath}"
+
+    // Create credential provider and add password
+    val hadoopConf = new Configuration()
+    hadoopConf.set(CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH, keystorePath)
+
+    val provider = CredentialProviderFactory.getProviders(hadoopConf).get(0)
+    provider.createCredentialEntry("test.password", getPassword.toCharArray)
+    provider.flush()
+
+    try {
+      val session = SparkSession
+        .builder()
+        .master("local[*]")
+        .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+        .config("spark.sql.catalog.ob.url", getJdbcUrl)
+        .config("spark.sql.catalog.ob.username", getUsername)
+        .config("spark.sql.catalog.ob.password", "alias:test.password") // Use alias format
+        .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+        .config(s"spark.hadoop.${CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH}", keystorePath)
+        .getOrCreate()
+
+      session.sql("use ob;")
+      insertTestData(session, "products")
+      queryAndVerifyTableData(session, "products", expected)
+
+      session.stop()
+    } finally {
+      // Clean up temporary files
+      keystoreFile.delete()
+      tempDir.toFile.delete()
+    }
+  }
+
   private def queryAndVerifyTableData(
       session: SparkSession,
       tableName: String,
