@@ -37,12 +37,14 @@ object ConfigUtils {
     }
 
     var credential: String = null
-    providers.stream().forEach {
-      (provider: org.apache.hadoop.security.alias.CredentialProvider) =>
-        val entry = provider.getCredentialEntry(alias)
-        if (entry != null) {
-          credential = entry.getCredential.mkString
-        }
+    // for scala 2.11 compatibility
+    val iterator = providers.iterator()
+    while (iterator.hasNext) {
+      val provider = iterator.next()
+      val entry = provider.getCredentialEntry(alias)
+      if (entry != null) {
+        credential = entry.getCredential.mkString
+      }
     }
     if (credential == null) {
       throw new RuntimeException(s"Alias '$alias' not found in credential provider.")

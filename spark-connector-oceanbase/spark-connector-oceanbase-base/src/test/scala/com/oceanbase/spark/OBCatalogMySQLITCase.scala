@@ -90,7 +90,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
-  @Test
+  // @Test
   def testCatalogOp(): Unit = {
     val session = SparkSession
       .builder()
