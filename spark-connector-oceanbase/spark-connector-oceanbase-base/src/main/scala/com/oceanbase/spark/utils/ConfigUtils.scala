@@ -38,7 +38,7 @@ object ConfigUtils {
 
     var credential: String = null
     providers.stream().forEach {
-      provider =>
+      (provider: org.apache.hadoop.security.alias.CredentialProvider) =>
         val entry = provider.getCredentialEntry(alias)
         if (entry != null) {
           credential = entry.getCredential.mkString

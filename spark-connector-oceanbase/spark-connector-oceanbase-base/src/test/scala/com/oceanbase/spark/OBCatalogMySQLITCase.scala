@@ -607,12 +607,12 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       val session = SparkSession
         .builder()
         .master("local[*]")
+        .config(s"spark.hadoop.hadoop.security.credential.provider.path", keystorePath)
         .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
         .config("spark.sql.catalog.ob.url", getJdbcUrl)
         .config("spark.sql.catalog.ob.username", getUsername)
         .config("spark.sql.catalog.ob.password", "alias:test.password") // Use alias format
         .config("spark.sql.catalog.ob.schema-name", getSchemaName)
-        .config(s"spark.hadoop.${CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH}", keystorePath)
         .getOrCreate()
 
       session.sql("use ob;")
