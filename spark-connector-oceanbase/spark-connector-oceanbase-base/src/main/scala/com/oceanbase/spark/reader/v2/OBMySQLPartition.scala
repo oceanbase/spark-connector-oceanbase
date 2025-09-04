@@ -147,7 +147,7 @@ object OBMySQLPartition extends Logging {
       computeUnevenlyWherePartInfoForNonPartTable(connection, config, priKeyColumnName)
     } else {
       // For partition table
-      computeUnevenlyWherePartInfoForPartTable(connection, config, obPartInfos, priKeyColumnName)
+      computeUnevenlyWherePartInfoForPartTable(config, obPartInfos, priKeyColumnName)
     }
   }
 
@@ -434,7 +434,6 @@ object OBMySQLPartition extends Logging {
   }
 
   private def computeUnevenlyWherePartInfoForPartTable(
-      conn: Connection,
       config: OceanBaseConfig,
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String): Array[InputPartition] = {
@@ -442,20 +441,25 @@ object OBMySQLPartition extends Logging {
     val futures = obPartInfos.map(
       obPartInfo => {
         Future {
-          val partitionName = obPartInfo.subPartName match {
-            case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
-            case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
+          val conn = OBJdbcUtils.getConnection(config)
+          try {
+            val partitionName = obPartInfo.subPartName match {
+              case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
+              case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
+            }
+            val unevenlyPriKeyTableInfo =
+              obtainUnevenlyPriKeyTableInfo(conn, config, partitionName, priKeyColumnName)
+            val partitions =
+              computeUnevenlyWhereSparkPart(
+                conn,
+                unevenlyPriKeyTableInfo,
+                partitionName,
+                priKeyColumnName,
+                config)
+            partitions
+          } finally {
+            conn.close()
           }
-          val unevenlyPriKeyTableInfo =
-            obtainUnevenlyPriKeyTableInfo(conn, config, partitionName, priKeyColumnName)
-          val partitions =
-            computeUnevenlyWhereSparkPart(
-              conn,
-              unevenlyPriKeyTableInfo,
-              partitionName,
-              priKeyColumnName,
-              config)
-          partitions
         }
       })
     val arr = futures.flatMap(
