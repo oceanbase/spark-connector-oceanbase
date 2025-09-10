@@ -25,12 +25,12 @@ import org.apache.spark.sql.connector.read.InputPartition
 
 import java.sql.Connection
 import java.util.{Objects, Optional}
+import java.util.concurrent.{Executors, TimeUnit}
 import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 
 /** Data corresponding to one partition of a JDBCLimitRDD. */
@@ -438,48 +438,64 @@ object OBMySQLPartition extends Logging {
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String): Array[InputPartition] = {
     val startTime = System.nanoTime()
-    val futures = obPartInfos.map(
-      obPartInfo => {
-        Future {
-          val conn = OBJdbcUtils.getConnection(config)
-          try {
-            val partitionName = obPartInfo.subPartName match {
-              case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
-              case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
-            }
-            val unevenlyPriKeyTableInfo =
-              obtainUnevenlyPriKeyTableInfo(conn, config, partitionName, priKeyColumnName)
-            val partitions =
-              computeUnevenlyWhereSparkPart(
-                conn,
-                unevenlyPriKeyTableInfo,
-                partitionName,
-                priKeyColumnName,
-                config)
-            partitions
-          } finally {
-            conn.close()
-          }
-        }
-      })
-    val arr = futures.flatMap(
-      future => {
-        Await.result(future, Duration(10, TimeUnit.MINUTES))
-      })
-    val endTime = System.nanoTime()
-    logInfo(s"Time cost: ${(endTime - startTime) / 1000000} ms")
 
-    arr.zipWithIndex.map {
-      case (partInfo, index) =>
-        OBMySQLPartition(
-          partInfo.partitionClause,
-          limitOffsetClause = EMPTY_STRING,
-          whereClause = partInfo.whereClause,
-          useHiddenPKColumn = partInfo.useHiddenPKColumn,
-          unevenlyWhereValue = partInfo.unevenlyWhereValue,
-          idx = index
-        )
-    }.toArray
+    // 创建自定义线程池，使用配置的并行度
+    val parallelism = config.getJdbcPartitionComputeParallelism
+    val executor = Executors.newFixedThreadPool(parallelism)
+    val executionContext = ExecutionContext.fromExecutor(executor)
+
+    try {
+      val futures = obPartInfos.map(
+        obPartInfo => {
+          Future {
+            val conn = OBJdbcUtils.getConnection(config)
+            try {
+              val partitionName = obPartInfo.subPartName match {
+                case x if Objects.isNull(x) => PARTITION_QUERY_FORMAT.format(obPartInfo.partName)
+                case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
+              }
+              val unevenlyPriKeyTableInfo =
+                obtainUnevenlyPriKeyTableInfo(conn, config, partitionName, priKeyColumnName)
+              val partitions =
+                computeUnevenlyWhereSparkPart(
+                  conn,
+                  unevenlyPriKeyTableInfo,
+                  partitionName,
+                  priKeyColumnName,
+                  config)
+              partitions
+            } finally {
+              conn.close()
+            }
+          }(executionContext)
+        })
+      val arr = futures.flatMap(
+        future => {
+          Await.result(future, Duration(10, TimeUnit.MINUTES))
+        })
+      val endTime = System.nanoTime()
+      logInfo(
+        s"Partition computation completed with parallelism=$parallelism, time cost: ${(endTime - startTime) / 1000000} ms")
+
+      arr.zipWithIndex.map {
+        case (partInfo, index) =>
+          OBMySQLPartition(
+            partInfo.partitionClause,
+            limitOffsetClause = EMPTY_STRING,
+            whereClause = partInfo.whereClause,
+            useHiddenPKColumn = partInfo.useHiddenPKColumn,
+            unevenlyWhereValue = partInfo.unevenlyWhereValue,
+            idx = index
+          )
+      }.toArray
+    } finally {
+      // 关闭线程池
+      executor.shutdown()
+      if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+        executor.shutdownNow()
+        logWarning("Thread pool did not terminate gracefully, forcing shutdown")
+      }
+    }
   }
 
   /**

@@ -349,6 +349,13 @@ select * from spark_catalog.default.orders;
                 <td>通过向生成的 SQL 添加 /*+ PARALLEL(N) */ hint 来控制统计查询（例如 COUNT、MIN、MAX）的并行级别。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.partition-compute-parallelism</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">32</td>
+                <td>Int</td>
+                <td>控制分区计算的并行级别。此参数确定计算分区表分区时使用的线程数，主要通过并行 SQL 查询 OceanBase 分区统计信息来实现。对于分区数量较多的表，设置更高的值可以显著提升性能。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.query-timeout-hint-degree</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">-1</td>
