@@ -357,7 +357,7 @@ Precautions for direct-load:
                 <td>No</td>
                 <td style="word-wrap: break-word;">32</td>
                 <td>Int</td>
-                <td>Controls the parallelism level for partition computation. This parameter determines the number of threads used when computing partitions for partitioned tables (mainly through parallel SQL queries to OceanBase partition statistics). Higher values can improve performance for tables with many partitions.</td>
+                <td>Controls the parallelism level for partition computation. This parameter determines the number of threads used when computing partitions for partitioned tables (mainly through parallel SQL queries to OceanBase partition statistics). The computation task runs on the driver node. Higher values can improve performance for tables with many partitions. When setting a larger value for this parameter, appropriately increasing the CPU cores and memory of the driver node can achieve better performance.</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.query-timeout-hint-degree</td>

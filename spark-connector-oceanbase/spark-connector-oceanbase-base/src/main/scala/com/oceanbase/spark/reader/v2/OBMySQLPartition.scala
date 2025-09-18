@@ -439,8 +439,10 @@ object OBMySQLPartition extends Logging {
       priKeyColumnName: String): Array[InputPartition] = {
     val startTime = System.nanoTime()
 
-    // 创建自定义线程池，使用配置的并行度
-    val parallelism = config.getJdbcPartitionComputeParallelism
+    // Create custom thread pool with optimized parallelism
+    val maxParallelism = config.getJdbcPartitionComputeParallelism
+    val partitionCount = obPartInfos.length
+    val parallelism = Math.min(partitionCount, maxParallelism)
     val executor = Executors.newFixedThreadPool(parallelism)
     val executionContext = ExecutionContext.fromExecutor(executor)
 
@@ -489,7 +491,7 @@ object OBMySQLPartition extends Logging {
           )
       }.toArray
     } finally {
-      // 关闭线程池
+      // Shutdown thread pool
       executor.shutdown()
       if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
         executor.shutdownNow()
