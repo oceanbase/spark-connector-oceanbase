@@ -274,6 +274,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .createWithDefault(4);
 
+    public static final ConfigEntry<Integer> JDBC_PARTITION_COMPUTE_PARALLELISM =
+            new ConfigBuilder("jdbc.partition-compute-parallelism")
+                    .doc(
+                            "Controls the parallelism level for partition computation. This parameter determines the number of threads used when computing partitions for partitioned tables. Higher values can improve performance for tables with many partitions.")
+                    .version(ConfigConstants.VERSION_1_3_0)
+                    .intConf()
+                    .createWithDefault(32);
+
     public static final ConfigEntry<Long> JDBC_MAX_RECORDS_PER_PARTITION =
             new ConfigBuilder("jdbc.max-records-per-partition")
                     .doc(
@@ -544,6 +552,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcStatsParallelHintDegree() {
         return get(JDBC_STATISTICS_PARALLEL_HINT_DEGREE);
+    }
+
+    public Integer getJdbcPartitionComputeParallelism() {
+        return get(JDBC_PARTITION_COMPUTE_PARALLELISM);
     }
 
     public Optional<Long> getJdbcMaxRecordsPrePartition() {
