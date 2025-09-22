@@ -51,6 +51,13 @@ class OBJdbcReader(
   private lazy val stmt: PreparedStatement =
     conn.prepareStatement(buildQuerySql(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
   private lazy val rs: ResultSet = {
+    partition match {
+      case part: OBMySQLPartition =>
+        part.unevenlyWhereValue.zipWithIndex.foreach {
+          case (value, index) => stmt.setObject(index + 1, value)
+        }
+      case _ =>
+    }
     stmt.setFetchSize(config.getJdbcFetchSize)
     stmt.setQueryTimeout(config.getJdbcQueryTimeout)
     stmt.executeQuery()
@@ -96,16 +103,23 @@ class OBJdbcReader(
         .map(p => s"($p)")
         .mkString(" AND ")
 
-    val whereClause: String = {
-      if (filterWhereClause.nonEmpty) {
+    val part: OBMySQLPartition = partition.asInstanceOf[OBMySQLPartition]
+    val whereClause = {
+      if (part.whereClause != null && filterWhereClause.nonEmpty) {
+        "WHERE " + s"($filterWhereClause)" + " AND " + s"(${part.whereClause})"
+      } else if (part.whereClause != null) {
+        "WHERE " + part.whereClause
+      } else if (filterWhereClause.nonEmpty) {
         "WHERE " + filterWhereClause
       } else {
         ""
       }
     }
-    val part: OBMySQLPartition = partition.asInstanceOf[OBMySQLPartition]
+    val hint =
+      s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) */"
+
     s"""
-       |SELECT $columnStr FROM ${config.getDbTable} ${part.partitionClause}
+       |SELECT $hint $columnStr FROM ${config.getDbTable} ${part.partitionClause}
        |$whereClause ${part.limitOffsetClause}
        |""".stripMargin
   }
