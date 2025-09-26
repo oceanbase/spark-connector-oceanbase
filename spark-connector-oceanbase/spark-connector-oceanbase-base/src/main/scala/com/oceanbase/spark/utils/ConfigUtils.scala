@@ -18,7 +18,13 @@ package com.oceanbase.spark.utils
 import org.apache.hadoop.security.alias.CredentialProviderFactory
 import org.apache.spark.sql.SparkSession
 
+import scala.collection.mutable
+
 object ConfigUtils {
+
+  private val credentialCache: mutable.Map[String, String] =
+    mutable.Map.empty
+
   def findFromRuntimeConf(key: String): String = {
     SparkSession.active.conf.getAll.find {
       case (k, _) if k.contains(key) => true
@@ -29,8 +35,6 @@ object ConfigUtils {
     }
   }
 
-  private val credentialCache: scala.collection.mutable.Map[String, String] =
-    scala.collection.mutable.Map.empty
   def getCredentialFromAlias(alias: String): String = {
     if (credentialCache.contains(alias)) {
       return credentialCache(alias)
