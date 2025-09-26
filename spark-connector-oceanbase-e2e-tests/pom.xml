@@ -22,6 +22,7 @@ under the License.
     </parent>
 
     <artifactId>spark-connector-oceanbase-e2e-tests</artifactId>
+    <name>Spark Connector OceanBase E2E Tests</name>
 
     <dependencies>
         <dependency>

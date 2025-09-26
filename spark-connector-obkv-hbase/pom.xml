@@ -23,6 +23,7 @@ under the License.
 
     <artifactId>spark-connector-obkv-hbase</artifactId>
     <packaging>pom</packaging>
+    <name>Spark Connector OBKV HBase</name>
     <modules>
         <module>spark-connector-obkv-hbase-base</module>
         <module>spark-connector-obkv-hbase-2.4</module>
