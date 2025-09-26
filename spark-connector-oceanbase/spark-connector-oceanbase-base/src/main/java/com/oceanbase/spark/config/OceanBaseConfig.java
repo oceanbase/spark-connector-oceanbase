@@ -17,6 +17,7 @@
 package com.oceanbase.spark.config;
 
 import com.oceanbase.spark.dialect.OceanBaseDialect;
+import com.oceanbase.spark.utils.ConfigUtils;
 
 import java.io.Serializable;
 import java.time.Duration;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public class OceanBaseConfig extends Config implements Serializable {
+
     public static final ConfigEntry<String> URL =
             new ConfigBuilder("url")
                     .doc("The connection URL")
@@ -56,7 +58,6 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .doc("The schema name or database name")
                     .version(ConfigConstants.VERSION_1_0_0)
                     .stringConf()
-                    .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
                     .create();
 
     public static final ConfigEntry<String> TABLE_NAME =
@@ -386,7 +387,19 @@ public class OceanBaseConfig extends Config implements Serializable {
     }
 
     public String getPassword() {
-        return get(PASSWORD);
+        String password = get(PASSWORD);
+        if (StringUtils.isNotBlank(password) && password.startsWith("alias:")) {
+            try {
+                return ConfigUtils.getCredentialFromAlias(password.substring(6));
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        String.format(
+                                "Failed to get password from hadoop credential alias: %s",
+                                password),
+                        e);
+            }
+        }
+        return password;
     }
 
     public String getSchemaName() {

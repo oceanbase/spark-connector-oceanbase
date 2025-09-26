@@ -15,9 +15,16 @@
  */
 
 package com.oceanbase.spark.utils
+import org.apache.hadoop.security.alias.CredentialProviderFactory
 import org.apache.spark.sql.SparkSession
 
+import scala.collection.mutable
+
 object ConfigUtils {
+
+  private val credentialCache: mutable.Map[String, String] =
+    mutable.Map.empty
+
   def findFromRuntimeConf(key: String): String = {
     SparkSession.active.conf.getAll.find {
       case (k, _) if k.contains(key) => true
@@ -26,5 +33,32 @@ object ConfigUtils {
       case Some((_, v)) => v
       case _ => null
     }
+  }
+
+  def getCredentialFromAlias(alias: String): String = {
+    if (credentialCache.contains(alias)) {
+      return credentialCache(alias)
+    }
+    val providers =
+      CredentialProviderFactory.getProviders(SparkSession.active.sparkContext.hadoopConfiguration)
+    if (providers == null || providers.isEmpty) {
+      throw new RuntimeException("No credential provider is configured or loaded.")
+    }
+
+    var credential: String = null
+    // for scala 2.11 compatibility
+    val iterator = providers.iterator()
+    while (iterator.hasNext) {
+      val provider = iterator.next()
+      val entry = provider.getCredentialEntry(alias)
+      if (entry != null) {
+        credential = entry.getCredential.mkString
+      }
+    }
+    if (credential == null) {
+      throw new RuntimeException(s"Alias '$alias' not found in credential provider.")
+    }
+    credentialCache(alias) = credential
+    credential
   }
 }

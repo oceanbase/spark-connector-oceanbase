@@ -26,7 +26,6 @@ import org.apache.spark.sql.connector.read.InputPartition
 import java.sql.Connection
 import java.util.{Objects, Optional}
 import java.util.concurrent.{Executors, TimeUnit}
-import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
