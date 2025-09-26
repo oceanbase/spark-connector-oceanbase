@@ -466,8 +466,6 @@ under the License.
                 <version>3.0.1</version>
                 <configuration>
                     <skip>${gpg.skip}</skip>
-                    <failOnNoKey>false</failOnNoKey>
-
                 </configuration>
                 <executions>
                     <execution>
