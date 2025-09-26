@@ -22,4 +22,5 @@ under the License.
     </parent>
 
     <artifactId>spark-connector-oceanbase-common</artifactId>
+    <name>Spark Connector OceanBase Common</name>
 </project>
