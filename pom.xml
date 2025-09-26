@@ -36,6 +36,7 @@ under the License.
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <revision>1.4-SNAPSHOT</revision>
+        <gpg.skip>true</gpg.skip>
         <scala.version>2.12.15</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <slf4j.version>1.7.32</slf4j.version>
@@ -464,14 +465,9 @@ under the License.
                 <artifactId>maven-gpg-plugin</artifactId>
                 <version>3.0.1</version>
                 <configuration>
-                    <skip>false</skip>
+                    <skip>${gpg.skip}</skip>
                     <failOnNoKey>false</failOnNoKey>
-                    <gpgArguments>
-                        <arg>--pinentry-mode</arg>
-                        <arg>loopback</arg>
-                        <arg>--batch</arg>
-                        <arg>--yes</arg>
-                    </gpgArguments>
+
                 </configuration>
                 <executions>
                     <execution>
