@@ -17,16 +17,21 @@
 package com.oceanbase.spark.dialect
 
 import com.oceanbase.spark.config.OceanBaseConfig
+import com.oceanbase.spark.utils.OBJdbcUtils
+import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 
+import org.apache.commons.lang3.StringUtils
+import org.apache.spark.sql.ExprUtils
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.connector.expressions.{Expression, Transform}
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{BooleanType, ByteType, DataType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
 
 import java.sql.{Connection, Date, Timestamp, Types}
 import java.util
 import java.util.TimeZone
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
@@ -45,37 +50,200 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
       schema: StructType,
       partitions: Array[Transform],
       config: OceanBaseConfig,
-      properties: util.Map[String, String]): Unit =
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+      properties: util.Map[String, String]): Unit = {
+
+    // Collect column and table comments (use COMMENT ON statements in Oracle mode)
+    val columnComments: mutable.ArrayBuffer[(String, String)] = mutable.ArrayBuffer.empty
+    val tableCommentOpt: Option[String] = Option(config.getTableComment)
+
+    def buildCreateTableSQL(
+        tableName: String,
+        schema: StructType,
+        transforms: Array[Transform],
+        config: OceanBaseConfig): String = {
+      val partitionClause = buildPartitionClause(transforms, config)
+      val columnClause = schema.fields
+        .map {
+          field =>
+            val obType = toOceanBaseOracleType(field.dataType, config)
+            val nullability = if (field.nullable) StringUtils.EMPTY else "NOT NULL"
+            field.getComment().foreach(c => columnComments += ((field.name, c)))
+            s"${quoteIdentifier(field.name)} $obType $nullability".trim
+        }
+        .mkString(",\n  ")
+      var primaryKey = ""
+      val tableOption = scala.collection.JavaConverters
+        .mapAsScalaMapConverter(properties)
+        .asScala
+        .map(tuple => (tuple._1.toLowerCase, tuple._2))
+        .flatMap {
+          case ("tablespace", value) => Some(s"TABLESPACE $value")
+          case ("compression", value) =>
+            logWarning(s"Ignored unsupported table property on Oracle mode: compression=$value");
+            None
+          case ("replica_num", value) =>
+            logWarning(s"Ignored unsupported table property on Oracle mode: replica_num=$value");
+            None
+          case ("primary_key", value) =>
+            primaryKey = s", CONSTRAINT pk_${config.getTableName} PRIMARY KEY($value)"
+            None
+          case (k, _) =>
+            logWarning(s"Ignored unsupported table property: $k")
+            None
+        }
+        .mkString(" ", " ", "")
+      s"""
+         |CREATE TABLE $tableName (
+         |  $columnClause
+         |  $primaryKey
+         |) $tableOption
+         |$partitionClause;
+         |""".stripMargin.trim
+    }
+
+    def toOceanBaseOracleType(dataType: DataType, config: OceanBaseConfig): String = {
+      var stringConvertType = s"VARCHAR2(${config.getLengthString2Varchar})"
+      if (config.getEnableString2Text) stringConvertType = "CLOB"
+      dataType match {
+        case BooleanType => "NUMBER(1)"
+        case ByteType => "NUMBER(3)"
+        case ShortType => "NUMBER(5)"
+        case IntegerType => "NUMBER(10)"
+        case LongType => "NUMBER(19)"
+        case FloatType => "BINARY_FLOAT"
+        case DoubleType => "BINARY_DOUBLE"
+        case d: DecimalType => s"NUMBER(${d.precision},${d.scale})"
+        case StringType => stringConvertType
+        case BinaryType => "RAW(2000)"
+        case DateType => "DATE"
+        case TimestampType => "TIMESTAMP"
+        case v: VarcharType => s"VARCHAR2(${v.length})"
+        case _ => throw new UnsupportedOperationException(s"Unsupported type: $dataType")
+      }
+    }
+
+    def buildPartitionClause(transforms: Array[Transform], config: OceanBaseConfig): String = {
+      transforms match {
+        case transforms if transforms.nonEmpty =>
+          ExprUtils.toOBOraclePartition(transforms.head, config)
+        case _ => ""
+      }
+    }
+
+    val sql = buildCreateTableSQL(tableName, schema, partitions, config)
+    executeStatement(conn, config, sql)
+
+    // Apply column comments
+    columnComments.foreach {
+      case (col, comment) =>
+        val colName = quoteIdentifier(col)
+        val commentSql = s"COMMENT ON COLUMN $tableName.$colName IS '${escapeSql(comment)}'"
+        executeStatement(conn, config, commentSql)
+    }
+
+    // Apply table comment
+    tableCommentOpt.foreach {
+      comment =>
+        val tblCommentSql = s"COMMENT ON TABLE $tableName IS '${escapeSql(comment)}'"
+        executeStatement(conn, config, tblCommentSql)
+    }
+
+    // In Oracle mode, complex table properties (compression/replica count) are not supported; ignored
+  }
 
   /** Creates a schema. */
   override def createSchema(
       conn: Connection,
       config: OceanBaseConfig,
       schema: String,
-      comment: String): Unit =
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+      comment: String): Unit = {
+    // In Oracle mode, schema equals user; create a user
+    val statement = conn.createStatement
+    try {
+      statement.setQueryTimeout(config.getJdbcQueryTimeout)
+      // Note: a real password is required; using a default here
+      // In Oracle mode, password should not use single quotes
+      statement.executeUpdate(s"CREATE USER ${quoteIdentifier(schema)} IDENTIFIED BY password")
+      // Grant basic privileges
+      statement.executeUpdate(s"GRANT CONNECT, RESOURCE TO ${quoteIdentifier(schema)}")
+    } finally {
+      statement.close()
+    }
+  }
 
-  override def schemaExists(conn: Connection, config: OceanBaseConfig, schema: String): Boolean =
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+  override def schemaExists(conn: Connection, config: OceanBaseConfig, schema: String): Boolean = {
+    listSchemas(conn, config).exists(_.head == schema)
+  }
 
-  override def listSchemas(conn: Connection, config: OceanBaseConfig): Array[Array[String]] =
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+  override def listSchemas(conn: Connection, config: OceanBaseConfig): Array[Array[String]] = {
+    val schemaBuilder = mutable.ArrayBuilder.make[Array[String]]
+    try {
+      OBJdbcUtils.executeQuery(conn, config, "SELECT USERNAME FROM ALL_USERS ORDER BY USERNAME") {
+        rs =>
+          while (rs.next()) {
+            schemaBuilder += Array(rs.getString("USERNAME"))
+          }
+      }
+    } catch {
+      case _: Exception =>
+        logWarning("Cannot list schemas.")
+    }
+    schemaBuilder.result
+  }
 
   /** Drops a schema from OceanBase. */
   override def dropSchema(
       conn: Connection,
       config: OceanBaseConfig,
       schema: String,
-      cascade: Boolean): Unit = throw new UnsupportedOperationException(
-    "Not currently supported in oracle mode")
+      cascade: Boolean): Unit = {
+    // In OceanBase Oracle mode, DROP USER without CASCADE is not supported
+    // Always use CASCADE regardless of the cascade parameter
+    executeStatement(conn, config, s"DROP USER ${quoteIdentifier(schema)} CASCADE")
+  }
 
   override def getPriKeyInfo(
       connection: Connection,
       schemaName: String,
       tableName: String,
       config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+    val sql =
+      s"""
+         |SELECT
+         |  cc.COLUMN_NAME,
+         |  tc.DATA_TYPE,
+         |  cc.CONSTRAINT_NAME,
+         |  tc.DATA_TYPE,
+         |  cc.CONSTRAINT_NAME
+         |FROM
+         |  ALL_CONSTRAINTS c
+         |  JOIN ALL_CONS_COLUMNS cc ON c.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
+         |    AND c.OWNER = cc.OWNER
+         |  JOIN ALL_TAB_COLUMNS tc ON cc.TABLE_NAME = tc.TABLE_NAME
+         |    AND cc.COLUMN_NAME = tc.COLUMN_NAME
+         |    AND cc.OWNER = tc.OWNER
+         |WHERE
+         |  c.OWNER = '$schemaName'
+         |  AND c.TABLE_NAME = '$tableName'
+         |  AND c.CONSTRAINT_TYPE = 'P'
+         |ORDER BY cc.POSITION
+         |""".stripMargin
+
+    val arrayBuffer = ArrayBuffer[PriKeyColumnInfo]()
+    OBJdbcUtils.executeQuery(connection, config, sql) {
+      rs =>
+        {
+          while (rs.next()) {
+            arrayBuffer += PriKeyColumnInfo(
+              quoteIdentifier(rs.getString(1)),
+              rs.getString(2),
+              "PRI",
+              rs.getString(4),
+              rs.getString(5))
+          }
+          arrayBuffer
+        }
+    }
   }
 
   override def getUniqueKeyInfo(
@@ -83,18 +251,90 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
       schemaName: String,
       tableName: String,
       config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+    val sql =
+      s"""
+         |SELECT
+         |  cc.COLUMN_NAME,
+         |  tc.DATA_TYPE,
+         |  cc.CONSTRAINT_NAME,
+         |  tc.DATA_TYPE,
+         |  cc.CONSTRAINT_NAME
+         |FROM
+         |  ALL_CONSTRAINTS c
+         |  JOIN ALL_CONS_COLUMNS cc ON c.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
+         |    AND c.OWNER = cc.OWNER
+         |  JOIN ALL_TAB_COLUMNS tc ON cc.TABLE_NAME = tc.TABLE_NAME
+         |    AND cc.COLUMN_NAME = tc.COLUMN_NAME
+         |    AND cc.OWNER = tc.OWNER
+         |WHERE
+         |  c.OWNER = '$schemaName'
+         |  AND c.TABLE_NAME = '$tableName'
+         |  AND c.CONSTRAINT_TYPE = 'U'
+         |ORDER BY cc.POSITION
+         |""".stripMargin
+
+    val arrayBuffer = ArrayBuffer[PriKeyColumnInfo]()
+    OBJdbcUtils.executeQuery(connection, config, sql) {
+      rs =>
+        {
+          while (rs.next()) {
+            arrayBuffer += PriKeyColumnInfo(
+              quoteIdentifier(rs.getString(1)),
+              rs.getString(2),
+              "UNI",
+              rs.getString(4),
+              rs.getString(5))
+          }
+          arrayBuffer
+        }
+    }
   }
 
   override def getInsertIntoStatement(tableName: String, schema: StructType): String = {
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+    val columnClause =
+      schema.fieldNames.map(columnName => quoteIdentifier(columnName)).mkString(", ")
+    val placeholders = schema.fieldNames.map(_ => "?").mkString(", ")
+    s"""
+       |INSERT INTO $tableName ($columnClause)
+       |VALUES ($placeholders)
+       |""".stripMargin
   }
 
   override def getUpsertIntoStatement(
       tableName: String,
       schema: StructType,
       priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String = {
-    throw new UnsupportedOperationException("Not currently supported in oracle mode")
+    val uniqueKeys = priKeyColumnInfo.map(_.columnName).toSet
+    val nonUniqueFields =
+      schema.fieldNames.filterNot(fieldName => uniqueKeys.contains(quoteIdentifier(fieldName)))
+
+    val columns = schema.fieldNames.map(quoteIdentifier).mkString(", ")
+    val keyColumns = priKeyColumnInfo.map(_.columnName).mkString(", ")
+
+    // Build SELECT ? AS col1, ? AS col2, ... for USING clause
+    val selectClause = schema.fieldNames.map(f => s"? AS ${quoteIdentifier(f)}").mkString(", ")
+
+    // For VALUES clause, reference the subquery columns
+    val valuesClause = schema.fieldNames.map(f => s"s.${quoteIdentifier(f)}").mkString(", ")
+
+    val whenMatchedClause = if (nonUniqueFields.nonEmpty) {
+      val updateClause = nonUniqueFields
+        .map(f => s"t.${quoteIdentifier(f)} = s.${quoteIdentifier(f)}")
+        .mkString(", ")
+      s"WHEN MATCHED THEN UPDATE SET $updateClause"
+    } else {
+      // In Oracle mode, columns referenced in the ON clause must not be updated (even self-assignment).
+      // If there are no updatable non-key columns, omit the WHEN MATCHED THEN UPDATE clause.
+      ""
+    }
+
+    s"""
+       |MERGE INTO $tableName t
+       |USING (SELECT $selectClause FROM DUAL) s
+       |ON (${keyColumns.split(", ").map(col => s"t.$col = s.$col").mkString(" AND ")})
+       |$whenMatchedClause
+       |WHEN NOT MATCHED THEN INSERT ($columns) VALUES ($valuesClause)
+       |""".stripMargin
   }
 
   /**
