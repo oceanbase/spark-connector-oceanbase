@@ -39,7 +39,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_full_pri_key",
       "products_no_int_pri_key",
       "products_unique_key",
-      "products_full_unique_key"
+      "products_full_unique_key",
+      "products_pri_and_unique_key"
     )
   }
 
@@ -673,6 +674,34 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       keystoreFile.delete()
       tempDir.toFile.delete()
     }
+  }
+
+  @Test
+  def testJdbcUpsertByUniqueKey(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.upsert-by-unique-key", true.toString)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    session.sql(
+      s"INSERT INTO $getSchemaName.products_pri_and_unique_key VALUES (1, 'n1', 'd1', 1.0)")
+    session.sql(
+      s"INSERT INTO $getSchemaName.products_pri_and_unique_key VALUES (2, 'n1', 'd2', 2.2)")
+
+    val actual = queryTable(
+      s"$getSchemaName.products_pri_and_unique_key",
+      util.Arrays.asList("id", "name", "description"))
+    Assertions.assertEquals(util.Arrays.asList("2,n1,d2"), actual)
+
+    dropTables("products_pri_and_unique_key")
+    session.stop()
   }
 
   private def queryAndVerifyTableData(
