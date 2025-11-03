@@ -16,7 +16,7 @@
 package com.oceanbase.spark.writer.v2
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.dialect.OceanBaseDialect
+import com.oceanbase.spark.dialect.{OceanBaseDialect, PriKeyColumnInfo}
 import com.oceanbase.spark.utils.{OBJdbcUtils, RetryUtils}
 import com.oceanbase.spark.utils.OBJdbcUtils.OBValueSetter
 
@@ -105,16 +105,25 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
   }
 
   private def getInsertSql: String = {
-    val priKeyColInfos =
-      dialect.getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config) match {
-        case cols if cols.nonEmpty => cols
-        case _ =>
-          dialect.getUniqueKeyInfo(conn, config.getSchemaName, config.getTableName, config)
+    val primaryKeyInfo =
+      dialect.getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
+    val uniqueKeyInfo =
+      dialect.getUniqueKeyInfo(conn, config.getSchemaName, config.getTableName, config)
+    var upsertColInfos: ArrayBuffer[PriKeyColumnInfo] = ArrayBuffer.empty
+
+    // if a table has both primary key and unique key index, use unique key to upsert. will update all table columns except unique key columns.
+    if (config.getJdbcUpsertByUniqueKey && primaryKeyInfo.nonEmpty && uniqueKeyInfo.nonEmpty) {
+      upsertColInfos = uniqueKeyInfo
+    } else {
+      upsertColInfos = primaryKeyInfo match {
+        case primaryKeyInfo if primaryKeyInfo.nonEmpty => primaryKeyInfo
+        case _ => uniqueKeyInfo
       }
+    }
 
     val tableName = config.getDbTable
-    if (null != priKeyColInfos && priKeyColInfos.nonEmpty) {
-      dialect.getUpsertIntoStatement(tableName, schema, priKeyColInfos)
+    if (upsertColInfos.nonEmpty) {
+      dialect.getUpsertIntoStatement(tableName, schema, upsertColInfos)
     } else {
       dialect.getInsertIntoStatement(tableName, schema)
     }
