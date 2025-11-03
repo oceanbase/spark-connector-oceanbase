@@ -699,8 +699,6 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       s"$getSchemaName.products_pri_and_unique_key",
       util.Arrays.asList("id", "name", "description"))
     Assertions.assertEquals(util.Arrays.asList("2,n1,d2"), actual)
-
-    dropTables("products_pri_and_unique_key")
     session.stop()
   }
 
