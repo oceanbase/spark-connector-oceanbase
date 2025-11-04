@@ -54,7 +54,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
     private static final String INTER_CONTAINER_JM_ALIAS = "spark";
 
     protected String getSparkDockerImageTag() {
-        return String.format("bitnami/spark:%s", SPARK_VERSION);
+        return String.format("apache/spark:%s", SPARK_VERSION);
     }
 
     @TempDir public java.nio.file.Path temporaryFolder;
@@ -69,9 +69,12 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
                 new GenericContainer<>(getSparkDockerImageTag())
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+                        .withLogConsumer(new Slf4jLogConsumer(LOG))
+                        .withCommand("bash", "-lc", "sleep infinity");
 
         Startables.deepStart(Stream.of(sparkContainer)).join();
+        // Ensure a generic jars directory exists regardless of image layout
+        sparkContainer.execInContainer("bash", "-lc", "mkdir -p /tmp/jars");
         LOG.info("Spark containers started");
     }
 
@@ -189,7 +192,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "spark-sql --conf spark.default.parallelism=1 %s",
+                        "/opt/spark/bin/spark-sql --conf spark.default.parallelism=1 %s",
                         String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
@@ -219,7 +222,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "timeout 2m spark-shell --conf spark.default.parallelism=1 %s",
+                        "timeout 2m /opt/spark/bin/spark-shell --conf spark.default.parallelism=1 %s",
                         String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
@@ -229,7 +232,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
     private String copyAndGetContainerPath(GenericContainer<?> container, String filePath) {
         Path path = Paths.get(filePath);
-        String containerPath = "/opt/bitnami/spark/jars/" + path.getFileName();
+        String containerPath = "/tmp/jars/" + path.getFileName();
         container.copyFileToContainer(MountableFile.forHostPath(path), containerPath);
         return containerPath;
     }

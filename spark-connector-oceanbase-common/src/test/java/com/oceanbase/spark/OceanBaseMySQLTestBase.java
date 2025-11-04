@@ -31,7 +31,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.HttpWaitStrategy;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.oceanbase.OceanBaseCEContainer;
 
 public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
@@ -62,7 +61,7 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public static final OceanBaseCEContainer CONTAINER =
-            new OceanBaseCEContainer("oceanbase/oceanbase-ce:latest")
+            new OceanBaseCEContainer("oceanbase/oceanbase-ce:4.3.3.1-101000012024102216")
                     .withNetwork(NETWORK)
                     .withMode(OceanBaseCEContainer.Mode.MINI)
                     .withTenantName(TEST_TENANT)
@@ -72,7 +71,6 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
                     .withEnv("OB_DATAFILE_SIZE", "2G")
                     .withEnv("OB_LOG_DISK_SIZE", "4G")
                     .withStartupTimeout(Duration.ofMinutes(4))
-                    .waitingFor(Wait.forLogMessage(".*boot success.*", 1))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public static final OceanBaseProxyContainer ODP =
