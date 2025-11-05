@@ -27,6 +27,7 @@ import org.junit.jupiter.api.function.ThrowingSupplier
 
 import java.util
 
+@Disabled("Skipping Oracle tests, only running in local test environment.")
 class OBCatalogOracleITCase extends OceanBaseOracleTestBase {
 
   @BeforeEach
