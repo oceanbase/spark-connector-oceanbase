@@ -301,7 +301,14 @@ object OBJdbcUtils {
       case java.sql.Types.DATALINK => null
       case java.sql.Types.DATE => DateType
       case java.sql.Types.DECIMAL if precision != 0 || scale != 0 =>
-        DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
+        // Optimize DECIMAL(P, 0) to BIGINT to avoid precision loss when comparing with string literals
+        // Spark converts String + DECIMAL to DOUBLE (losing precision), but String + BIGINT stays as BIGINT
+        // WARNING: This assumes data values fit within BIGINT range (-9223372036854775808 to 9223372036854775807)
+        if (scale == 0) {
+          LongType
+        } else {
+          DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
+        }
       case java.sql.Types.DECIMAL => DecimalType.SYSTEM_DEFAULT
       case java.sql.Types.DISTINCT => null
       case java.sql.Types.DOUBLE => DoubleType
@@ -317,7 +324,12 @@ object OBJdbcUtils {
       case java.sql.Types.NCLOB => StringType
       case java.sql.Types.NULL => null
       case java.sql.Types.NUMERIC if precision != 0 || scale != 0 =>
-        DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
+        // Optimize NUMERIC(P, 0) to BIGINT to avoid precision loss
+        if (scale == 0) {
+          LongType
+        } else {
+          DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
+        }
       case java.sql.Types.NUMERIC => DecimalType.SYSTEM_DEFAULT
       case java.sql.Types.NVARCHAR => StringType
       case java.sql.Types.OTHER => null
