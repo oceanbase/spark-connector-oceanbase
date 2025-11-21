@@ -130,13 +130,17 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         }
 
         try (Stream<Path> dependencyResources = Files.walk(path)) {
+            // Extract version prefix (e.g., "3.1" from "v3.1.3" or "3.1.3")
+            final String versionPrefix =
+                    SPARK_VERSION.startsWith("v")
+                            ? SPARK_VERSION.substring(1, Math.min(4, SPARK_VERSION.length()))
+                            : SPARK_VERSION.substring(0, Math.min(3, SPARK_VERSION.length()));
+
             final List<Path> matchingResources =
                     dependencyResources
                             .filter(
                                     file ->
-                                            file.toAbsolutePath()
-                                                            .toString()
-                                                            .contains(SPARK_VERSION.substring(0, 3))
+                                            file.toAbsolutePath().toString().contains(versionPrefix)
                                                     || file.toAbsolutePath()
                                                             .toString()
                                                             .contains("mysql"))
