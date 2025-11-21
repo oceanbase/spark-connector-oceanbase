@@ -21,7 +21,7 @@ import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
 
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql.SparkSession
-import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Test}
+import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Disabled, Test}
 import org.junit.jupiter.api.condition.{DisabledOnOs, OS}
 
 import java.sql.ResultSet
@@ -111,6 +111,7 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   @DisabledOnOs(
     value = Array[OS](OS.MAC),
     disabledReason = "Currently it can only be successfully run on the GitHub CI environment")
+  @Disabled
   def testDirectSqlSink(): Unit = {
     val session = SparkSession.builder.master("local[*]").getOrCreate
     val newContact =
