@@ -77,7 +77,7 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
       ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
     session.createDataFrame(Seq(newContact)).createOrReplaceTempView("content")
     session.sql(s"""
-                   |CREATE TEMPORARY VIEW test_sink
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink
                    |USING `obkv-hbase`
                    |OPTIONS(
                    |  "odp-mode" = "true",
@@ -117,7 +117,7 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
       ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
     session.createDataFrame(Seq(newContact)).createOrReplaceTempView("content")
     session.sql(s"""
-                   |CREATE TEMPORARY VIEW test_sink
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink
                    |USING `obkv-hbase`
                    |OPTIONS(
                    |  "url" = "${OceanBaseMySQLTestBase.getSysParameter("obconfig_url")}",
