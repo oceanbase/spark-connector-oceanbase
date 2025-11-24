@@ -384,6 +384,13 @@ select * from spark_catalog.default.orders;
                 <td>使用 jdbc 写入时，是否启用 autocommit 进行事务自动提交。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.use-insert-ignore</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>当启用时，使用 INSERT IGNORE 而不是 INSERT ... ON DUPLICATE KEY UPDATE 来处理主键冲突。INSERT IGNORE 会跳过具有重复键的行并继续处理，而 ON DUPLICATE KEY UPDATE 会用新值更新现有行。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.upsert-by-unique-key</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">false</td>

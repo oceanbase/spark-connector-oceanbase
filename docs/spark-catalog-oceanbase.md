@@ -388,6 +388,13 @@ Precautions for direct-load:
                 <td>When using jdbc to write, whether to enable autocommit for automatic transaction commit.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.use-insert-ignore</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>When enabled, uses INSERT IGNORE instead of INSERT ... ON DUPLICATE KEY UPDATE for handling primary key conflicts. INSERT IGNORE will skip rows with duplicate keys and continue processing, while ON DUPLICATE KEY UPDATE will update existing rows with new values.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.upsert-by-unique-key</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">false</td>

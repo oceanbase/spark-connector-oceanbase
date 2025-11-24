@@ -233,6 +233,16 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> JDBC_USE_INSERT_IGNORE =
+            new ConfigBuilder("jdbc.use-insert-ignore")
+                    .doc(
+                            "When enabled, uses INSERT IGNORE instead of INSERT ... ON DUPLICATE KEY UPDATE for handling primary key conflicts. "
+                                    + "INSERT IGNORE will skip rows with duplicate keys and continue processing, "
+                                    + "while ON DUPLICATE KEY UPDATE will update existing rows with new values.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_PREDICATE =
             new ConfigBuilder("jdbc.push-down-predicate")
                     .doc(
@@ -494,6 +504,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getJdbcEnableAutoCommit() {
         return get(JDBC_ENABLE_AUTOCOMMIT);
+    }
+
+    public Boolean getJdbcUseInsertIgnore() {
+        return get(JDBC_USE_INSERT_IGNORE);
     }
 
     public Integer getJdbcQueryTimeout() {

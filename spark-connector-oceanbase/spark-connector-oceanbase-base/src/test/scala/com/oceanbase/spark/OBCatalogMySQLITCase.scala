@@ -703,6 +703,61 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testJdbcUseInsertIgnore(): Unit = {
+    // Test case 1: With jdbc.use-insert-ignore enabled, duplicate key should be ignored
+    val session1 = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.use-insert-ignore", true.toString)
+      .getOrCreate()
+
+    session1.sql("use ob;")
+    // Insert initial data
+    session1.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'scooter', 'Small 2-wheel scooter', 3.14)")
+    // Insert duplicate primary key with different values - should be ignored
+    session1.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'updated scooter', 'Updated description', 5.0)")
+
+    // Verify that the original data remains unchanged (INSERT IGNORE behavior)
+    val expected1: util.List[String] = util.Arrays.asList("101,scooter,Small 2-wheel scooter,3.14")
+    queryAndVerifyTableData(session1, "products", expected1)
+    session1.stop()
+
+    // Test case 2: Without jdbc.use-insert-ignore, duplicate key should trigger UPDATE
+    val session2 = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session2.sql("use ob;")
+    // Clear the table first
+    session2.sql(s"TRUNCATE TABLE $getSchemaName.products")
+    // Insert initial data
+    session2.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'scooter', 'Small 2-wheel scooter', 3.14)")
+    // Insert duplicate primary key with different values - should update (ON DUPLICATE KEY UPDATE)
+    session2.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'updated scooter', 'Updated description', 5.0)")
+
+    // Verify that the data was updated (ON DUPLICATE KEY UPDATE behavior)
+    val expected2: util.List[String] =
+      util.Arrays.asList("101,updated scooter,Updated description,5.0")
+    queryAndVerifyTableData(session2, "products", expected2)
+    session2.stop()
+  }
+
   private def queryAndVerifyTableData(
       session: SparkSession,
       tableName: String,
