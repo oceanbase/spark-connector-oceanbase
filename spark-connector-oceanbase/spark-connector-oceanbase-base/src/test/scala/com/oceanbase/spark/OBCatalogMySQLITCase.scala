@@ -726,7 +726,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       s"INSERT INTO $getSchemaName.products VALUES (101, 'updated scooter', 'Updated description', 5.0)")
 
     // Verify that the original data remains unchanged (INSERT IGNORE behavior)
-    val expected1: util.List[String] = util.Arrays.asList("101,scooter,Small 2-wheel scooter,3.14")
+    val expected1: util.List[String] =
+      util.Arrays.asList("101,scooter,Small 2-wheel scooter,3.1400000000")
     queryAndVerifyTableData(session1, "products", expected1)
     session1.stop()
 
@@ -749,7 +750,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       s"INSERT INTO $getSchemaName.products VALUES (101, 'scooter', 'Small 2-wheel scooter', 3.14)")
     // Insert duplicate primary key with different values - should update (ON DUPLICATE KEY UPDATE)
     session2.sql(
-      s"INSERT INTO $getSchemaName.products VALUES (101, 'updated scooter', 'Updated description', 5.0)")
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'updated scooter', 'Updated description', 5.0000000000)")
 
     // Verify that the data was updated (ON DUPLICATE KEY UPDATE behavior)
     val expected2: util.List[String] =
