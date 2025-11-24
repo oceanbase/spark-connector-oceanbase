@@ -19,7 +19,6 @@ import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 import com.oceanbase.spark.reader.JDBCLimitScanBuilder
 import com.oceanbase.spark.reader.v2.OBJdbcScanBuilder
-import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.writer.v2.{DirectLoadWriteBuilderV2, JDBCWriteBuilder}
 
 import org.apache.spark.sql.SparkSession
@@ -34,7 +33,6 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import java.util
 
 import scala.collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
 
 case class OceanBaseTable(
     ident: Identifier,
