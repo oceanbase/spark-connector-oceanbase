@@ -20,7 +20,7 @@ import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 
-private class OBKVHBaseSparkSource
+class OBKVHBaseSparkSource
   extends DataSourceRegister
   with RelationProvider
   with CreatableRelationProvider {

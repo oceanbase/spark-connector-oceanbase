@@ -68,3 +68,15 @@ CREATE TABLE products_full_unique_key
   weight      DECIMAL(20, 10),
   unique index unique_idx(id, name, description, weight)
 );
+
+-- Tables for upsert-by-unique-key behavior tests
+CREATE TABLE products_pri_and_unique_key
+(
+  id          INTEGER      NOT NULL,
+  name        VARCHAR(255) NOT NULL,
+  description VARCHAR(512),
+  weight      DECIMAL(20, 10),
+  PRIMARY KEY(id, name),
+  UNIQUE INDEX unique_idx(name)
+);
+

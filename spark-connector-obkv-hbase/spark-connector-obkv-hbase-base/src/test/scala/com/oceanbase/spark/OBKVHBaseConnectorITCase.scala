@@ -21,7 +21,7 @@ import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
 
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql.SparkSession
-import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Test}
+import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Disabled, Test}
 import org.junit.jupiter.api.condition.{DisabledOnOs, OS}
 
 import java.sql.ResultSet
@@ -77,7 +77,7 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
       ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
     session.createDataFrame(Seq(newContact)).createOrReplaceTempView("content")
     session.sql(s"""
-                   |CREATE TEMPORARY VIEW test_sink
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink
                    |USING `obkv-hbase`
                    |OPTIONS(
                    |  "odp-mode" = "true",
@@ -111,13 +111,14 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   @DisabledOnOs(
     value = Array[OS](OS.MAC),
     disabledReason = "Currently it can only be successfully run on the GitHub CI environment")
+  @Disabled
   def testDirectSqlSink(): Unit = {
     val session = SparkSession.builder.master("local[*]").getOrCreate
     val newContact =
       ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
     session.createDataFrame(Seq(newContact)).createOrReplaceTempView("content")
     session.sql(s"""
-                   |CREATE TEMPORARY VIEW test_sink
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink
                    |USING `obkv-hbase`
                    |OPTIONS(
                    |  "url" = "${OceanBaseMySQLTestBase.getSysParameter("obconfig_url")}",

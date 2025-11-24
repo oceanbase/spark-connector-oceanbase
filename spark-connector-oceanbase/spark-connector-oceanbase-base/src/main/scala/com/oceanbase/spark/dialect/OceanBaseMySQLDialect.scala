@@ -221,7 +221,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo] = {
     val sql =
       s"""
-         |show index from ${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)} where non_unique = 0;
+         |show index from ${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)} where non_unique = 0 AND key_name <> 'PRIMARY';
          |""".stripMargin
     val arrayBuffer = ArrayBuffer[PriKeyColumnInfo]()
     OBJdbcUtils.executeQuery(connection, config, sql) {
