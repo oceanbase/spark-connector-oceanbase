@@ -40,7 +40,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_no_int_pri_key",
       "products_unique_key",
       "products_full_unique_key",
-      "products_pri_and_unique_key"
+      "products_pri_and_unique_key",
+      "products_with_decimal"
     )
   }
 
@@ -757,6 +758,41 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       util.Arrays.asList("101,updated scooter,Updated description,5.0000000000")
     queryAndVerifyTableData(session2, "products", expected2)
     session2.stop()
+  }
+
+  @Test
+  def testJdbcSelectDecimal(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    // Insert initial data
+    session.sql(
+      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241253, 3.14)")
+    session.sql(
+      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241252, 3.13)")
+
+    // Verify that the original data remains unchanged (INSERT IGNORE behavior)
+    val expected: util.List[String] =
+      util.Arrays.asList("1000000000539241253,3.14")
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql(s"select * from products_with_decimal where id = '1000000000539241253'")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+    session.stop()
   }
 
   private def queryAndVerifyTableData(
