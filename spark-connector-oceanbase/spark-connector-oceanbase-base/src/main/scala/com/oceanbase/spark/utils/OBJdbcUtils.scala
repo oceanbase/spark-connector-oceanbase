@@ -303,8 +303,8 @@ object OBJdbcUtils {
       case java.sql.Types.DECIMAL if precision != 0 || scale != 0 =>
         // Optimize DECIMAL(P, 0) to BIGINT to avoid precision loss when comparing with string literals
         // Spark converts String + DECIMAL to DOUBLE (losing precision), but String + BIGINT stays as BIGINT
-        // WARNING: This assumes data values fit within BIGINT range (-9223372036854775808 to 9223372036854775807)
-        if (scale == 0) {
+        // Only convert when scale == 0 AND precision <= 19 (BIGINT range: -9223372036854775808 to 9223372036854775807)
+        if (scale == 0 && precision <= 19) {
           LongType
         } else {
           DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
@@ -325,7 +325,8 @@ object OBJdbcUtils {
       case java.sql.Types.NULL => null
       case java.sql.Types.NUMERIC if precision != 0 || scale != 0 =>
         // Optimize NUMERIC(P, 0) to BIGINT to avoid precision loss
-        if (scale == 0) {
+        // Only convert when scale == 0 AND precision <= 19 (BIGINT range: -9223372036854775808 to 9223372036854775807)
+        if (scale == 0 && precision <= 19) {
           LongType
         } else {
           DecimalType(min(precision, MAX_PRECISION), min(scale, MAX_SCALE))
