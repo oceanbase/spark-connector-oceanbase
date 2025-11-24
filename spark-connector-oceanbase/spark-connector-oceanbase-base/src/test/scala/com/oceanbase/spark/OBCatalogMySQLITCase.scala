@@ -783,7 +783,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     // Verify that the original data remains unchanged (INSERT IGNORE behavior)
     val expected: util.List[String] =
-      util.Arrays.asList("1000000000539241253,1000000000539241253,3.14")
+      util.Arrays.asList("1000000000539241253,1000000000539241253,3.1400000000")
     import scala.collection.JavaConverters._
     val actual = session
       .sql(s"select * from products_with_decimal where len = '1000000000539241253'")
