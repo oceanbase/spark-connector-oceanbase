@@ -120,7 +120,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products_unique_key,false]",
       "[test,products_full_unique_key,false]",
       "[test,products_pri_and_unique_key,false]",
-      "[test,products_decimal,false]"
+      "[test,products_with_decimal,false]"
     ).toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
@@ -771,21 +771,22 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.username", getUsername)
       .config("spark.sql.catalog.ob.password", getPassword)
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.optimize-decimal-string-comparison", true.toString)
       .getOrCreate()
 
     session.sql("use ob;")
     // Insert initial data
     session.sql(
-      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241253, 3.14)")
+      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241253, 1000000000539241253, 3.14)")
     session.sql(
-      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241252, 3.13)")
+      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241252, 1000000000539241252, 3.13)")
 
     // Verify that the original data remains unchanged (INSERT IGNORE behavior)
     val expected: util.List[String] =
-      util.Arrays.asList("1000000000539241253,3.14")
+      util.Arrays.asList("1000000000539241253,1000000000539241253,3.14")
     import scala.collection.JavaConverters._
     val actual = session
-      .sql(s"select * from products_with_decimal where id = '1000000000539241253'")
+      .sql(s"select * from products_with_decimal where len = '1000000000539241253'")
       .collect()
       .map(
         _.toString().drop(1).dropRight(1)

@@ -402,6 +402,13 @@ Precautions for direct-load:
                 <td>When a table has both primary key and unique key index, this option controls which key to use for determining conflict detection. If set to true, uses unique key for conflict detection and updates all columns except unique key columns (including primary key columns). If set to false (default), uses primary key for conflict detection and updates all columns except primary key columns.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.optimize-decimal-string-comparison</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>When this option is true, DECIMAL(P, 0) columns with precision <= 19 will be converted to BIGINT (LongType) to avoid precision loss when comparing with string literals. This optimization prevents Spark from converting String + DECIMAL to DOUBLE (which loses precision for large numbers). If false (default), DECIMAL columns will remain as DecimalType. Note: This optimization only applies to integer DECIMAL with scale = 0 and precision <= 19 (BIGINT range: -9223372036854775808 to 9223372036854775807).</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">1024</td>

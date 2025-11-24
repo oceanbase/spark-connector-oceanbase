@@ -381,6 +381,17 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> OPTIMIZE_DECIMAL_STRING_COMPARISON =
+            new ConfigBuilder("jdbc.optimize-decimal-string-comparison")
+                    .doc(
+                            "When this option is true, DECIMAL(P, 0) columns with precision <= 19 will be converted to BIGINT (LongType) "
+                                    + "to avoid precision loss when comparing with string literals. "
+                                    + "This optimization prevents Spark from converting String + DECIMAL to DOUBLE (which loses precision for large numbers). "
+                                    + "If false (default), DECIMAL columns will remain as DecimalType.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -544,6 +555,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableSparkVarcharDataType() {
         return get(ENABLE_SPARK_VARCHAR_DATA_TYPE);
+    }
+
+    public Boolean getOptimizeDecimalStringComparison() {
+        return get(OPTIMIZE_DECIMAL_STRING_COMPARISON);
     }
 
     public Boolean getEnableAlwaysNullable() {
