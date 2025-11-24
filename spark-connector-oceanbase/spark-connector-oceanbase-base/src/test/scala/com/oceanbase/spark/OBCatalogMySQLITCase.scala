@@ -754,7 +754,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     // Verify that the data was updated (ON DUPLICATE KEY UPDATE behavior)
     val expected2: util.List[String] =
-      util.Arrays.asList("101,updated scooter,Updated description,5.0")
+      util.Arrays.asList("101,updated scooter,Updated description,5.0000000000")
     queryAndVerifyTableData(session2, "products", expected2)
     session2.stop()
   }
