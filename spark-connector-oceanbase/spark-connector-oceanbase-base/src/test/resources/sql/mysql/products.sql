@@ -82,6 +82,6 @@ CREATE TABLE products_pri_and_unique_key
 
 CREATE TABLE products_with_decimal
 (
-  id          DECIMAL(30, 0)
+  id          DECIMAL(30, 0),
   weight      DECIMAL(20, 10)
 );
