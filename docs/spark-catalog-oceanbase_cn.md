@@ -486,6 +486,13 @@ select * from spark_catalog.default.orders;
                 <td>旁路导入用户名。如果不指定该配置，则使用jdbc用户名。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.odp-mode</td>
+                <td>否</td>
+                <td>false</td>
+                <td>Boolean</td>
+                <td>是否通过ODP代理进行旁路导入。当设置为true时，将通过ODP代理（通常是2885端口）连接，此时会传递完整的用户名格式（如user@tenant#cluster）；当设置为false（默认）时，直连OBServer（通常是2882端口）。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.parallel</td>
                 <td>否</td>
                 <td>8</td>
