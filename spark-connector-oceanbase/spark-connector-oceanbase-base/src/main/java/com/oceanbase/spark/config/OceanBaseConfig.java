@@ -91,6 +91,13 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .checkValue(port -> port > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(2882);
 
+    public static final ConfigEntry<Boolean> DIRECT_LOAD_ODP_MODE =
+            new ConfigBuilder("direct-load.odp-mode")
+                    .doc("Whether to use ODP proxy for direct-load")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final ConfigEntry<String> DIRECT_LOAD_USERNAME =
             new ConfigBuilder("direct-load.username")
                     .doc("The username used in direct-load")
@@ -430,6 +437,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public int getDirectLoadPort() {
         return get(DIRECT_LOAD_RPC_PORT);
+    }
+
+    public Boolean getDirectLoadOdpMode() {
+        return get(DIRECT_LOAD_ODP_MODE);
     }
 
     public String getDirectLoadUserName() {
