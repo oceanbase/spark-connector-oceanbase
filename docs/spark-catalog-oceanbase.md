@@ -470,10 +470,17 @@ Precautions for direct-load:
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.username</td>
-                <td>否</td>
+                <td>No</td>
                 <td></td>
                 <td>String</td>
                 <td>The direct-load's username. If this configuration is not specified, the jdbc username is used.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.odp-mode</td>
+                <td>No</td>
+                <td>false</td>
+                <td>Boolean</td>
+                <td>Whether to use ODP proxy for direct-load. When set to true, it will connect through ODP proxy (typically port 2885) and pass the full username format (e.g., user@tenant#cluster); when set to false (default), it will connect directly to OBServer (typically port 2882).</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.parallel</td>
