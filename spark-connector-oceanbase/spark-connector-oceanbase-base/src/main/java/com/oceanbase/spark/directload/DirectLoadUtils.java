@@ -26,6 +26,9 @@ public class DirectLoadUtils {
         try {
             OceanBaseUserInfo userInfo = OceanBaseUserInfo.parse(oceanBaseConfig.getUsername());
             String directLoadUserName = oceanBaseConfig.getDirectLoadUserName();
+            if (directLoadUserName != null && !directLoadUserName.isEmpty()) {
+                userInfo = OceanBaseUserInfo.parse(directLoadUserName);
+            }
 
             String username = "";
             if (oceanBaseConfig.getDirectLoadOdpMode()) {
@@ -35,9 +38,6 @@ public class DirectLoadUtils {
                     username = oceanBaseConfig.getUsername();
                 }
             } else {
-                if (directLoadUserName != null && !directLoadUserName.isEmpty()) {
-                    userInfo = OceanBaseUserInfo.parse(directLoadUserName);
-                }
                 username = userInfo.getUser();
             }
 
