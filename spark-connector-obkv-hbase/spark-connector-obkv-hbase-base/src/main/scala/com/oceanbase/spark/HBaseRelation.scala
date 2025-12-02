@@ -77,7 +77,7 @@ case class HBaseRelation(
 
   private def flush(buffer: ArrayBuffer[Row], hTableClient: Table): Unit = {
     // Group puts by column family to handle multiple families correctly
-    val familyPutListMap = new java.util.HashMap[String, util.ArrayList[Put]]()
+    val familyPutListMap = mutable.HashMap.empty[String, util.ArrayList[Put]]
 
     buffer.foreach(
       row => {
@@ -114,21 +114,17 @@ case class HBaseRelation(
                 put.addColumn(familyName, Bytes.toBytes(colName), colValue)
             }
 
-            familyPutListMap.computeIfAbsent(cfName, _ => new util.ArrayList[Put]()).add(put)
+            familyPutListMap.getOrElseUpdate(cfName, new util.ArrayList[Put]()).add(put)
         }
       })
 
     // Flush each family's puts separately
-    import scala.collection.JavaConverters._
-    familyPutListMap
-      .values()
-      .asScala
-      .foreach(
-        putList => {
-          if (!putList.isEmpty) {
-            hTableClient.put(putList)
-          }
-        })
+    familyPutListMap.values.foreach(
+      putList => {
+        if (!putList.isEmpty) {
+          hTableClient.put(putList)
+        }
+      })
 
     buffer.clear()
   }
