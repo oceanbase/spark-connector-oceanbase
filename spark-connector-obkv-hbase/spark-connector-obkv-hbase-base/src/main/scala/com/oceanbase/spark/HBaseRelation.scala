@@ -40,13 +40,13 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 case class HBaseRelation(
-    parameters: Map[String, String],
-    userSpecifiedSchema: Option[StructType]
-)(@transient val sqlContext: SQLContext)
+                          parameters: Map[String, String],
+                          userSpecifiedSchema: Option[StructType]
+                        )(@transient val sqlContext: SQLContext)
   extends BaseRelation
-  with PrunedFilteredScan
-  with InsertableRelation
-  with Logging {
+    with PrunedFilteredScan
+    with InsertableRelation
+    with Logging {
 
   import scala.collection.JavaConverters._
   private val config = new OBKVHbaseConfig(parameters.asJava)
@@ -76,32 +76,60 @@ case class HBaseRelation(
   }
 
   private def flush(buffer: ArrayBuffer[Row], hTableClient: Table): Unit = {
-    val putList = new util.ArrayList[Put]()
+    // Group puts by column family to handle multiple families correctly
+    val familyPutListMap = new java.util.HashMap[String, util.ArrayList[Put]]()
+
     buffer.foreach(
       row => {
         // Get field index by col name that defined in catalog
         val rowKeyIndex = row.schema.fieldIndex(HBaseRelation.rowKey)
         val rowKey: Array[Byte] = convertToBytes(row(rowKeyIndex))
-        val put: Put = new Put(rowKey)
+
+        // Group columns by family
+        val columnsByFamily = new mutable.HashMap[String, ArrayBuffer[(String, Array[Byte])]]()
+
         // Mapping DataFrame's schema to User-defined schema
         for (i <- 0 until (row.size)) {
-          if (i == rowKeyIndex) {
-            // do nothing
-          } else {
+          if (i != rowKeyIndex) {
             val rowFieldName = row.schema.fieldNames(i)
             // Only write columns defined by the user in the schema.
             if (HBaseRelation.columnFamilyMap.contains(rowFieldName)) {
               val userFieldName = HBaseRelation.columnFamilyMap(rowFieldName)._1
               val cfName = HBaseRelation.columnFamilyMap(rowFieldName)._2
-              val familyName: Array[Byte] = Bytes.toBytes(cfName)
               val columnValue = convertToBytes(row.get(i))
-              put.addColumn(familyName, Bytes.toBytes(userFieldName), columnValue)
+
+              columnsByFamily.getOrElseUpdate(cfName, ArrayBuffer.empty) +=
+                ((userFieldName, columnValue))
             }
           }
         }
-        putList.add(put)
+
+        // Create one Put per family with the same rowKey
+        columnsByFamily.foreach {
+          case (cfName, columns) =>
+            val put: Put = new Put(rowKey)
+            val familyName: Array[Byte] = Bytes.toBytes(cfName)
+            columns.foreach {
+              case (colName, colValue) =>
+                put.addColumn(familyName, Bytes.toBytes(colName), colValue)
+            }
+
+            familyPutListMap.computeIfAbsent(cfName, _ => new util.ArrayList[Put]()).add(put)
+        }
       })
-    hTableClient.put(putList)
+
+    // Flush each family's puts separately
+    import scala.collection.JavaConverters._
+    familyPutListMap
+      .values()
+      .asScala
+      .foreach(
+        putList => {
+          if (!putList.isEmpty) {
+            hTableClient.put(putList)
+          }
+        })
+
     buffer.clear()
   }
 }
