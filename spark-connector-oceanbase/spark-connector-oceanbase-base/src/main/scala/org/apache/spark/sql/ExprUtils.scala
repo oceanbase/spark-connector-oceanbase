@@ -38,6 +38,19 @@ object ExprUtils extends SQLConfHelper with Serializable {
         throw new UnsupportedOperationException(s"Unsupported transform: ${other.name()}")
     }
 
+  def toOBOraclePartition(transform: Transform, config: OceanBaseConfig): String =
+    transform match {
+      case bucket: BucketTransform =>
+        val identities = bucket.columns
+          .map(col => s""""${col.fieldNames().head}"""")
+          .mkString(",")
+        s"PARTITION BY HASH($identities) PARTITIONS ${bucket.numBuckets.value()}".stripMargin
+      case _: YearsTransform | _: DaysTransform | _: HoursTransform | _: IdentityTransform =>
+        throw new UnsupportedOperationException("OceanBase does not support dynamic partitions.")
+      case other: Transform =>
+        throw new UnsupportedOperationException(s"Unsupported transform: ${other.name()}")
+    }
+
   /**
    * Turns a single Filter into a String representing a SQL expression. Returns None for an
    * unhandled filter.
