@@ -40,13 +40,13 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 case class HBaseRelation(
-                          parameters: Map[String, String],
-                          userSpecifiedSchema: Option[StructType]
-                        )(@transient val sqlContext: SQLContext)
+    parameters: Map[String, String],
+    userSpecifiedSchema: Option[StructType]
+)(@transient val sqlContext: SQLContext)
   extends BaseRelation
-    with PrunedFilteredScan
-    with InsertableRelation
-    with Logging {
+  with PrunedFilteredScan
+  with InsertableRelation
+  with Logging {
 
   import scala.collection.JavaConverters._
   private val config = new OBKVHbaseConfig(parameters.asJava)
