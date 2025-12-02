@@ -91,6 +91,13 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .checkValue(port -> port > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(2882);
 
+    public static final ConfigEntry<Boolean> DIRECT_LOAD_ODP_MODE =
+            new ConfigBuilder("direct-load.odp-mode")
+                    .doc("Whether to use ODP proxy for direct-load")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final ConfigEntry<String> DIRECT_LOAD_USERNAME =
             new ConfigBuilder("direct-load.username")
                     .doc("The username used in direct-load")
@@ -361,6 +368,16 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(true);
 
+    public static final ConfigEntry<Boolean> JDBC_UPSERT_BY_UNIQUE_KEY =
+            new ConfigBuilder("jdbc.upsert-by-unique-key")
+                    .doc(
+                            "When a table has both primary key and unique key index, this option controls which key to use for determining conflict detection. "
+                                    + "If true, uses unique key for conflict detection and updates all columns except unique key columns (including primary key columns). "
+                                    + "If false (default), uses primary key for conflict detection and updates all columns except primary key columns.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -420,6 +437,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public int getDirectLoadPort() {
         return get(DIRECT_LOAD_RPC_PORT);
+    }
+
+    public Boolean getDirectLoadOdpMode() {
+        return get(DIRECT_LOAD_ODP_MODE);
     }
 
     public String getDirectLoadUserName() {
@@ -524,6 +545,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableAlwaysNullable() {
         return get(ENABLE_ALWAYS_NULLABLE);
+    }
+
+    public Boolean getJdbcUpsertByUniqueKey() {
+        return get(JDBC_UPSERT_BY_UNIQUE_KEY);
     }
 
     public String getDbTable() {

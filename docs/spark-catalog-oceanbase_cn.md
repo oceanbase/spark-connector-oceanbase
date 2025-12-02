@@ -384,6 +384,13 @@ select * from spark_catalog.default.orders;
                 <td>使用 jdbc 写入时，是否启用 autocommit 进行事务自动提交。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.upsert-by-unique-key</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>当表同时拥有主键和唯一键索引时，此选项控制使用哪个键来进行冲突检测。如果设置为 true，则使用唯一键进行冲突检测，并更新除唯一键列之外的所有列（包括主键列）。如果设置为 false（默认值），则使用主键进行冲突检测，并更新除主键列之外的所有列。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">1024</td>
@@ -463,6 +470,13 @@ select * from spark_catalog.default.orders;
                 <td></td>
                 <td>String</td>
                 <td>旁路导入用户名。如果不指定该配置，则使用jdbc用户名。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.odp-mode</td>
+                <td>否</td>
+                <td>false</td>
+                <td>Boolean</td>
+                <td>是否通过ODP代理进行旁路导入。当设置为true时，将通过ODP代理（通常是2885端口）连接，此时会传递完整的用户名格式（如user@tenant#cluster）；当设置为false（默认）时，直连OBServer（通常是2882端口）。</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.parallel</td>

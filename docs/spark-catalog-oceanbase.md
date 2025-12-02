@@ -388,6 +388,13 @@ Precautions for direct-load:
                 <td>When using jdbc to write, whether to enable autocommit for automatic transaction commit.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.upsert-by-unique-key</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>When a table has both primary key and unique key index, this option controls which key to use for determining conflict detection. If set to true, uses unique key for conflict detection and updates all columns except unique key columns (including primary key columns). If set to false (default), uses primary key for conflict detection and updates all columns except primary key columns.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">1024</td>
@@ -463,10 +470,17 @@ Precautions for direct-load:
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.username</td>
-                <td>否</td>
+                <td>No</td>
                 <td></td>
                 <td>String</td>
                 <td>The direct-load's username. If this configuration is not specified, the jdbc username is used.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.direct-load.odp-mode</td>
+                <td>No</td>
+                <td>false</td>
+                <td>Boolean</td>
+                <td>Whether to use ODP proxy for direct-load. When set to true, it will connect through ODP proxy (typically port 2885) and pass the full username format (e.g., user@tenant#cluster); when set to false (default), it will connect directly to OBServer (typically port 2882).</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.direct-load.parallel</td>
