@@ -253,7 +253,8 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
   def getUpsertIntoStatement(
       tableName: String,
       schema: StructType,
-      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String = {
+      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo],
+      config: OceanBaseConfig): String = {
     val uniqueKeys = priKeyColumnInfo.map(_.columnName).toSet
     val nonUniqueFields =
       schema.fieldNames.filterNot(fieldName => uniqueKeys.contains(quoteIdentifier(fieldName)))
@@ -264,14 +265,17 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       s"INSERT INTO $tableName ($columns) VALUES ($placeholders)"
     }
 
-    if (nonUniqueFields.nonEmpty) {
+    // Force INSERT IGNORE if explicitly configured
+    if (config.getJdbcUseInsertIgnore) {
+      baseInsert.replace("INSERT", "INSERT IGNORE")
+    } else if (nonUniqueFields.nonEmpty) {
       // ON DUPLICATE KEY UPDATE
       val updateClause = nonUniqueFields
         .map(f => s"${quoteIdentifier(f)} = VALUES(${quoteIdentifier(f)})")
         .mkString(", ")
       s"$baseInsert ON DUPLICATE KEY UPDATE $updateClause"
     } else {
-      // INSERT IGNORE
+      // INSERT IGNORE (fallback when all columns are keys)
       baseInsert.replace("INSERT", "INSERT IGNORE")
     }
   }

@@ -40,7 +40,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_no_int_pri_key",
       "products_unique_key",
       "products_full_unique_key",
-      "products_pri_and_unique_key"
+      "products_pri_and_unique_key",
+      "products_with_decimal"
     )
   }
 
@@ -118,7 +119,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products_no_int_pri_key,false]",
       "[test,products_unique_key,false]",
       "[test,products_full_unique_key,false]",
-      "[test,products_pri_and_unique_key,false]"
+      "[test,products_pri_and_unique_key,false]",
+      "[test,products_with_decimal,false]"
     ).toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
@@ -700,6 +702,98 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       s"$getSchemaName.products_pri_and_unique_key",
       util.Arrays.asList("id", "name", "description"))
     Assertions.assertEquals(util.Arrays.asList("2,n1,d2"), actual)
+    session.stop()
+  }
+
+  @Test
+  def testJdbcUseInsertIgnore(): Unit = {
+    // Test case 1: With jdbc.use-insert-ignore enabled, duplicate key should be ignored
+    val session1 = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.use-insert-ignore", true.toString)
+      .getOrCreate()
+
+    session1.sql("use ob;")
+    // Insert initial data
+    session1.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'scooter', 'Small 2-wheel scooter', 3.14)")
+    // Insert duplicate primary key with different values - should be ignored
+    session1.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'updated scooter', 'Updated description', 5.0)")
+
+    // Verify that the original data remains unchanged (INSERT IGNORE behavior)
+    val expected1: util.List[String] =
+      util.Arrays.asList("101,scooter,Small 2-wheel scooter,3.1400000000")
+    queryAndVerifyTableData(session1, "products", expected1)
+    session1.stop()
+
+    // Test case 2: Without jdbc.use-insert-ignore, duplicate key should trigger UPDATE
+    val session2 = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session2.sql("use ob;")
+    // Clear the table first
+    session2.sql(s"TRUNCATE TABLE $getSchemaName.products")
+    // Insert initial data
+    session2.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'scooter', 'Small 2-wheel scooter', 3.14)")
+    // Insert duplicate primary key with different values - should update (ON DUPLICATE KEY UPDATE)
+    session2.sql(
+      s"INSERT INTO $getSchemaName.products VALUES (101, 'updated scooter', 'Updated description', 5.0000000000)")
+
+    // Verify that the data was updated (ON DUPLICATE KEY UPDATE behavior)
+    val expected2: util.List[String] =
+      util.Arrays.asList("101,updated scooter,Updated description,5.0000000000")
+    queryAndVerifyTableData(session2, "products", expected2)
+    session2.stop()
+  }
+
+  @Test
+  def testJdbcSelectDecimal(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.optimize-decimal-string-comparison", true.toString)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    // Insert initial data
+    session.sql(
+      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241253, 1000000000539241253, 3.14)")
+    session.sql(
+      s"INSERT INTO $getSchemaName.products_with_decimal VALUES (1000000000539241252, 1000000000539241252, 3.13)")
+
+    // Verify that the original data remains unchanged (INSERT IGNORE behavior)
+    val expected: util.List[String] =
+      util.Arrays.asList("1000000000539241253,1000000000539241253,3.1400000000")
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql(s"select * from products_with_decimal where len = '1000000000539241253'")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
     session.stop()
   }
 

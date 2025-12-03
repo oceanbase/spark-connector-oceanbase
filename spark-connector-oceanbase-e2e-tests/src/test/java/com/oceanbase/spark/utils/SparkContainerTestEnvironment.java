@@ -54,7 +54,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
     private static final String INTER_CONTAINER_JM_ALIAS = "spark";
 
     protected String getSparkDockerImageTag() {
-        return String.format("apache/spark:%s", SPARK_VERSION);
+        return String.format("spark:%s", SPARK_VERSION);
     }
 
     @TempDir public java.nio.file.Path temporaryFolder;
@@ -194,10 +194,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         commands.add(jarStr);
         commands.add("-f /tmp/script.sql");
 
-        String command =
-                String.format(
-                        "/opt/spark/bin/spark-sql --conf spark.default.parallelism=1 %s",
-                        String.join(" ", commands));
+        String command = String.format("/opt/spark/bin/spark-sql %s", String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
         LOG.info(execResult.getStdout());
@@ -226,8 +223,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "timeout 2m /opt/spark/bin/spark-shell --conf spark.default.parallelism=1 %s",
-                        String.join(" ", commands));
+                        "timeout 2m /opt/spark/bin/spark-shell %s", String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
         LOG.info(execResult.getStdout());

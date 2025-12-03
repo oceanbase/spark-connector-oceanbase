@@ -80,3 +80,9 @@ CREATE TABLE products_pri_and_unique_key
   UNIQUE INDEX unique_idx(name)
 );
 
+CREATE TABLE products_with_decimal
+(
+  id          DECIMAL(38, 0),
+  len         DECIMAL(19, 0),
+  weight      DECIMAL(20, 10)
+);
