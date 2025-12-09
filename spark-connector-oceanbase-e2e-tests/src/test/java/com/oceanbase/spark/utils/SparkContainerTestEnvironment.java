@@ -54,7 +54,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
     private static final String INTER_CONTAINER_JM_ALIAS = "spark";
 
     protected String getSparkDockerImageTag() {
-        return String.format("spark:%s", SPARK_VERSION);
+        return String.format("apache/spark:%s", SPARK_VERSION);
     }
 
     @TempDir public java.nio.file.Path temporaryFolder;
