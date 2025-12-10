@@ -303,7 +303,8 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
   override def getUpsertIntoStatement(
       tableName: String,
       schema: StructType,
-      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String = {
+      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo],
+      config: OceanBaseConfig): String = {
     val uniqueKeys = priKeyColumnInfo.map(_.columnName).toSet
     val nonUniqueFields =
       schema.fieldNames.filterNot(fieldName => uniqueKeys.contains(quoteIdentifier(fieldName)))

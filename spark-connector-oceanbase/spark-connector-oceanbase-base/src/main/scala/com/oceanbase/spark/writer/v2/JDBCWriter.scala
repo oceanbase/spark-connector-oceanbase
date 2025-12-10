@@ -123,7 +123,7 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
 
     val tableName = config.getDbTable
     if (upsertColInfos.nonEmpty) {
-      dialect.getUpsertIntoStatement(tableName, schema, upsertColInfos)
+      dialect.getUpsertIntoStatement(tableName, schema, upsertColInfos, config)
     } else {
       dialect.getInsertIntoStatement(tableName, schema)
     }

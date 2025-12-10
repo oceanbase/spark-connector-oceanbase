@@ -240,6 +240,16 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> JDBC_USE_INSERT_IGNORE =
+            new ConfigBuilder("jdbc.use-insert-ignore")
+                    .doc(
+                            "When enabled, uses INSERT IGNORE instead of INSERT ... ON DUPLICATE KEY UPDATE for handling primary key conflicts. "
+                                    + "INSERT IGNORE will skip rows with duplicate keys and continue processing, "
+                                    + "while ON DUPLICATE KEY UPDATE will update existing rows with new values.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_PREDICATE =
             new ConfigBuilder("jdbc.push-down-predicate")
                     .doc(
@@ -378,6 +388,17 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    public static final ConfigEntry<Boolean> OPTIMIZE_DECIMAL_STRING_COMPARISON =
+            new ConfigBuilder("jdbc.optimize-decimal-string-comparison")
+                    .doc(
+                            "When this option is true, DECIMAL(P, 0) columns with precision <= 19 will be converted to BIGINT (LongType) "
+                                    + "to avoid precision loss when comparing with string literals. "
+                                    + "This optimization prevents Spark from converting String + DECIMAL to DOUBLE (which loses precision for large numbers). "
+                                    + "If false (default), DECIMAL columns will remain as DecimalType.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -507,6 +528,10 @@ public class OceanBaseConfig extends Config implements Serializable {
         return get(JDBC_ENABLE_AUTOCOMMIT);
     }
 
+    public Boolean getJdbcUseInsertIgnore() {
+        return get(JDBC_USE_INSERT_IGNORE);
+    }
+
     public Integer getJdbcQueryTimeout() {
         return get(JDBC_QUERY_TIMEOUT);
     }
@@ -541,6 +566,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Boolean getEnableSparkVarcharDataType() {
         return get(ENABLE_SPARK_VARCHAR_DATA_TYPE);
+    }
+
+    public Boolean getOptimizeDecimalStringComparison() {
+        return get(OPTIMIZE_DECIMAL_STRING_COMPARISON);
     }
 
     public Boolean getEnableAlwaysNullable() {
