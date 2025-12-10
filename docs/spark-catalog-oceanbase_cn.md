@@ -384,11 +384,25 @@ select * from spark_catalog.default.orders;
                 <td>使用 jdbc 写入时，是否启用 autocommit 进行事务自动提交。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.use-insert-ignore</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>当启用时，使用 INSERT IGNORE 而不是 INSERT ... ON DUPLICATE KEY UPDATE 来处理主键冲突。INSERT IGNORE 会跳过具有重复键的行并继续处理，而 ON DUPLICATE KEY UPDATE 会用新值更新现有行。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.upsert-by-unique-key</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">false</td>
                 <td>Boolean</td>
                 <td>当表同时拥有主键和唯一键索引时，此选项控制使用哪个键来进行冲突检测。如果设置为 true，则使用唯一键进行冲突检测，并更新除唯一键列之外的所有列（包括主键列）。如果设置为 false（默认值），则使用主键进行冲突检测，并更新除主键列之外的所有列。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.optimize-decimal-string-comparison</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>Boolean</td>
+                <td>当该选项为 true 时，精度小于等于 19 的 DECIMAL(P, 0) 列将被转换为 BIGINT (LongType)，以避免与字符串字面量比较时的精度丢失问题。此优化可防止 Spark 将 String + DECIMAL 转换为 DOUBLE（对于大数字会丢失精度）。如果设置为 false（默认值），DECIMAL 列将保持为 DecimalType。注意：此优化仅适用于 scale = 0 的整数型 DECIMAL，且 precision <= 19（BIGINT 范围：-9223372036854775808 到 9223372036854775807）。</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.string-as-varchar-length</td>

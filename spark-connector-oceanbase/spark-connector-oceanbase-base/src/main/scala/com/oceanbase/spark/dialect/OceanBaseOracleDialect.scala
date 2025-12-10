@@ -93,7 +93,8 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
   override def getUpsertIntoStatement(
       tableName: String,
       schema: StructType,
-      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String = {
+      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo],
+      config: OceanBaseConfig): String = {
     throw new UnsupportedOperationException("Not currently supported in oracle mode")
   }
 

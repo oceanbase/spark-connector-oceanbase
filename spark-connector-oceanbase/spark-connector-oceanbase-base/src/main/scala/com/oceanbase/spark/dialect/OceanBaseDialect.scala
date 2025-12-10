@@ -186,7 +186,8 @@ abstract class OceanBaseDialect extends Logging with Serializable {
   def getUpsertIntoStatement(
       tableName: String,
       schema: StructType,
-      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo]): String
+      priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo],
+      config: OceanBaseConfig): String
 
   /**
    * The SQL query that should be used to discover the schema of a table. It only needs to ensure
