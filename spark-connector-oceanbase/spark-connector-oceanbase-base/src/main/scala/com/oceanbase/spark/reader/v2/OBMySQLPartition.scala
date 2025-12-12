@@ -470,9 +470,10 @@ object OBMySQLPartition extends Logging {
             }
           }(executionContext)
         })
+      val timeoutMinutes = config.getJdbcPartitionComputeTimeoutMinutes.toLong
       val arr = futures.flatMap(
         future => {
-          Await.result(future, Duration(10, TimeUnit.MINUTES))
+          Await.result(future, Duration(timeoutMinutes, TimeUnit.MINUTES))
         })
       val endTime = System.nanoTime()
       logInfo(

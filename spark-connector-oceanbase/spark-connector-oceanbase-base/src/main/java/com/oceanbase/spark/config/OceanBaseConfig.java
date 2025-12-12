@@ -299,6 +299,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .createWithDefault(32);
 
+    public static final ConfigEntry<Integer> JDBC_PARTITION_COMPUTE_TIMEOUT_MINUTES =
+            new ConfigBuilder("jdbc.partition-compute-timeout-minutes")
+                    .doc(
+                            "Timeout in minutes for partition computation. This parameter controls how long to wait for partition computation to complete before throwing a timeout exception.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .intConf()
+                    .createWithDefault(10);
+
     public static final ConfigEntry<Long> JDBC_MAX_RECORDS_PER_PARTITION =
             new ConfigBuilder("jdbc.max-records-per-partition")
                     .doc(
@@ -610,6 +618,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcPartitionComputeParallelism() {
         return get(JDBC_PARTITION_COMPUTE_PARALLELISM);
+    }
+
+    public Integer getJdbcPartitionComputeTimeoutMinutes() {
+        return get(JDBC_PARTITION_COMPUTE_TIMEOUT_MINUTES);
     }
 
     public Optional<Long> getJdbcMaxRecordsPrePartition() {

@@ -360,8 +360,15 @@ Precautions for direct-load:
                 <td>Controls the parallelism level for partition computation. This parameter determines the number of threads used when computing partitions for partitioned tables (mainly through parallel SQL queries to OceanBase partition statistics). The computation task runs on the driver node. Higher values can improve performance for tables with many partitions. When setting a larger value for this parameter, appropriately increasing the CPU cores and memory of the driver node can achieve better performance.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.partition-compute-timeout-minutes</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;">10</td>
+                <td>Int</td>
+                <td>Timeout in minutes for partition computation. This parameter controls how long to wait for partition computation to complete before throwing a timeout exception.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.query-timeout-hint-degree</td>
-                <td>否</td>
+                <td>No</td>
                 <td style="word-wrap: break-word;">-1</td>
                 <td>Int</td>
                 <td>Control the query timeout by adding /*+ query_timeout(N) */ hint to the generated SQL. This parameter can be used to specify the timeout in microseconds. The default value is -1, which means that the hint is not added.</td>
