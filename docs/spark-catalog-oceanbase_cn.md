@@ -356,6 +356,13 @@ select * from spark_catalog.default.orders;
                 <td>控制分区计算的并行级别。此参数确定计算分区表分区时使用的线程数，主要通过并行 SQL 查询 OceanBase 分区统计信息来实现。该计算任务在 driver 节点运行，对于分区数量较多的表，设置更高的值可以显著提升性能。当指定的该参数值较大的时候，适当调大 driver 节点的 CPU 核数和内存，可以取得更好的性能。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.partition-compute-timeout-minutes</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">10</td>
+                <td>Int</td>
+                <td>分区计算的超时时间，单位为分钟。此参数控制在抛出超时异常之前等待分区计算完成的时长。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.query-timeout-hint-degree</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">-1</td>
