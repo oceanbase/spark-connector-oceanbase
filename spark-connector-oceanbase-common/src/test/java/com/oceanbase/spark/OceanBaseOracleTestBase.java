@@ -69,7 +69,7 @@ public abstract class OceanBaseOracleTestBase extends OceanBaseTestBase {
 
     @Override
     public String getUsername() {
-        return System.getenv("USERNAME");
+        return System.getenv("USER_NAME");
     }
 
     @Override
