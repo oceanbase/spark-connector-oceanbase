@@ -93,6 +93,62 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testCacheTableDoesNotChangeAfterExternalInsert(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+
+    // Cache query result as a temp view.
+    session.sql("CACHE TABLE xxx AS SELECT id FROM products WHERE id < 150")
+
+    import scala.collection.JavaConverters._
+    val first = session
+      .sql("SELECT id FROM xxx ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+    val expectedBeforeExternalInsert =
+      util.Arrays.asList("101", "102", "103", "104", "105", "106", "107", "108", "109")
+    assertEqualsInAnyOrder(expectedBeforeExternalInsert, first)
+
+    // External insert via JDBC (simulates OB-side incremental changes outside Spark).
+    val conn = getJdbcConnection()
+    try {
+      val stmt = conn.createStatement()
+      try {
+        stmt.executeUpdate(
+          s"INSERT INTO $getSchemaName.products(id, name, description, weight) VALUES (149, 'ext', 'external insert', 1.0)")
+      } finally {
+        stmt.close()
+      }
+    } finally {
+      conn.close()
+    }
+
+    // Cache should remain stable unless explicitly refreshed/uncached.
+    val second = session
+      .sql("SELECT id FROM xxx ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expectedBeforeExternalInsert, second)
+
+    session.sql("UNCACHE TABLE xxx")
+    session.stop()
+  }
+
+  @Test
   def testCatalogOp(): Unit = {
     val session = SparkSession
       .builder()
