@@ -46,3 +46,7 @@ build/
 ### Log ###
 *.log
 /logs
+
+### Local Test Files ###
+set-test-env.sh
+**/S1.scala
