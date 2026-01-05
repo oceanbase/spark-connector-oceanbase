@@ -17,7 +17,7 @@
 package com.oceanbase.spark.reader.v2
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.dialect.OceanBaseDialect
+import com.oceanbase.spark.dialect.{OceanBaseDialect, OceanBaseOracleDialect}
 import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.internal.Logging
@@ -63,6 +63,18 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
 
   override def pushAggregation(aggregation: Aggregation): Boolean = {
     if (!config.getPushDownAggregate) return false
+
+    // TODO(oracle-agg-pushdown): Disable aggregate pushdown for Oracle mode.
+    // Reasons:
+    // 1) NUMBER precision/scale metadata from JDBC can be unstable in some aggregate cases,
+    //    leading to value mis-scaling (e.g., 5.3 -> 0.53).
+    // 2) MAX/MIN semantics on non-numeric types (e.g., strings) are lexicographical; blindly
+    //    casting to numeric changes semantics or throws errors.
+    // 3) Needs type-aware rewrite strategy; enable later once fully implemented.
+    if (dialect.isInstanceOf[OceanBaseOracleDialect]) {
+      logInfo("Disable aggregate pushdown on Oracle mode due to precision/semantic concerns.")
+      return false
+    }
 
     val compiledAggs = aggregation.aggregateExpressions.flatMap(dialect.compileExpression(_))
     if (compiledAggs.length != aggregation.aggregateExpressions.length) return false
@@ -179,8 +191,12 @@ class OBJdbcBatch(
     pushedGroupBys: Option[Array[String]],
     dialect: OceanBaseDialect)
   extends Batch {
-  private lazy val inputPartitions: Array[InputPartition] =
-    OBMySQLPartition.columnPartition(config, dialect)
+  private lazy val inputPartitions: Array[InputPartition] = {
+    OBJdbcUtils.getCompatibleMode(config).map(_.toLowerCase) match {
+      case Some("oracle") => OBOraclePartition.columnPartition(config, dialect)
+      case _ => OBMySQLPartition.columnPartition(config, dialect)
+    }
+  }
 
   override def planInputPartitions(): Array[InputPartition] = inputPartitions
 

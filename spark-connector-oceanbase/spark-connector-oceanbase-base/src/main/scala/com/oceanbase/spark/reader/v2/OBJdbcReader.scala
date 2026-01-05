@@ -17,7 +17,7 @@
 package com.oceanbase.spark.reader.v2
 
 import com.oceanbase.spark.config.OceanBaseConfig
-import com.oceanbase.spark.dialect.OceanBaseDialect
+import com.oceanbase.spark.dialect.{OceanBaseDialect, OceanBaseOracleDialect}
 import com.oceanbase.spark.reader.v2.OBJdbcReader.{makeGetters, OBValueGetter}
 import com.oceanbase.spark.utils.OBJdbcUtils
 
@@ -61,8 +61,13 @@ class OBJdbcReader(
         part.unevenlyWhereValue.zipWithIndex.foreach {
           case (value, index) => stmt.setObject(index + 1, value)
         }
+      case part: OBOraclePartition =>
+        part.unevenlyWhereValue.zipWithIndex.foreach {
+          case (value, index) => stmt.setObject(index + 1, value)
+        }
       case _ =>
     }
+    print("Query SQL: " + buildQuerySql())
     stmt.setFetchSize(config.getJdbcFetchSize)
     stmt.setQueryTimeout(config.getJdbcQueryTimeout)
     stmt.executeQuery()
@@ -101,9 +106,31 @@ class OBJdbcReader(
   private def buildQuerySql(): String = {
     var columns = schema.map(col => dialect.quoteIdentifier(col.name)).toArray
     if (requiredColumns != null && requiredColumns.nonEmpty) {
-      columns = requiredColumns;
+      columns = requiredColumns
     }
-    val columnStr: String = if (columns.isEmpty) "1" else columns.mkString(",")
+
+    // For Oracle mode, avoid JDBC NUMBER precision/scale issues by casting numeric columns
+    // to BINARY_DOUBLE in the projection. Only apply to fractional numeric types to avoid
+    // altering integral semantics (e.g., NUMBER(10,0)).
+    val columnStr: String = {
+      dialect match {
+        case _: OceanBaseOracleDialect =>
+          val nameToType = schema.fields.map(f => f.name -> f.dataType).toMap
+          val projected = columns.map {
+            raw =>
+              val unquoted = dialect.unQuoteIdentifier(raw)
+              val quoted = dialect.quoteIdentifier(unquoted)
+              nameToType.get(unquoted) match {
+                // Keep DecimalType as JDBC BigDecimal to avoid losing fractional formatting
+                case Some(dt) if dt == DoubleType || dt == FloatType =>
+                  s"CAST($quoted AS BINARY_DOUBLE) AS $quoted"
+                case _ => quoted
+              }
+          }
+          if (projected.isEmpty) "1" else projected.mkString(",")
+        case _ => if (columns.isEmpty) "1" else columns.mkString(",")
+      }
+    }
 
     val filterWhereClause: String =
       pushedFilter
@@ -111,17 +138,28 @@ class OBJdbcReader(
         .map(p => s"($p)")
         .mkString(" AND ")
 
-    val part: OBMySQLPartition = partition.asInstanceOf[OBMySQLPartition]
-    val whereClause = {
-      if (part.whereClause != null && filterWhereClause.nonEmpty) {
-        "WHERE " + s"($filterWhereClause)" + " AND " + s"(${part.whereClause})"
-      } else if (part.whereClause != null) {
-        "WHERE " + part.whereClause
-      } else if (filterWhereClause.nonEmpty) {
-        "WHERE " + filterWhereClause
-      } else {
-        ""
-      }
+    val whereClause = partition match {
+      case part: OBMySQLPartition =>
+        if (part.whereClause != null && filterWhereClause.nonEmpty) {
+          "WHERE " + s"($filterWhereClause)" + " AND " + s"(${part.whereClause})"
+        } else if (part.whereClause != null) {
+          "WHERE " + part.whereClause
+        } else if (filterWhereClause.nonEmpty) {
+          "WHERE " + filterWhereClause
+        } else {
+          ""
+        }
+      case part: OBOraclePartition =>
+        if (part.whereClause != null && filterWhereClause.nonEmpty) {
+          "WHERE " + s"($filterWhereClause)" + " AND " + s"(${part.whereClause})"
+        } else if (part.whereClause != null) {
+          "WHERE " + part.whereClause
+        } else if (filterWhereClause.nonEmpty) {
+          "WHERE " + filterWhereClause
+        } else {
+          ""
+        }
+      case _ => throw new RuntimeException(s"Unsupported partition type: ${partition.getClass}")
     }
 
     /** A GROUP BY clause representing pushed-down grouping columns. */
@@ -134,17 +172,27 @@ class OBJdbcReader(
       }
     }
 
-    val myLimitClause: String = {
-      if (part.limitOffsetClause == null || part.limitOffsetClause.isEmpty)
-        dialect.getLimitClause(pushDownLimit)
-      else
-        ""
-    }
-
-    val useHiddenPKColumnHint = if (part.useHiddenPKColumn) {
-      s", opt_param('hidden_column_visible', 'true') "
-    } else {
-      ""
+    val (limitClause, useHiddenPKColumnHint) = partition match {
+      case part: OBMySQLPartition =>
+        val myLimitClause =
+          if (part.limitOffsetClause == null || part.limitOffsetClause.isEmpty)
+            dialect.getLimitClause(pushDownLimit)
+          else
+            ""
+        val useHiddenPKColumnHint = if (part.useHiddenPKColumn) {
+          s", opt_param('hidden_column_visible', 'true') "
+        } else {
+          ""
+        }
+        (myLimitClause, useHiddenPKColumnHint)
+      case part: OBOraclePartition =>
+        val useHiddenPKColumnHint = if (part.useHiddenPKColumn) {
+          s", opt_param('hidden_column_visible', 'true') "
+        } else {
+          ""
+        }
+        ("", useHiddenPKColumnHint)
+      case _ => throw new RuntimeException(s"Unsupported partition type: ${partition.getClass}")
     }
     val queryTimeoutHint = if (config.getQueryTimeoutHintDegree > 0) {
       s", query_timeout(${config.getQueryTimeoutHintDegree}) "
@@ -154,9 +202,24 @@ class OBJdbcReader(
     val hint =
       s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) $useHiddenPKColumnHint $queryTimeoutHint */"
 
+    val partitionClause = partition match {
+      case part: OBMySQLPartition => part.partitionClause
+      case part: OBOraclePartition => part.partitionClause
+      case _ => ""
+    }
+
+    val finalLimitClause = partition match {
+      case part: OBMySQLPartition =>
+        if (part.limitOffsetClause != null && part.limitOffsetClause.nonEmpty)
+          part.limitOffsetClause
+        else limitClause
+      case part: OBOraclePartition => ""
+      case _ => ""
+    }
+
     s"""
-       |SELECT $hint $columnStr FROM ${config.getDbTable} ${part.partitionClause}
-       |$whereClause $getGroupByClause $getOrderByClause ${part.limitOffsetClause} $myLimitClause
+       |SELECT $hint $columnStr FROM ${config.getDbTable} $partitionClause
+       |$whereClause $getGroupByClause $getOrderByClause $finalLimitClause
        |""".stripMargin
   }
 
@@ -243,12 +306,12 @@ object OBJdbcReader extends SQLConfHelper {
       // DecimalType(12, 2). Thus, after saving the dataframe into parquet file and then
       // retrieve it, you will get wrong result 199.99.
     // So it is needed to set precision and scale for Decimal based on JDBC metadata.
-    case _: DecimalType =>
+    case t: DecimalType =>
       (rs: ResultSet, row: InternalRow, pos: Int) =>
         val decimal =
           nullSafeConvert[java.math.BigDecimal](
             rs.getBigDecimal(pos + 1),
-            d => Decimal(d, d.precision(), d.scale()))
+            d => Decimal(d, t.precision, t.scale))
         row.update(pos, decimal)
 
     case DoubleType =>
