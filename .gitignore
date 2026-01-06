@@ -49,4 +49,5 @@ build/
 
 ### Local Test Files ###
 set-test-env.sh
-**/S1.scala
+*.db
+**/LocalTest.scala

@@ -41,7 +41,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_unique_key",
       "products_full_unique_key",
       "products_pri_and_unique_key",
-      "products_with_decimal"
+      "products_with_decimal",
+      "products_complex_types"
     )
   }
 
@@ -120,7 +121,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products_unique_key,false]",
       "[test,products_full_unique_key,false]",
       "[test,products_pri_and_unique_key,false]",
-      "[test,products_with_decimal,false]"
+      "[test,products_with_decimal,false]",
+      "[test,products_complex_types,false]"
     ).toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
@@ -860,6 +862,135 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
          |(108, 'jacket', null, 0.1),
          |(109, 'spare tire', '24 inch spare tire', 22.2);
          |""".stripMargin)
+  }
+
+  @Test
+  def testComplexTypesMetadata(): Unit = {
+    import java.sql.DriverManager
+
+    // Use JDBC directly to inspect column metadata
+    val conn = DriverManager.getConnection(getJdbcUrl, getUsername, getPassword)
+    try {
+      val stmt = conn.createStatement()
+      try {
+        // Insert a sample row to ensure table has data
+        stmt.execute(s"""
+                        |INSERT INTO $getSchemaName.products_complex_types VALUES
+                        |(100, [1, 2], 'red', 'red', '{"test": "value"}', map(1, 10))
+                        |""".stripMargin)
+
+        // Query and inspect metadata
+        val rs =
+          stmt.executeQuery(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 100")
+        val metaData = rs.getMetaData
+        val columnCount = metaData.getColumnCount
+
+        println("\n=== Complex Types Column Metadata ===")
+        for (i <- 1 to columnCount) {
+          val columnName = metaData.getColumnName(i)
+          val columnType = metaData.getColumnType(i)
+          val columnTypeName = metaData.getColumnTypeName(i)
+          val columnClassName = metaData.getColumnClassName(i)
+
+          println(s"""
+                     |Column: $columnName
+                     |  sqlType (java.sql.Types): $columnType
+                     |  typeName: $columnTypeName
+                     |  className: $columnClassName
+                     |""".stripMargin)
+
+          // Verify type mappings
+          columnName match {
+            case "id" =>
+              Assertions.assertEquals(4, columnType) // INTEGER
+              Assertions.assertEquals("INT", columnTypeName)
+            case "int_array" =>
+              Assertions.assertEquals(1, columnType) // CHAR
+              Assertions.assertEquals("CHAR", columnTypeName)
+            case "enum_col" =>
+              Assertions.assertEquals(1, columnType) // CHAR
+              Assertions.assertEquals("CHAR", columnTypeName)
+            case "set_col" =>
+              Assertions.assertEquals(1, columnType) // CHAR
+              Assertions.assertEquals("CHAR", columnTypeName)
+            case "json_col" =>
+              Assertions.assertEquals(-1, columnType) // OTHER
+              Assertions.assertEquals("JSON", columnTypeName)
+            case "map_col" =>
+              Assertions.assertEquals(1, columnType) // CHAR
+              Assertions.assertEquals("CHAR", columnTypeName)
+            case _ => // ignore
+          }
+        }
+
+        // Clean up test data
+        stmt.execute(s"DELETE FROM $getSchemaName.products_complex_types WHERE id = 100")
+      } finally {
+        stmt.close()
+      }
+    } finally {
+      conn.close()
+    }
+  }
+
+  @Test
+  def testComplexTypes(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+
+    // Insert test data with complex types (ARRAY, ENUM, SET, JSON, MAP)
+    session.sql(
+      s"""
+         |INSERT INTO $getSchemaName.products_complex_types VALUES
+         |(1, [1, 2, 3], 'red', 'red', '{"brand": "Dell", "price": 999.99}', map(1, 10, 2, 20)),
+         |(2, [4, 5], 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', map(3, 30)),
+         |(3, [6], 'red', 'yellow', '{"title": "Spark Guide"}', map(4, 40, 5, 50));
+         |""".stripMargin)
+
+    // Query and verify complex types are read as strings
+    import scala.collection.JavaConverters._
+    val result = session
+      .sql(s"SELECT * FROM $getSchemaName.products_complex_types ORDER BY id")
+      .collect()
+
+    Assertions.assertEquals(3, result.length)
+
+    // Verify first row
+    val row1 = result(0)
+    Assertions.assertEquals(1, row1.getInt(0))
+    Assertions.assertTrue(row1.getString(1).contains("1"))
+    Assertions.assertEquals("red", row1.getString(2))
+    Assertions.assertEquals("red", row1.getString(3))
+    Assertions.assertTrue(row1.getString(4).contains("Dell"))
+    Assertions.assertTrue(row1.getString(5).contains("10"))
+
+    // Test NULL handling
+    session.sql(s"""
+                   |INSERT INTO $getSchemaName.products_complex_types VALUES
+                   |(4, null, null, null, null, null);
+                   |""".stripMargin)
+
+    val resultWithNull = session
+      .sql(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 4")
+      .collect()
+
+    Assertions.assertEquals(1, resultWithNull.length)
+    Assertions.assertTrue(resultWithNull(0).isNullAt(1)) // int_array is NULL
+    Assertions.assertTrue(resultWithNull(0).isNullAt(2)) // enum_col is NULL
+    Assertions.assertTrue(resultWithNull(0).isNullAt(3)) // set_col is NULL
+    Assertions.assertTrue(resultWithNull(0).isNullAt(4)) // json_col is NULL
+    Assertions.assertTrue(resultWithNull(0).isNullAt(5)) // map_col is NULL
+
+    session.stop()
   }
 }
 

@@ -299,6 +299,11 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       Option(LongType)
     } else if (sqlType == Types.BIT && typeName.equals("TINYINT")) {
       Option(BooleanType)
+    } else if (typeName.toUpperCase.equals("JSON")) {
+      // JSON type is stored as StringType in Spark
+      // Note: Other complex types (ARRAY, ENUM, SET, MAP) are returned by OceanBase JDBC driver
+      // as CHAR type and will be automatically mapped to StringType by the default logic
+      Option(StringType)
     } else None
   }
 
