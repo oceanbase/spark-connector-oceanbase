@@ -129,7 +129,7 @@ case class OBJdbcScanBuilder(schema: StructType, config: OceanBaseConfig, dialec
 
   override def build(): Scan = {
     val columnList = if (pushedGroupBys.isEmpty) {
-      finalSchema.map(_.name).toArray
+      finalSchema.map(col => dialect.quoteIdentifier(col.name)).toArray
     } else {
       pushedAggregateList
     }
