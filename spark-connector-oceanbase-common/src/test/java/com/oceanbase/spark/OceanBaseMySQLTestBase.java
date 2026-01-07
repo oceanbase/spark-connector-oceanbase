@@ -73,19 +73,6 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
                     .withStartupTimeout(Duration.ofMinutes(4))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    //    public static final OceanBaseCEContainer OB_CONTAINER_4_3_5 =
-    //            new OceanBaseCEContainer("oceanbase/oceanbase-ce:4.4.1.0-100010012025120515")
-    //                    .withNetwork(NETWORK)
-    //                    .withMode(OceanBaseCEContainer.Mode.MINI)
-    //                    .withTenantName(TEST_TENANT)
-    //                    .withPassword(TEST_PASSWORD)
-    //                    .withEnv("OB_CLUSTER_NAME", CLUSTER_NAME)
-    //                    .withEnv("OB_SYS_PASSWORD", SYS_PASSWORD)
-    //                    .withEnv("OB_DATAFILE_SIZE", "2G")
-    //                    .withEnv("OB_LOG_DISK_SIZE", "4G")
-    //                    .withStartupTimeout(Duration.ofMinutes(4))
-    //                    .withLogConsumer(new Slf4jLogConsumer(LOG));
-
     public static final OceanBaseProxyContainer ODP =
             new OceanBaseProxyContainer("4.3.1.0-4")
                     .withNetwork(NETWORK)

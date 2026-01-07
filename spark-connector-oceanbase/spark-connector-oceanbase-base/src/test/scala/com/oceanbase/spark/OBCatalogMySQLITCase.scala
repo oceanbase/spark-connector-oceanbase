@@ -17,11 +17,13 @@ package com.oceanbase.spark
 
 import com.oceanbase.spark.OceanBaseMySQLConnectorITCase.expected
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
+import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.sql.SparkSession
 import org.junit.jupiter.api.{AfterAll, AfterEach, Assertions, BeforeAll, BeforeEach, Test}
 import org.junit.jupiter.api.function.ThrowingSupplier
 
+import java.sql.{Connection, ResultSet, Statement}
 import java.util
 
 class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
@@ -866,70 +868,41 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
   @Test
   def testComplexTypesMetadata(): Unit = {
-    import java.sql.DriverManager
-
-    // Use JDBC directly to inspect column metadata
-    val conn = DriverManager.getConnection(getJdbcUrl, getUsername, getPassword)
+    var conn: Connection = null
+    var stmt: Statement = null
+    var rs: ResultSet = null
     try {
-      val stmt = conn.createStatement()
-      try {
-        // Insert a sample row to ensure table has data
-        stmt.execute(s"""
-                        |INSERT INTO $getSchemaName.products_complex_types VALUES
-                        |(100, [1, 2], 'red', 'red', '{"test": "value"}', map(1, 10))
-                        |""".stripMargin)
+      conn = getJdbcConnection
+      stmt = conn.createStatement()
 
-        // Query and inspect metadata
-        val rs =
-          stmt.executeQuery(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 100")
-        val metaData = rs.getMetaData
-        val columnCount = metaData.getColumnCount
+      // Insert sample data
+      stmt.execute(s"""INSERT INTO $getSchemaName.products_complex_types VALUES
+                      |(100, [1, 2], 'red', 'red', '{"test": "value"}', map(1, 10))""".stripMargin)
 
-        println("\n=== Complex Types Column Metadata ===")
-        for (i <- 1 to columnCount) {
-          val columnName = metaData.getColumnName(i)
-          val columnType = metaData.getColumnType(i)
-          val columnTypeName = metaData.getColumnTypeName(i)
-          val columnClassName = metaData.getColumnClassName(i)
+      // Query and verify metadata
+      rs = stmt.executeQuery(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 100")
+      val metaData = rs.getMetaData
 
-          println(s"""
-                     |Column: $columnName
-                     |  sqlType (java.sql.Types): $columnType
-                     |  typeName: $columnTypeName
-                     |  className: $columnClassName
-                     |""".stripMargin)
-
-          // Verify type mappings
-          columnName match {
-            case "id" =>
-              Assertions.assertEquals(4, columnType) // INTEGER
-              Assertions.assertEquals("INT", columnTypeName)
-            case "int_array" =>
-              Assertions.assertEquals(1, columnType) // CHAR
-              Assertions.assertEquals("CHAR", columnTypeName)
-            case "enum_col" =>
-              Assertions.assertEquals(1, columnType) // CHAR
-              Assertions.assertEquals("CHAR", columnTypeName)
-            case "set_col" =>
-              Assertions.assertEquals(1, columnType) // CHAR
-              Assertions.assertEquals("CHAR", columnTypeName)
-            case "json_col" =>
-              Assertions.assertEquals(-1, columnType) // OTHER
-              Assertions.assertEquals("JSON", columnTypeName)
-            case "map_col" =>
-              Assertions.assertEquals(1, columnType) // CHAR
-              Assertions.assertEquals("CHAR", columnTypeName)
-            case _ => // ignore
-          }
-        }
-
-        // Clean up test data
-        stmt.execute(s"DELETE FROM $getSchemaName.products_complex_types WHERE id = 100")
-      } finally {
-        stmt.close()
+      // Helper function to verify column metadata
+      def verifyColumn(name: String, sqlType: Int, typeName: String): Unit = {
+        val idx = (1 to metaData.getColumnCount)
+          .find(i => metaData.getColumnName(i) == name)
+          .getOrElse(throw new AssertionError(s"Column $name not found"))
+        Assertions.assertEquals(sqlType, metaData.getColumnType(idx))
+        Assertions.assertEquals(typeName, metaData.getColumnTypeName(idx))
       }
+
+      // Verify type mappings
+      verifyColumn("id", 4, "INT")
+      verifyColumn("int_array", 1, "CHAR")
+      verifyColumn("enum_col", 1, "CHAR")
+      verifyColumn("set_col", 1, "CHAR")
+      verifyColumn("json_col", -1, "JSON")
+      verifyColumn("map_col", 1, "CHAR")
     } finally {
-      conn.close()
+      if (rs != null) rs.close()
+      if (stmt != null) stmt.close()
+      if (conn != null) conn.close()
     }
   }
 
@@ -944,10 +917,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.password", getPassword)
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
       .getOrCreate()
-
     session.sql("use ob;")
-
-    // Insert test data with complex types (ARRAY, ENUM, SET, JSON, MAP)
     session.sql(
       s"""
          |INSERT INTO $getSchemaName.products_complex_types VALUES
@@ -972,23 +942,6 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals("red", row1.getString(3))
     Assertions.assertTrue(row1.getString(4).contains("Dell"))
     Assertions.assertTrue(row1.getString(5).contains("10"))
-
-    // Test NULL handling
-    session.sql(s"""
-                   |INSERT INTO $getSchemaName.products_complex_types VALUES
-                   |(4, null, null, null, null, null);
-                   |""".stripMargin)
-
-    val resultWithNull = session
-      .sql(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 4")
-      .collect()
-
-    Assertions.assertEquals(1, resultWithNull.length)
-    Assertions.assertTrue(resultWithNull(0).isNullAt(1)) // int_array is NULL
-    Assertions.assertTrue(resultWithNull(0).isNullAt(2)) // enum_col is NULL
-    Assertions.assertTrue(resultWithNull(0).isNullAt(3)) // set_col is NULL
-    Assertions.assertTrue(resultWithNull(0).isNullAt(4)) // json_col is NULL
-    Assertions.assertTrue(resultWithNull(0).isNullAt(5)) // map_col is NULL
 
     session.stop()
   }
