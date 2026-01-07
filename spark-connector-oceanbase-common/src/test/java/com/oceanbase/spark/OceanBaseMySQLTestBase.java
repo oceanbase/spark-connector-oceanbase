@@ -63,7 +63,7 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
     public static final OceanBaseCEContainer CONTAINER =
             new OceanBaseCEContainer("oceanbase/oceanbase-ce:4.5.0.0-100000012025112711")
                     .withNetwork(NETWORK)
-                    .withMode(OceanBaseCEContainer.Mode.SLIM)
+                    .withMode(OceanBaseCEContainer.Mode.MINI)
                     .withTenantName(TEST_TENANT)
                     .withPassword(TEST_PASSWORD)
                     .withEnv("OB_CLUSTER_NAME", CLUSTER_NAME)
