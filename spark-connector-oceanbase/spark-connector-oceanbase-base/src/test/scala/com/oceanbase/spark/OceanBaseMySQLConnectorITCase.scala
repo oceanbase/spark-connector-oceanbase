@@ -40,7 +40,8 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
       "products_unique_key",
       "products_full_unique_key",
       "products_pri_and_unique_key",
-      "products_with_decimal"
+      "products_with_decimal",
+      "products_complex_types"
     )
   }
 

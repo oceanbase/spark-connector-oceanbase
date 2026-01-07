@@ -17,11 +17,13 @@ package com.oceanbase.spark
 
 import com.oceanbase.spark.OceanBaseMySQLConnectorITCase.expected
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
+import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.sql.SparkSession
 import org.junit.jupiter.api.{AfterAll, AfterEach, Assertions, BeforeAll, BeforeEach, Test}
 import org.junit.jupiter.api.function.ThrowingSupplier
 
+import java.sql.{Connection, ResultSet, Statement}
 import java.util
 
 class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
@@ -41,7 +43,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_unique_key",
       "products_full_unique_key",
       "products_pri_and_unique_key",
-      "products_with_decimal"
+      "products_with_decimal",
+      "products_complex_types"
     )
   }
 
@@ -120,7 +123,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products_unique_key,false]",
       "[test,products_full_unique_key,false]",
       "[test,products_pri_and_unique_key,false]",
-      "[test,products_with_decimal,false]"
+      "[test,products_with_decimal,false]",
+      "[test,products_complex_types,false]"
     ).toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
@@ -860,6 +864,86 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
          |(108, 'jacket', null, 0.1),
          |(109, 'spare tire', '24 inch spare tire', 22.2);
          |""".stripMargin)
+  }
+
+  @Test
+  def testComplexTypesMetadata(): Unit = {
+    var conn: Connection = null
+    var stmt: Statement = null
+    var rs: ResultSet = null
+    try {
+      conn = getJdbcConnection
+      stmt = conn.createStatement()
+
+      // Insert sample data
+      stmt.execute(s"""INSERT INTO $getSchemaName.products_complex_types VALUES
+                      |(100, [1, 2], 'red', 'red', '{"test": "value"}', map(1, 10))""".stripMargin)
+
+      // Query and verify metadata
+      rs = stmt.executeQuery(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 100")
+      val metaData = rs.getMetaData
+
+      // Helper function to verify column metadata
+      def verifyColumn(name: String, sqlType: Int, typeName: String): Unit = {
+        val idx = (1 to metaData.getColumnCount)
+          .find(i => metaData.getColumnName(i) == name)
+          .getOrElse(throw new AssertionError(s"Column $name not found"))
+        Assertions.assertEquals(sqlType, metaData.getColumnType(idx))
+        Assertions.assertEquals(typeName, metaData.getColumnTypeName(idx))
+      }
+
+      // Verify type mappings
+      verifyColumn("id", 4, "INT")
+      verifyColumn("int_array", 1, "CHAR")
+      verifyColumn("enum_col", 1, "CHAR")
+      verifyColumn("set_col", 1, "CHAR")
+      verifyColumn("json_col", -1, "JSON")
+      verifyColumn("map_col", 1, "CHAR")
+    } finally {
+      if (rs != null) rs.close()
+      if (stmt != null) stmt.close()
+      if (conn != null) conn.close()
+    }
+  }
+
+  @Test
+  def testComplexTypes(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+    session.sql("use ob;")
+    session.sql(
+      s"""
+         |INSERT INTO $getSchemaName.products_complex_types VALUES
+         |(1, '[1, 2, 3]', 'red', 'red', '{"brand": "Dell", "price": 999.99}', '{1:10, 2:20}'),
+         |(2, '[4, 5]', 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', '{3:30}'),
+         |(3, '[6]', 'red', 'yellow', '{"title": "Spark Guide"}', '{4:40, 5:50}');
+         |""".stripMargin)
+
+    // Query and verify complex types are read as strings
+    import scala.collection.JavaConverters._
+    val result = session
+      .sql(s"SELECT * FROM $getSchemaName.products_complex_types ORDER BY id")
+      .collect()
+
+    Assertions.assertEquals(3, result.length)
+
+    // Verify first row
+    val row1 = result(0)
+    Assertions.assertEquals(1, row1.getInt(0))
+    Assertions.assertTrue(row1.getString(1).contains("1"))
+    Assertions.assertEquals("red", row1.getString(2))
+    Assertions.assertEquals("red", row1.getString(3))
+    Assertions.assertTrue(row1.getString(4).contains("Dell"))
+    Assertions.assertTrue(row1.getString(5).contains("10"))
+
+    session.stop()
   }
 }
 

@@ -86,3 +86,14 @@ CREATE TABLE products_with_decimal
   len         DECIMAL(19, 0),
   weight      DECIMAL(20, 10)
 );
+
+-- Table for testing complex data types (ARRAY, ENUM, SET, JSON, MAP)
+CREATE TABLE products_complex_types
+(
+  id          INTEGER      NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  int_array   INT[],
+  enum_col    ENUM('red', 'yellow'),
+  set_col     SET('red', 'yellow'),
+  json_col    JSON,
+  map_col     MAP(INT, INT)
+);
