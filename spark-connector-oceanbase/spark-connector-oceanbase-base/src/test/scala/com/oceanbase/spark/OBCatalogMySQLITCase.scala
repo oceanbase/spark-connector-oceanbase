@@ -951,9 +951,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.sql(
       s"""
          |INSERT INTO $getSchemaName.products_complex_types VALUES
-         |(1, [1, 2, 3], 'red', 'red', '{"brand": "Dell", "price": 999.99}', map(1, 10, 2, 20)),
-         |(2, [4, 5], 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', map(3, 30)),
-         |(3, [6], 'red', 'yellow', '{"title": "Spark Guide"}', map(4, 40, 5, 50));
+         |(1, '[1, 2, 3]', 'red', 'red', '{"brand": "Dell", "price": 999.99}', '{1:10, 2:20}'),
+         |(2, '[4, 5]', 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', '{3:30}'),
+         |(3, '[6]', 'red', 'yellow', '{"title": "Spark Guide"}', '{4:40, 5:50}');
          |""".stripMargin)
 
     // Query and verify complex types are read as strings
