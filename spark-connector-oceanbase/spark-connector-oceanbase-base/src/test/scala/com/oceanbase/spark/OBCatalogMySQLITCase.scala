@@ -997,11 +997,11 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 object OBCatalogMySQLITCase {
   @BeforeAll
   def setup(): Unit = {
-    OceanBaseMySQLTestBase.OB_CONTAINER_4_3_5.start()
+    OceanBaseMySQLTestBase.CONTAINER.start()
   }
 
   @AfterAll
   def tearDown(): Unit = {
-    OceanBaseMySQLTestBase.OB_CONTAINER_4_3_5.stop()
+    OceanBaseMySQLTestBase.CONTAINER.stop()
   }
 }
