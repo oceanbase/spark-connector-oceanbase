@@ -780,8 +780,6 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .getOrCreate()
 
     session1.sql("use ob;")
-    // Clear the table first to ensure clean state
-    session1.sql(s"TRUNCATE TABLE $getSchemaName.products")
     // Insert initial data
     session1.sql(
       s"INSERT INTO $getSchemaName.products VALUES (101, 'scooter', 'Small 2-wheel scooter', 3.14)")
@@ -857,71 +855,6 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .asJava
     assertEqualsInAnyOrder(expected, actual)
     session.stop()
-  }
-
-  private def queryAndVerifyTableData(
-      session: SparkSession,
-      tableName: String,
-      expected: util.List[String]): Unit = {
-    import scala.collection.JavaConverters._
-    val actual = session
-      .sql(s"select * from $tableName")
-      .collect()
-      .map(
-        _.toString().drop(1).dropRight(1)
-      )
-      .toList
-      .asJava
-    assertEqualsInAnyOrder(expected, actual)
-  }
-
-  private def queryAndVerify(
-      session: SparkSession,
-      sql: String,
-      expected: util.List[String]): Unit = {
-    import scala.collection.JavaConverters._
-    val actual = session
-      .sql(sql)
-      .collect()
-      .map(
-        _.toString().drop(1).dropRight(1)
-      )
-      .toList
-      .asJava
-    println(actual)
-    assertEqualsInAnyOrder(expected, actual)
-  }
-
-  private def insertTestData(session: SparkSession, tableName: String): Unit = {
-    session.sql(
-      s"""
-         |INSERT INTO $getSchemaName.$tableName VALUES
-         |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
-         |(102, 'car battery', '12V car battery', 8.1),
-         |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
-         |(104, 'hammer', '12oz carpenter\\'s hammer', 0.75),
-         |(105, 'hammer', '14oz carpenter\\'s hammer', 0.875),
-         |(106, 'hammer', '16oz carpenter\\'s hammer', 1.0),
-         |(107, 'rocks', 'box of assorted rocks', 5.3),
-         |(108, 'jacket', 'water resistent black wind breaker', 0.1),
-         |(109, 'spare tire', '24 inch spare tire', 22.2);
-         |""".stripMargin)
-  }
-
-  private def insertTestDataWithNullValue(session: SparkSession, tableName: String): Unit = {
-    session.sql(
-      s"""
-         |INSERT INTO $getSchemaName.$tableName VALUES
-         |(null, null, 'Small 2-wheel scooter', 3.14),
-         |(102, 'car battery', '12V car battery', 8.1),
-         |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
-         |(104, 'hammer', '12oz carpenter\\'s hammer', 0.75),
-         |(null, null, '14oz carpenter\\'s hammer', 0.875),
-         |(106, 'hammer', '16oz carpenter\\'s hammer', 1.0),
-         |(106, 'hammer', 'box of assorted rocks', null),
-         |(108, 'jacket', null, 0.1),
-         |(109, 'spare tire', '24 inch spare tire', 22.2);
-         |""".stripMargin)
   }
 
   @Test
@@ -1019,16 +952,47 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     session.sql("use ob;")
 
-    // Test writing all complex types including VECTOR
-    session.sql(
-      s"""
-         |INSERT INTO $getSchemaName.products_complex_types VALUES
-         |(100, '[10, 20, 30]', '[10.0, 20.0, 30.0]', 'red', 'red', '{"name": "Product1"}', '{1:100}'),
-         |(101, '[40, 50]', '[40.0, 50.0, 60.0]', 'yellow', 'red,yellow', '{"name": "Product2", "price": 99.99}', '{2:200, 3:300}');
-         |""".stripMargin)
+    // Create DataFrame with real Spark complex types instead of string literals
+    import org.apache.spark.sql.Row
+    import org.apache.spark.sql.types._
+    import scala.collection.JavaConverters._
+
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("int_array", ArrayType(IntegerType), nullable = true),
+        StructField("vector_col", ArrayType(FloatType), nullable = true),
+        StructField("enum_col", StringType, nullable = true),
+        StructField("set_col", StringType, nullable = true),
+        StructField("json_col", StringType, nullable = true),
+        StructField("map_col", MapType(IntegerType, IntegerType), nullable = true)
+      ))
+
+    val data = Seq(
+      Row(
+        100,
+        Array(10, 20, 30),
+        Array(10.0f, 20.0f, 30.0f),
+        "red",
+        "red",
+        """{"name": "Product1"}""",
+        Map(1 -> 100)),
+      Row(
+        101,
+        Array(40, 50),
+        Array(40.0f, 50.0f, 60.0f),
+        "yellow",
+        "red,yellow",
+        """{"name": "Product2", "price": 99.99}""",
+        Map(2 -> 200, 3 -> 300))
+    )
+
+    val df = session.createDataFrame(data.asJava, schema)
+
+    // Write using DataFrame API to test serialization of Spark complex types
+    df.writeTo(s"$getSchemaName.products_complex_types").append()
 
     // Query and verify the written data
-    import scala.collection.JavaConverters._
     val actual = session
       .sql(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id >= 100 ORDER BY id")
       .collect()
@@ -1037,12 +1001,77 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .asJava
 
     val expected: util.List[String] = util.Arrays.asList(
-      "100,[10,20,30],[10,20,30],red,red,{\"name\": \"Product1\"},{1:100}",
-      "101,[40,50],[40,50,60],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200,3:300}"
+      "100,[10,20,30],[10.0,20.0,30.0],red,red,{\"name\": \"Product1\"},{1:100}",
+      "101,[40,50],[40.0,50.0,60.0],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200,3:300}"
     )
     assertEqualsInAnyOrder(expected, actual)
 
     session.stop()
+  }
+
+  private def queryAndVerifyTableData(
+      session: SparkSession,
+      tableName: String,
+      expected: util.List[String]): Unit = {
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql(s"select * from $tableName")
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+  }
+
+  private def queryAndVerify(
+      session: SparkSession,
+      sql: String,
+      expected: util.List[String]): Unit = {
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql(sql)
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    println(actual)
+    assertEqualsInAnyOrder(expected, actual)
+  }
+
+  private def insertTestData(session: SparkSession, tableName: String): Unit = {
+    session.sql(
+      s"""
+         |INSERT INTO $getSchemaName.$tableName VALUES
+         |(101, 'scooter', 'Small 2-wheel scooter', 3.14),
+         |(102, 'car battery', '12V car battery', 8.1),
+         |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
+         |(104, 'hammer', '12oz carpenter\\'s hammer', 0.75),
+         |(105, 'hammer', '14oz carpenter\\'s hammer', 0.875),
+         |(106, 'hammer', '16oz carpenter\\'s hammer', 1.0),
+         |(107, 'rocks', 'box of assorted rocks', 5.3),
+         |(108, 'jacket', 'water resistent black wind breaker', 0.1),
+         |(109, 'spare tire', '24 inch spare tire', 22.2);
+         |""".stripMargin)
+  }
+
+  private def insertTestDataWithNullValue(session: SparkSession, tableName: String): Unit = {
+    session.sql(
+      s"""
+         |INSERT INTO $getSchemaName.$tableName VALUES
+         |(null, null, 'Small 2-wheel scooter', 3.14),
+         |(102, 'car battery', '12V car battery', 8.1),
+         |(103, '12-pack drill bits', '12-pack of drill bits with sizes ranging from #40 to #3', 0.8),
+         |(104, 'hammer', '12oz carpenter\\'s hammer', 0.75),
+         |(null, null, '14oz carpenter\\'s hammer', 0.875),
+         |(106, 'hammer', '16oz carpenter\\'s hammer', 1.0),
+         |(106, 'hammer', 'box of assorted rocks', null),
+         |(108, 'jacket', null, 0.1),
+         |(109, 'spare tire', '24 inch spare tire', 22.2);
+         |""".stripMargin)
   }
 }
 
