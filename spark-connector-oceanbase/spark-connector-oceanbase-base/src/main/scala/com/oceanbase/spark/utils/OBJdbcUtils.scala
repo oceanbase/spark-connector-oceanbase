@@ -300,15 +300,22 @@ object OBJdbcUtils {
     try {
       stmt.setString(1, schemaName)
       stmt.setString(2, tableName)
+      println(s"[DEBUG] Querying information_schema for schema=$schemaName, table=$tableName")
       val rs = stmt.executeQuery()
       val typeMap = scala.collection.mutable.Map[String, String]()
       while (rs.next()) {
         val columnName = rs.getString("COLUMN_NAME")
         val columnType = rs.getString("COLUMN_TYPE").toUpperCase
         typeMap(columnName.toUpperCase) = columnType
+        println(s"[DEBUG] Found column: $columnName -> $columnType")
       }
       rs.close()
+      println(s"[DEBUG] Total columns found: ${typeMap.size}")
       typeMap.toMap
+    } catch {
+      case e: Exception =>
+        println(s"[DEBUG] Error querying information_schema: ${e.getMessage}")
+        throw e
     } finally {
       stmt.close()
     }
@@ -333,13 +340,19 @@ object OBJdbcUtils {
       try {
         val tableName = rsmd.getTableName(1)
         val connection = resultSet.getStatement.getConnection
+        println(s"[DEBUG] getSchema: tableName=$tableName, schemaName=${config.getSchemaName}")
         if (tableName != null && !tableName.isEmpty && connection != null) {
           getActualColumnTypes(connection, tableName, config.getSchemaName)
         } else {
+          println(
+            s"[DEBUG] Skipping information_schema query: tableName=$tableName, connection=$connection")
           Map.empty[String, String]
         }
       } catch {
-        case _: Exception => Map.empty[String, String]
+        case e: Exception =>
+          println(s"[DEBUG] Failed to get actual column types: ${e.getMessage}")
+          e.printStackTrace()
+          Map.empty[String, String]
       }
 
     var i = 0
@@ -351,7 +364,11 @@ object OBJdbcUtils {
       // Override typeName with actual type from information_schema if available
       val actualType = actualTypeMap.get(columnName.toUpperCase)
       if (actualType.isDefined) {
+        val oldTypeName = typeName
         typeName = actualType.get
+        println(s"[DEBUG] Column $columnName: overriding type from $oldTypeName to $typeName")
+      } else {
+        println(s"[DEBUG] Column $columnName: using JDBC type $typeName")
       }
 
       val fieldSize = rsmd.getPrecision(i + 1)
