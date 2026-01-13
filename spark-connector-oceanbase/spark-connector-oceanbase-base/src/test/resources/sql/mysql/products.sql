@@ -92,6 +92,7 @@ CREATE TABLE products_complex_types
 (
   id          INTEGER      NOT NULL AUTO_INCREMENT PRIMARY KEY,
   int_array   INT[],
+  vector_col  VECTOR(3),
   enum_col    ENUM('red', 'yellow'),
   set_col     SET('red', 'yellow'),
   json_col    JSON,

@@ -23,7 +23,7 @@ import com.oceanbase.spark.dialect.OceanBaseDialect
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructField, StructType, TimestampType, VarcharType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MapType, MetadataBuilder, ShortType, StringType, StructField, StructType, TimestampType, VarcharType}
 import org.apache.spark.sql.types.DecimalType.{MAX_PRECISION, MAX_SCALE}
 
 import java.sql.{Connection, PreparedStatement, ResultSet, ResultSetMetaData, SQLException}
@@ -149,6 +149,61 @@ object OBJdbcUtils {
 
   type OBValueSetter = (PreparedStatement, InternalRow, Int) => Unit
 
+  /** Convert ArrayData to OceanBase ARRAY string format. For example: [1, 2, 3] for INT array */
+  private def convertArrayToString(
+      array: org.apache.spark.sql.catalyst.util.ArrayData,
+      elementType: DataType): String = {
+    val elements = (0 until array.numElements()).map {
+      i =>
+        if (array.isNullAt(i)) {
+          "NULL"
+        } else {
+          elementType match {
+            case IntegerType => array.getInt(i).toString
+            case LongType => array.getLong(i).toString
+            case ShortType => array.getShort(i).toString
+            case ByteType => array.getByte(i).toString
+            case FloatType => array.getFloat(i).toString
+            case DoubleType => array.getDouble(i).toString
+            case BooleanType => array.getBoolean(i).toString
+            case StringType => s"'${array.getUTF8String(i).toString}'"
+            case _ => array.get(i, elementType).toString
+          }
+        }
+    }
+    "[" + elements.mkString(", ") + "]"
+  }
+
+  /** Convert MapData to OceanBase MAP string format. For example: {1:10, 2:20} for MAP(INT, INT) */
+  private def convertMapToString(
+      map: org.apache.spark.sql.catalyst.util.MapData,
+      keyType: DataType,
+      valueType: DataType): String = {
+    val keys = map.keyArray()
+    val values = map.valueArray()
+    val pairs = (0 until keys.numElements()).map {
+      i =>
+        val key = keyType match {
+          case IntegerType => keys.getInt(i).toString
+          case LongType => keys.getLong(i).toString
+          case StringType => keys.getUTF8String(i).toString
+          case _ => keys.get(i, keyType).toString
+        }
+        val value = if (values.isNullAt(i)) {
+          "NULL"
+        } else {
+          valueType match {
+            case IntegerType => values.getInt(i).toString
+            case LongType => values.getLong(i).toString
+            case StringType => s"'${values.getUTF8String(i).toString}'"
+            case _ => values.get(i, valueType).toString
+          }
+        }
+        s"$key:$value"
+    }
+    "{" + pairs.mkString(", ") + "}"
+  }
+
   def makeSetter(dataType: DataType): OBValueSetter = dataType match {
     case IntegerType =>
       (stmt: PreparedStatement, row: InternalRow, pos: Int) => stmt.setInt(pos + 1, row.getInt(pos))
@@ -206,8 +261,20 @@ object OBJdbcUtils {
         stmt.setBigDecimal(pos + 1, row.getDecimal(pos, t.precision, t.scale).toJavaBigDecimal)
 
     case ArrayType(et, _) =>
-      // remove type length parameters from end of type name
-      throw new UnsupportedOperationException(s"Not support Array data-type now")
+      // Convert Array to string format for OceanBase ARRAY type
+      (stmt: PreparedStatement, row: InternalRow, pos: Int) => {
+        val array = row.getArray(pos)
+        val arrayString = convertArrayToString(array, et)
+        stmt.setString(pos + 1, arrayString)
+      }
+
+    case MapType(kt, vt, _) =>
+      // Convert Map to string format for OceanBase MAP type
+      (stmt: PreparedStatement, row: InternalRow, pos: Int) => {
+        val map = row.getMap(pos)
+        val mapString = convertMapToString(map, kt, vt)
+        stmt.setString(pos + 1, mapString)
+      }
 
     case _ =>
       (_: PreparedStatement, _: InternalRow, pos: Int) =>

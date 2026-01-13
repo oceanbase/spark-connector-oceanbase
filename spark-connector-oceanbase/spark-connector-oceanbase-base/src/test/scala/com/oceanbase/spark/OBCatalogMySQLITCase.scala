@@ -876,8 +876,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       stmt = conn.createStatement()
 
       // Insert sample data
-      stmt.execute(s"""INSERT INTO $getSchemaName.products_complex_types VALUES
-                      |(100, [1, 2], 'red', 'red', '{"test": "value"}', map(1, 10))""".stripMargin)
+      stmt.execute(
+        s"""INSERT INTO $getSchemaName.products_complex_types VALUES
+           |(100, [1, 2], '[1.0, 2.0, 3.0]', 'red', 'red', '{"test": "value"}', map(1, 10))""".stripMargin)
 
       // Query and verify metadata
       rs = stmt.executeQuery(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 100")
@@ -895,6 +896,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       // Verify type mappings
       verifyColumn("id", 4, "INT")
       verifyColumn("int_array", 1, "CHAR")
+      verifyColumn("vector_col", 1, "CHAR")
       verifyColumn("enum_col", 1, "CHAR")
       verifyColumn("set_col", 1, "CHAR")
       verifyColumn("json_col", -1, "JSON")
@@ -921,27 +923,66 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.sql(
       s"""
          |INSERT INTO $getSchemaName.products_complex_types VALUES
-         |(1, '[1, 2, 3]', 'red', 'red', '{"brand": "Dell", "price": 999.99}', '{1:10, 2:20}'),
-         |(2, '[4, 5]', 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', '{3:30}'),
-         |(3, '[6]', 'red', 'yellow', '{"title": "Spark Guide"}', '{4:40, 5:50}');
+         |(1, '[1, 2, 3]', '[1.0, 2.0, 3.0]', 'red', 'red', '{"brand": "Dell", "price": 999.99}', '{1:10, 2:20}'),
+         |(2, '[4, 5]', '[4.0, 5.0, 6.0]', 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', '{3:30}'),
+         |(3, '[6]', '[7.0, 8.0, 9.0]', 'red', 'yellow', '{"title": "Spark Guide"}', '{4:40, 5:50}');
          |""".stripMargin)
 
     // Query and verify complex types are read as strings
     import scala.collection.JavaConverters._
-    val result = session
+    val actual = session
       .sql(s"SELECT * FROM $getSchemaName.products_complex_types ORDER BY id")
       .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
 
-    Assertions.assertEquals(3, result.length)
+    val expected: util.List[String] = util.Arrays.asList(
+      "1,[1, 2, 3],[1.0, 2.0, 3.0],red,red,{\"brand\": \"Dell\", \"price\": 999.99},{1:10, 2:20}",
+      "2,[4, 5],[4.0, 5.0, 6.0],yellow,red,yellow,{\"brand\": \"Apple\", \"price\": 799.99},{3:30}",
+      "3,[6],[7.0, 8.0, 9.0],red,yellow,{\"title\": \"Spark Guide\"},{4:40, 5:50}"
+    )
+    assertEqualsInAnyOrder(expected, actual)
 
-    // Verify first row
-    val row1 = result(0)
-    Assertions.assertEquals(1, row1.getInt(0))
-    Assertions.assertTrue(row1.getString(1).contains("1"))
-    Assertions.assertEquals("red", row1.getString(2))
-    Assertions.assertEquals("red", row1.getString(3))
-    Assertions.assertTrue(row1.getString(4).contains("Dell"))
-    Assertions.assertTrue(row1.getString(5).contains("10"))
+    session.stop()
+  }
+
+  @Test
+  def testComplexTypesWrite(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+
+    // Test writing all complex types including VECTOR
+    session.sql(
+      s"""
+         |INSERT INTO $getSchemaName.products_complex_types VALUES
+         |(100, '[10, 20, 30]', '[10.0, 20.0, 30.0]', 'red', 'red', '{"name": "Product1"}', '{1:100}'),
+         |(101, '[40, 50]', '[40.0, 50.0, 60.0]', 'yellow', 'red,yellow', '{"name": "Product2", "price": 99.99}', '{2:200, 3:300}');
+         |""".stripMargin)
+
+    // Query and verify the written data
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id >= 100 ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "100,[10, 20, 30],[10.0, 20.0, 30.0],red,red,{\"name\": \"Product1\"},{1:100}",
+      "101,[40, 50],[40.0, 50.0, 60.0],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200, 3:300}"
+    )
+    assertEqualsInAnyOrder(expected, actual)
 
     session.stop()
   }
