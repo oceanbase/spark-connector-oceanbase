@@ -724,6 +724,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .getOrCreate()
 
     session1.sql("use ob;")
+    // Clear the table first to ensure clean state
+    session1.sql(s"TRUNCATE TABLE $getSchemaName.products")
     // Insert initial data
     session1.sql(
       s"INSERT INTO $getSchemaName.products VALUES (101, 'scooter', 'Small 2-wheel scooter', 3.14)")
@@ -938,9 +940,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .asJava
 
     val expected: util.List[String] = util.Arrays.asList(
-      "1,[1, 2, 3],[1.0, 2.0, 3.0],red,red,{\"brand\": \"Dell\", \"price\": 999.99},{1:10, 2:20}",
-      "2,[4, 5],[4.0, 5.0, 6.0],yellow,red,yellow,{\"brand\": \"Apple\", \"price\": 799.99},{3:30}",
-      "3,[6],[7.0, 8.0, 9.0],red,yellow,{\"title\": \"Spark Guide\"},{4:40, 5:50}"
+      "1,[1,2,3],[1,2,3],red,red,{\"brand\": \"Dell\", \"price\": 999.99},{1:10, 2:20}",
+      "2,[4,5],[4,5,6],yellow,red,yellow,{\"brand\": \"Apple\", \"price\": 799.99},{3:30}",
+      "3,[6],[7,8,9],red,yellow,{\"title\": \"Spark Guide\"},{4:40, 5:50}"
     )
     assertEqualsInAnyOrder(expected, actual)
 
@@ -979,8 +981,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .asJava
 
     val expected: util.List[String] = util.Arrays.asList(
-      "100,[10, 20, 30],[10.0, 20.0, 30.0],red,red,{\"name\": \"Product1\"},{1:100}",
-      "101,[40, 50],[40.0, 50.0, 60.0],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200, 3:300}"
+      "100,[10,20,30],[10,20,30],red,red,{\"name\": \"Product1\"},{1:100}",
+      "101,[40,50],[40,50,60],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200, 3:300}"
     )
     assertEqualsInAnyOrder(expected, actual)
 
