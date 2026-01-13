@@ -18,6 +18,12 @@ dependency-reduced-pom.xml
 *.ipr
 *.iws
 
+### Scala/Metals ###
+.metals/
+.bloop/
+.bsp/
+metals.sbt
+
 ### Eclipse ###
 .apt_generated
 .classpath
@@ -47,7 +53,7 @@ build/
 *.log
 /logs
 
-### Local Test Files ###
+### Local Test ###
+LocalTest.scala
 set-test-env.sh
 *.db
-**/LocalTest.scala
