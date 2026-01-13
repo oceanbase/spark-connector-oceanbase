@@ -996,9 +996,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .asJava
 
     val expected: util.List[String] = util.Arrays.asList(
-      "1,[1,2,3],[1,2,3],red,red,{\"brand\": \"Dell\", \"price\": 999.99},{1:10, 2:20}",
+      "1,[1,2,3],[1,2,3],red,red,{\"brand\": \"Dell\", \"price\": 999.99},{1:10,2:20}",
       "2,[4,5],[4,5,6],yellow,red,yellow,{\"brand\": \"Apple\", \"price\": 799.99},{3:30}",
-      "3,[6],[7,8,9],red,yellow,{\"title\": \"Spark Guide\"},{4:40, 5:50}"
+      "3,[6],[7,8,9],red,yellow,{\"title\": \"Spark Guide\"},{4:40,5:50}"
     )
     assertEqualsInAnyOrder(expected, actual)
 
@@ -1038,7 +1038,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     val expected: util.List[String] = util.Arrays.asList(
       "100,[10,20,30],[10,20,30],red,red,{\"name\": \"Product1\"},{1:100}",
-      "101,[40,50],[40,50,60],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200, 3:300}"
+      "101,[40,50],[40,50,60],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200,3:300}"
     )
     assertEqualsInAnyOrder(expected, actual)
 
