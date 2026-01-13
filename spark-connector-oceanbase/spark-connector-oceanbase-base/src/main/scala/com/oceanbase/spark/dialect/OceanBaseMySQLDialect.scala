@@ -316,9 +316,15 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       Option(LongType)
     } else if (sqlType == Types.BIT && typeName.equals("TINYINT")) {
       Option(BooleanType)
-    } else if (upperTypeName.startsWith("ARRAY<") || upperTypeName.startsWith("VECTOR<")) {
-      // Parse ARRAY<INT> or VECTOR<FLOAT> to get element type
-      val pattern = """(?:ARRAY|VECTOR)<(.+)>""".r
+    } else if (upperTypeName.startsWith("VECTOR(")) {
+      // VECTOR(n) where n is the dimension, stored as FLOAT by default
+      // Parse VECTOR(3) -> ArrayType(FloatType)
+      println(s"[DEBUG] Mapped $upperTypeName to ArrayType(FloatType)")
+      Option(ArrayType(FloatType, containsNull = true))
+    } else if (upperTypeName.startsWith("ARRAY(")) {
+      // Parse ARRAY(INT) to get element type
+      // Note: OceanBase uses parentheses, not angle brackets
+      val pattern = """ARRAY\((.+)\)""".r
       pattern.findFirstMatchIn(upperTypeName) match {
         case Some(m) =>
           val elementTypeName = m.group(1)
@@ -330,13 +336,15 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
           println(s"[DEBUG] Failed to parse $upperTypeName, using ArrayType(StringType)")
           Option(ArrayType(StringType, containsNull = true))
       }
-    } else if (upperTypeName.startsWith("MAP<")) {
-      // Parse MAP<INT,INT> to get key and value types
-      val pattern = """MAP<(.+),(.+)>""".r
+    } else if (upperTypeName.startsWith("MAP(")) {
+      // Parse MAP(INT,INT) to get key and value types
+      // Note: OceanBase uses parentheses, not angle brackets
+      // Use non-greedy match and handle potential spaces
+      val pattern = """MAP\(([^,]+),\s*([^)]+)\)""".r
       pattern.findFirstMatchIn(upperTypeName) match {
         case Some(m) =>
-          val keyTypeName = m.group(1)
-          val valueTypeName = m.group(2)
+          val keyTypeName = m.group(1).trim
+          val valueTypeName = m.group(2).trim
           val keyType = parseElementType(keyTypeName)
           val valueType = parseElementType(valueTypeName)
           println(s"[DEBUG] Mapped $upperTypeName to MapType($keyType, $valueType)")
