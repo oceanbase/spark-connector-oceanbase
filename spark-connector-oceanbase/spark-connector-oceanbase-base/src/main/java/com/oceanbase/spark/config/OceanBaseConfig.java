@@ -22,6 +22,7 @@ import com.oceanbase.spark.utils.ConfigUtils;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 
@@ -637,5 +638,44 @@ public class OceanBaseConfig extends Config implements Serializable {
                 .filter(entry -> entry.getKey().contains(configPartCol))
                 .map(entry -> dialect.quoteIdentifier(entry.getValue()))
                 .findFirst();
+    }
+
+    /**
+     * Spark SQL cache relies on stable equality semantics for the resolved table/plan.
+     *
+     * <p>OceanBaseCatalog.loadTable() creates a new OceanBaseConfig instance each time. If this
+     * class uses reference equality (Object.equals), Spark may treat the table as changed and
+     * invalidate cached query results unexpectedly.
+     *
+     * <p>We intentionally compare only stable, identity-related fields (URL/user/schema/table) and
+     * avoid sensitive or runtime-variant fields such as password.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        OceanBaseConfig that = (OceanBaseConfig) o;
+        return Objects.equals(getRawString(URL.getKey()), that.getRawString(URL.getKey()))
+                && Objects.equals(
+                        getRawString(USERNAME.getKey()), that.getRawString(USERNAME.getKey()))
+                && Objects.equals(
+                        getRawString(SCHEMA_NAME.getKey()), that.getRawString(SCHEMA_NAME.getKey()))
+                && Objects.equals(
+                        getRawString(TABLE_NAME.getKey()), that.getRawString(TABLE_NAME.getKey()))
+                && Objects.equals(getRawString(DB_TABLE), that.getRawString(DB_TABLE));
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                getRawString(URL.getKey()),
+                getRawString(USERNAME.getKey()),
+                getRawString(SCHEMA_NAME.getKey()),
+                getRawString(TABLE_NAME.getKey()),
+                getRawString(DB_TABLE));
     }
 }
