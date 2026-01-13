@@ -23,7 +23,7 @@ import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.ExprUtils
 import org.apache.spark.sql.connector.expressions.{Expression, NullOrdering, SortDirection, Transform}
-import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MapType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
 
 import java.sql.{Connection, Types}
 
@@ -287,11 +287,26 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     case _ => getCommonJDBCType(dt)
   }
 
+  /** Parse OceanBase element type name to Spark DataType */
+  private def parseElementType(elementTypeName: String): DataType = {
+    elementTypeName.toUpperCase.trim match {
+      case "INT" | "INTEGER" => IntegerType
+      case "BIGINT" | "LONG" => LongType
+      case "FLOAT" => FloatType
+      case "DOUBLE" => DoubleType
+      case "BOOLEAN" | "BOOL" => BooleanType
+      case "STRING" | "VARCHAR" | "TEXT" => StringType
+      case _ => StringType // Default to StringType for unknown types
+    }
+  }
+
   override def getCatalystType(
       sqlType: Int,
       typeName: String,
       size: Int,
       md: MetadataBuilder): Option[DataType] = {
+    val upperTypeName = typeName.toUpperCase
+
     if (sqlType == Types.VARBINARY && typeName.equals("BIT") && size != 1) {
       // This could instead be a BinaryType if we'd rather return bit-vectors of up to 64 bits as
       // byte arrays instead of longs.
@@ -299,10 +314,37 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       Option(LongType)
     } else if (sqlType == Types.BIT && typeName.equals("TINYINT")) {
       Option(BooleanType)
-    } else if (typeName.toUpperCase.equals("JSON")) {
+    } else if (upperTypeName.startsWith("ARRAY<") || upperTypeName.startsWith("VECTOR<")) {
+      // Parse ARRAY<INT> or VECTOR<FLOAT> to get element type
+      val pattern = """(?:ARRAY|VECTOR)<(.+)>""".r
+      pattern.findFirstMatchIn(upperTypeName) match {
+        case Some(m) =>
+          val elementTypeName = m.group(1)
+          val elementType = parseElementType(elementTypeName)
+          Option(ArrayType(elementType, containsNull = true))
+        case None =>
+          // Fallback to Array of String if parsing fails
+          Option(ArrayType(StringType, containsNull = true))
+      }
+    } else if (upperTypeName.startsWith("MAP<")) {
+      // Parse MAP<INT,INT> to get key and value types
+      val pattern = """MAP<(.+),(.+)>""".r
+      pattern.findFirstMatchIn(upperTypeName) match {
+        case Some(m) =>
+          val keyTypeName = m.group(1)
+          val valueTypeName = m.group(2)
+          val keyType = parseElementType(keyTypeName)
+          val valueType = parseElementType(valueTypeName)
+          Option(MapType(keyType, valueType, valueContainsNull = true))
+        case None =>
+          // Fallback to Map of String->String if parsing fails
+          Option(MapType(StringType, StringType, valueContainsNull = true))
+      }
+    } else if (upperTypeName.equals("JSON")) {
       // JSON type is stored as StringType in Spark
-      // Note: Other complex types (ARRAY, ENUM, SET, MAP) are returned by OceanBase JDBC driver
-      // as CHAR type and will be automatically mapped to StringType by the default logic
+      Option(StringType)
+    } else if (upperTypeName.startsWith("ENUM(") || upperTypeName.startsWith("SET(")) {
+      // ENUM and SET are stored as StringType
       Option(StringType)
     } else None
   }

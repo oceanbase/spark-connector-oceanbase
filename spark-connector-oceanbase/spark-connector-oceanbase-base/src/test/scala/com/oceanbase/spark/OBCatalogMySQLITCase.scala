@@ -952,7 +952,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     session.sql("use ob;")
 
-    // Create DataFrame with real Spark complex types instead of string literals
+    // Create DataFrame with real Spark complex types
     import org.apache.spark.sql.Row
     import org.apache.spark.sql.types._
     import scala.collection.JavaConverters._
@@ -989,7 +989,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
     val df = session.createDataFrame(data.asJava, schema)
 
-    // Write using DataFrame API to test serialization of Spark complex types
+    // Write using DataFrame API - now should work with type mapping
     df.writeTo(s"$getSchemaName.products_complex_types").append()
 
     // Query and verify the written data

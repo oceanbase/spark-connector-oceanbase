@@ -282,6 +282,39 @@ object OBJdbcUtils {
   }
 
   /**
+   * Get actual column type names from information_schema.columns Returns COLUMN_TYPE which includes
+   * full type definition like "ARRAY<INT>", "VECTOR<FLOAT>"
+   */
+  private def getActualColumnTypes(
+      connection: Connection,
+      tableName: String,
+      schemaName: String): Map[String, String] = {
+    val sql =
+      s"""
+         |SELECT COLUMN_NAME, COLUMN_TYPE
+         |FROM information_schema.columns
+         |WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+         |""".stripMargin
+
+    val stmt = connection.prepareStatement(sql)
+    try {
+      stmt.setString(1, schemaName)
+      stmt.setString(2, tableName)
+      val rs = stmt.executeQuery()
+      val typeMap = scala.collection.mutable.Map[String, String]()
+      while (rs.next()) {
+        val columnName = rs.getString("COLUMN_NAME")
+        val columnType = rs.getString("COLUMN_TYPE").toUpperCase
+        typeMap(columnName.toUpperCase) = columnType
+      }
+      rs.close()
+      typeMap.toMap
+    } finally {
+      stmt.close()
+    }
+  }
+
+  /**
    * Copy from
    * [[org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getSchema(ResultSet, JdbcDialect, Boolean)]]
    * to solve compatibility issues with lower Spark versions.
@@ -294,11 +327,33 @@ object OBJdbcUtils {
     val rsmd = resultSet.getMetaData
     val ncols = rsmd.getColumnCount
     val fields = new Array[StructField](ncols)
+
+    // Try to get actual column types from information_schema
+    val actualTypeMap: Map[String, String] =
+      try {
+        val tableName = rsmd.getTableName(1)
+        val connection = resultSet.getStatement.getConnection
+        if (tableName != null && !tableName.isEmpty && connection != null) {
+          getActualColumnTypes(connection, tableName, config.getSchemaName)
+        } else {
+          Map.empty[String, String]
+        }
+      } catch {
+        case _: Exception => Map.empty[String, String]
+      }
+
     var i = 0
     while (i < ncols) {
       val columnName = rsmd.getColumnLabel(i + 1)
       val dataType = rsmd.getColumnType(i + 1)
-      val typeName = rsmd.getColumnTypeName(i + 1)
+      var typeName = rsmd.getColumnTypeName(i + 1)
+
+      // Override typeName with actual type from information_schema if available
+      val actualType = actualTypeMap.get(columnName.toUpperCase)
+      if (actualType.isDefined) {
+        typeName = actualType.get
+      }
+
       val fieldSize = rsmd.getPrecision(i + 1)
       val fieldScale = rsmd.getScale(i + 1)
       val isSigned =
