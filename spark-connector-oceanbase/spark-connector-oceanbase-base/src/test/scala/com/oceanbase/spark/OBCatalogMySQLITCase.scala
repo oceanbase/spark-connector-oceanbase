@@ -933,9 +933,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .asJava
 
     val expected: util.List[String] = util.Arrays.asList(
-      "1,[1,2,3],[1,2,3],red,red,{\"brand\": \"Dell\", \"price\": 999.99},{1:10,2:20}",
-      "2,[4,5],[4,5,6],yellow,red,yellow,{\"brand\": \"Apple\", \"price\": 799.99},{3:30}",
-      "3,[6],[7,8,9],red,yellow,{\"title\": \"Spark Guide\"},{4:40,5:50}"
+      "1,WrappedArray(1, 2, 3),WrappedArray(1.0, 2.0, 3.0),red,red,{\"brand\": \"Dell\", \"price\": 999.99},Map(1 -> 10, 2 -> 20)",
+      "2,WrappedArray(4, 5),WrappedArray(4.0, 5.0, 6.0),yellow,red,yellow,{\"brand\": \"Apple\", \"price\": 799.99},Map(3 -> 30)",
+      "3,WrappedArray(6),WrappedArray(7.0, 8.0, 9.0),red,yellow,{\"title\": \"Spark Guide\"},Map(4 -> 40, 5 -> 50)"
     )
     assertEqualsInAnyOrder(expected, actual)
 
@@ -1005,8 +1005,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .asJava
 
     val expected: util.List[String] = util.Arrays.asList(
-      "100,[10,20,30],[10.0,20.0,30.0],red,red,{\"name\": \"Product1\"},{1:100}",
-      "101,[40,50],[40.0,50.0,60.0],yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},{2:200,3:300}"
+      "100,WrappedArray(10, 20, 30),WrappedArray(10.0, 20.0, 30.0),red,red,{\"name\": \"Product1\"},Map(1 -> 100)",
+      "101,WrappedArray(40, 50),WrappedArray(40.0, 50.0, 60.0),yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},Map(2 -> 200, 3 -> 300)"
     )
     assertEqualsInAnyOrder(expected, actual)
 
