@@ -168,7 +168,7 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
 
     @Override
     public String getJdbcUrl() {
-        return "jdbc:mysql://"
+        return "jdbc:oceanbase://"
                 + getHost()
                 + ":"
                 + getPort()
