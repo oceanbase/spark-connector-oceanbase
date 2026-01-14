@@ -44,7 +44,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_full_unique_key",
       "products_pri_and_unique_key",
       "products_with_decimal",
-      "products_complex_types"
+      "products_complex_types",
+      "products_nested_arrays"
     )
   }
 
@@ -1007,6 +1008,79 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     val expected: util.List[String] = util.Arrays.asList(
       "100,WrappedArray(10, 20, 30),WrappedArray(10.0, 20.0, 30.0),red,red,{\"name\": \"Product1\"},Map(1 -> 100)",
       "101,WrappedArray(40, 50),WrappedArray(40.0, 50.0, 60.0),yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},Map(2 -> 200, 3 -> 300)"
+    )
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+  }
+
+  @Test
+  def testNestedArrayTypes(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+
+    // Create DataFrame with nested arrays (up to 4 levels)
+    import org.apache.spark.sql.Row
+    import org.apache.spark.sql.types._
+    import scala.collection.JavaConverters._
+
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("array_level1", ArrayType(IntegerType), nullable = true),
+        StructField("array_level2", ArrayType(ArrayType(IntegerType)), nullable = true),
+        StructField("array_level3", ArrayType(ArrayType(ArrayType(IntegerType))), nullable = true),
+        StructField(
+          "array_level4",
+          ArrayType(ArrayType(ArrayType(ArrayType(IntegerType)))),
+          nullable = true),
+        StructField("float_array_level2", ArrayType(ArrayType(FloatType)), nullable = true)
+      ))
+
+    val data = Seq(
+      Row(
+        1,
+        Array(1, 2, 3), // Level 1: [1,2,3]
+        Array(Array(1, 2), Array(3, 4)), // Level 2: [[1,2],[3,4]]
+        Array(Array(Array(1, 2)), Array(Array(3))), // Level 3: [[[1,2]],[[3]]]
+        Array(Array(Array(Array(1)))), // Level 4: [[[[1]]]]
+        Array(Array(1.0f, 2.0f), Array(3.0f)) // Float Level 2: [[1.0,2.0],[3.0]]
+      ),
+      Row(
+        2,
+        Array(5, 6),
+        Array(Array(7, 8, 9)),
+        Array(Array(Array(10))),
+        Array(Array(Array(Array(11), Array(12)))),
+        Array(Array(4.0f, 5.0f))
+      )
+    )
+
+    val df = session.createDataFrame(data.asJava, schema)
+
+    // Write using DataFrame API
+    df.writeTo(s"$getSchemaName.products_nested_arrays").append()
+
+    // Query and verify the written data
+    val actual = session
+      .sql(s"SELECT * FROM $getSchemaName.products_nested_arrays ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "1,WrappedArray(1, 2, 3),WrappedArray(WrappedArray(1, 2), WrappedArray(3, 4)),WrappedArray(WrappedArray(WrappedArray(1, 2)), WrappedArray(WrappedArray(3))),WrappedArray(WrappedArray(WrappedArray(WrappedArray(1)))),WrappedArray(WrappedArray(1.0, 2.0), WrappedArray(3.0))",
+      "2,WrappedArray(5, 6),WrappedArray(WrappedArray(7, 8, 9)),WrappedArray(WrappedArray(WrappedArray(10))),WrappedArray(WrappedArray(WrappedArray(WrappedArray(11), WrappedArray(12)))),WrappedArray(WrappedArray(4.0, 5.0))"
     )
     assertEqualsInAnyOrder(expected, actual)
 

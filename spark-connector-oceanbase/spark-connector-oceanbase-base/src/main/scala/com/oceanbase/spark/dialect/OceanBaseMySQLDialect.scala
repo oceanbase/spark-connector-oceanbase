@@ -287,16 +287,54 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     case _ => getCommonJDBCType(dt)
   }
 
-  /** Parse OceanBase element type name to Spark DataType */
-  private def parseElementType(elementTypeName: String): DataType = {
-    elementTypeName.toUpperCase.trim match {
-      case "INT" | "INTEGER" => IntegerType
-      case "BIGINT" | "LONG" => LongType
-      case "FLOAT" => FloatType
-      case "DOUBLE" => DoubleType
-      case "BOOLEAN" | "BOOL" => BooleanType
-      case "STRING" | "VARCHAR" | "TEXT" => StringType
-      case _ => StringType // Default to StringType for unknown types
+  /**
+   * Parse OceanBase element type name to Spark DataType with nested array support. Supports up to 6
+   * levels of nesting as per OceanBase limitation.
+   *
+   * @param elementTypeName
+   *   The type name to parse (e.g., "INT", "ARRAY(INT)", "ARRAY(ARRAY(INT))")
+   * @param depth
+   *   Current nesting depth (starts from 0)
+   * @return
+   *   Corresponding Spark DataType
+   */
+  private def parseElementType(elementTypeName: String, depth: Int = 0): DataType = {
+    val upperTypeName = elementTypeName.toUpperCase.trim
+
+    // OceanBase supports maximum 6 levels of array nesting
+    // If exceeds limit, treat as StringType
+    if (depth >= 6) {
+      logWarning(
+        s"Array nesting depth exceeds OceanBase limit of 6: $upperTypeName. Treating as StringType.")
+      return StringType
+    }
+
+    // Check for nested ARRAY type
+    if (upperTypeName.startsWith("ARRAY(")) {
+      val pattern = """ARRAY\((.+)\)""".r
+      pattern.findFirstMatchIn(upperTypeName) match {
+        case Some(m) =>
+          val innerTypeName = m.group(1)
+          // Recursively parse inner type with incremented depth
+          val innerType = parseElementType(innerTypeName, depth + 1)
+          ArrayType(innerType, containsNull = true)
+        case None =>
+          logWarning(s"Failed to parse nested array type: $upperTypeName")
+          StringType
+      }
+    } else {
+      // Parse basic types
+      upperTypeName match {
+        case "INT" | "INTEGER" => IntegerType
+        case "BIGINT" | "LONG" => LongType
+        case "FLOAT" => FloatType
+        case "DOUBLE" => DoubleType
+        case "BOOLEAN" | "BOOL" => BooleanType
+        case "STRING" | "VARCHAR" | "TEXT" => StringType
+        case _ =>
+          logWarning(s"Unknown element type: $upperTypeName. Treating as StringType.")
+          StringType
+      }
     }
   }
 

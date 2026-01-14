@@ -149,7 +149,12 @@ object OBJdbcUtils {
 
   type OBValueSetter = (PreparedStatement, InternalRow, Int) => Unit
 
-  /** Convert ArrayData to OceanBase ARRAY string format. For example: [1, 2, 3] for INT array */
+  /**
+   * Convert ArrayData to OceanBase ARRAY string format with nested array support. Examples:
+   *   - [1, 2, 3] for ARRAY(INT)
+   *   - [[1, 2], [3, 4]] for ARRAY(ARRAY(INT))
+   *   - [[[1]]] for ARRAY(ARRAY(ARRAY(INT)))
+   */
   private def convertArrayToString(
       array: org.apache.spark.sql.catalyst.util.ArrayData,
       elementType: DataType): String = {
@@ -167,6 +172,10 @@ object OBJdbcUtils {
             case DoubleType => array.getDouble(i).toString
             case BooleanType => array.getBoolean(i).toString
             case StringType => s"'${array.getUTF8String(i).toString}'"
+            case ArrayType(innerElementType, _) =>
+              // Recursively convert nested array
+              val innerArray = array.getArray(i)
+              convertArrayToString(innerArray, innerElementType)
             case _ => array.get(i, elementType).toString
           }
         }

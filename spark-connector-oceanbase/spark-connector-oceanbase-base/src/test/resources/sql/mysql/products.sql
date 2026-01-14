@@ -98,3 +98,14 @@ CREATE TABLE products_complex_types
   json_col    JSON,
   map_col     MAP(INT, INT)
 );
+
+-- Table for testing nested array types (up to 6 levels as per OceanBase limit)
+CREATE TABLE products_nested_arrays
+(
+  id                 INTEGER      NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  array_level1       INT[],
+  array_level2       INT[][],
+  array_level3       INT[][][],
+  array_level4       INT[][][][],
+  float_array_level2 FLOAT[][]
+);

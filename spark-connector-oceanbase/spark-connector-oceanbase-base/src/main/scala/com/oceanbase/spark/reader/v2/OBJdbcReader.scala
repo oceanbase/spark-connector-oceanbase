@@ -476,9 +476,18 @@ object OBJdbcReader extends SQLConfHelper {
     }
   }
 
-  /** Parse OceanBase ARRAY string format like "[1,2,3]" to Spark ArrayData */
+  /**
+   * Parse OceanBase ARRAY string format to Spark ArrayData with nested array support. Supports
+   * formats like "[1,2,3]", "[[1,2],[3,4]]", "[[[1]]]" etc.
+   *
+   * @param str
+   *   The array string to parse
+   * @param elementType
+   *   The expected element type
+   * @return
+   *   GenericArrayData containing parsed elements
+   */
   private def parseArrayString(str: String, elementType: DataType): GenericArrayData = {
-    // Remove brackets and split by comma
     val trimmed = str.trim
     if (trimmed == "[]" || trimmed.isEmpty) {
       return new GenericArrayData(Array.empty[Any])
@@ -494,7 +503,13 @@ object OBJdbcReader extends SQLConfHelper {
       return new GenericArrayData(Array.empty[Any])
     }
 
-    val elements = content.split(",").map(_.trim)
+    // For nested arrays, we need to split carefully respecting brackets
+    val elements = if (elementType.isInstanceOf[ArrayType]) {
+      splitArrayElements(content)
+    } else {
+      content.split(",").map(_.trim)
+    }
+
     val convertedElements = elements.map {
       elem =>
         if (elem == "null" || elem.isEmpty) {
@@ -507,11 +522,51 @@ object OBJdbcReader extends SQLConfHelper {
             case DoubleType => elem.toDouble
             case StringType => UTF8String.fromString(elem)
             case BooleanType => elem.toBoolean
+            case ArrayType(innerType, _) =>
+              // Recursively parse nested array
+              parseArrayString(elem, innerType)
             case _ => elem
           }
         }
     }
     new GenericArrayData(convertedElements)
+  }
+
+  /**
+   * Split array elements respecting nested brackets. For example: "[1,2],[3,4]" => Array("[1,2]",
+   * "[3,4]")
+   */
+  private def splitArrayElements(content: String): Array[String] = {
+    val elements = scala.collection.mutable.ArrayBuffer[String]()
+    var currentElement = new StringBuilder()
+    var bracketDepth = 0
+
+    content.foreach {
+      char =>
+        char match {
+          case '[' =>
+            bracketDepth += 1
+            currentElement.append(char)
+          case ']' =>
+            bracketDepth -= 1
+            currentElement.append(char)
+          case ',' if bracketDepth == 0 =>
+            // Only split at top-level commas
+            if (currentElement.nonEmpty) {
+              elements += currentElement.toString.trim
+              currentElement.clear()
+            }
+          case _ =>
+            currentElement.append(char)
+        }
+    }
+
+    // Add the last element
+    if (currentElement.nonEmpty) {
+      elements += currentElement.toString.trim
+    }
+
+    elements.toArray
   }
 
   /** Parse OceanBase MAP string format like "{1:10,2:20}" to Spark MapData */
