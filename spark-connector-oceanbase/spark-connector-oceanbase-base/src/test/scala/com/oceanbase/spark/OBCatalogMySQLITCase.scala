@@ -181,7 +181,8 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products_full_unique_key,false]",
       "[test,products_pri_and_unique_key,false]",
       "[test,products_with_decimal,false]",
-      "[test,products_complex_types,false]"
+      "[test,products_complex_types,false]",
+      "[test,products_nested_arrays,false]"
     ).toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
