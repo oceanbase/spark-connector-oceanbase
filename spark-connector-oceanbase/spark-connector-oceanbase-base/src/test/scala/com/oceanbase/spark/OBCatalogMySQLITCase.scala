@@ -911,15 +911,19 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
       .getOrCreate()
     session.sql("use ob;")
+
+    // Use Spark SQL syntax for complex types
+    // ARRAY: array(1, 2, 3)
+    // MAP: map(key1, value1, key2, value2)
     session.sql(
       s"""
          |INSERT INTO $getSchemaName.products_complex_types VALUES
-         |(1, '[1, 2, 3]', '[1.0, 2.0, 3.0]', 'red', 'red', '{"brand": "Dell", "price": 999.99}', '{1:10, 2:20}'),
-         |(2, '[4, 5]', '[4.0, 5.0, 6.0]', 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', '{3:30}'),
-         |(3, '[6]', '[7.0, 8.0, 9.0]', 'red', 'yellow', '{"title": "Spark Guide"}', '{4:40, 5:50}');
+         |(1, array(1, 2, 3), array(1.0, 2.0, 3.0), 'red', 'red', '{"brand": "Dell", "price": 999.99}', map(1, 10, 2, 20)),
+         |(2, array(4, 5), array(4.0, 5.0, 6.0), 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', map(3, 30)),
+         |(3, array(6), array(7.0, 8.0, 9.0), 'red', 'yellow', '{"title": "Spark Guide"}', map(4, 40, 5, 50));
          |""".stripMargin)
 
-    // Query and verify complex types are read as strings
+    // Query and verify complex types are read correctly
     import scala.collection.JavaConverters._
     val actual = session
       .sql(s"SELECT * FROM $getSchemaName.products_complex_types ORDER BY id")

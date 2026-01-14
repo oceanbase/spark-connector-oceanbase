@@ -306,8 +306,6 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       size: Int,
       md: MetadataBuilder): Option[DataType] = {
     val upperTypeName = typeName.toUpperCase
-    println(
-      s"[DEBUG] getCatalystType: sqlType=$sqlType, typeName=$typeName, upperTypeName=$upperTypeName")
 
     if (sqlType == Types.VARBINARY && typeName.equals("BIT") && size != 1) {
       // This could instead be a BinaryType if we'd rather return bit-vectors of up to 64 bits as
@@ -319,7 +317,6 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     } else if (upperTypeName.startsWith("VECTOR(")) {
       // VECTOR(n) where n is the dimension, stored as FLOAT by default
       // Parse VECTOR(3) -> ArrayType(FloatType)
-      println(s"[DEBUG] Mapped $upperTypeName to ArrayType(FloatType)")
       Option(ArrayType(FloatType, containsNull = true))
     } else if (upperTypeName.startsWith("ARRAY(")) {
       // Parse ARRAY(INT) to get element type
@@ -329,11 +326,10 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
         case Some(m) =>
           val elementTypeName = m.group(1)
           val elementType = parseElementType(elementTypeName)
-          println(s"[DEBUG] Mapped $upperTypeName to ArrayType($elementType)")
           Option(ArrayType(elementType, containsNull = true))
         case None =>
           // Fallback to Array of String if parsing fails
-          println(s"[DEBUG] Failed to parse $upperTypeName, using ArrayType(StringType)")
+          logWarning(s"Failed to parse $upperTypeName, using ArrayType(StringType)")
           Option(ArrayType(StringType, containsNull = true))
       }
     } else if (upperTypeName.startsWith("MAP(")) {
@@ -347,23 +343,18 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
           val valueTypeName = m.group(2).trim
           val keyType = parseElementType(keyTypeName)
           val valueType = parseElementType(valueTypeName)
-          println(s"[DEBUG] Mapped $upperTypeName to MapType($keyType, $valueType)")
           Option(MapType(keyType, valueType, valueContainsNull = true))
         case None =>
           // Fallback to Map of String->String if parsing fails
-          println(s"[DEBUG] Failed to parse $upperTypeName, using MapType(StringType, StringType)")
           Option(MapType(StringType, StringType, valueContainsNull = true))
       }
     } else if (upperTypeName.equals("JSON")) {
       // JSON type is stored as StringType in Spark
-      println(s"[DEBUG] Mapped JSON to StringType")
       Option(StringType)
     } else if (upperTypeName.startsWith("ENUM(") || upperTypeName.startsWith("SET(")) {
       // ENUM and SET are stored as StringType
-      println(s"[DEBUG] Mapped $upperTypeName to StringType")
       Option(StringType)
     } else {
-      println(s"[DEBUG] No mapping for $upperTypeName, returning None")
       None
     }
   }
