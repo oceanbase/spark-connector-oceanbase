@@ -425,4 +425,43 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
         None
     }
   }
+
+  /**
+   * Get actual column type names from information_schema.columns for MySQL mode. Returns
+   * COLUMN_TYPE which includes full type definition like "ARRAY(INT)", "VECTOR(3)"
+   */
+  override def getActualColumnTypes(
+      connection: Connection,
+      tableName: String,
+      schemaName: String,
+      config: OceanBaseConfig): Map[String, String] = {
+    val sql =
+      s"""
+         |SELECT COLUMN_NAME, COLUMN_TYPE
+         |FROM information_schema.columns
+         |WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+         |""".stripMargin
+
+    val stmt = connection.prepareStatement(sql)
+    try {
+      stmt.setString(1, schemaName)
+      stmt.setString(2, tableName)
+      val rs = stmt.executeQuery()
+      val typeMap = scala.collection.mutable.Map[String, String]()
+      while (rs.next()) {
+        val columnName = rs.getString("COLUMN_NAME")
+        val columnType = rs.getString("COLUMN_TYPE").toUpperCase
+        typeMap(columnName.toUpperCase) = columnType
+      }
+      rs.close()
+      typeMap.toMap
+    } catch {
+      case e: Exception =>
+        // Log warning but don't fail - fall back to JDBC metadata
+        logWarning(s"Failed to get actual column types from information_schema: ${e.getMessage}")
+        Map.empty[String, String]
+    } finally {
+      stmt.close()
+    }
+  }
 }

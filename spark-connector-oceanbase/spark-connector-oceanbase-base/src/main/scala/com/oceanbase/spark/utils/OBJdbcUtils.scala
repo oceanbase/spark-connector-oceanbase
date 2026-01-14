@@ -282,43 +282,6 @@ object OBJdbcUtils {
   }
 
   /**
-   * Get actual column type names from information_schema.columns Returns COLUMN_TYPE which includes
-   * full type definition like "ARRAY(INT)", "VECTOR(3)"
-   */
-  private def getActualColumnTypes(
-      connection: Connection,
-      tableName: String,
-      schemaName: String): Map[String, String] = {
-    val sql =
-      s"""
-         |SELECT COLUMN_NAME, COLUMN_TYPE
-         |FROM information_schema.columns
-         |WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
-         |""".stripMargin
-
-    val stmt = connection.prepareStatement(sql)
-    try {
-      stmt.setString(1, schemaName)
-      stmt.setString(2, tableName)
-      val rs = stmt.executeQuery()
-      val typeMap = scala.collection.mutable.Map[String, String]()
-      while (rs.next()) {
-        val columnName = rs.getString("COLUMN_NAME")
-        val columnType = rs.getString("COLUMN_TYPE").toUpperCase
-        typeMap(columnName.toUpperCase) = columnType
-      }
-      rs.close()
-      typeMap.toMap
-    } catch {
-      case e: Exception =>
-        // Log warning but don't fail - fall back to JDBC metadata
-        Map.empty[String, String]
-    } finally {
-      stmt.close()
-    }
-  }
-
-  /**
    * Copy from
    * [[org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getSchema(ResultSet, JdbcDialect, Boolean)]]
    * to solve compatibility issues with lower Spark versions.
@@ -332,13 +295,13 @@ object OBJdbcUtils {
     val ncols = rsmd.getColumnCount
     val fields = new Array[StructField](ncols)
 
-    // Try to get actual column types from information_schema
+    // Try to get actual column types from database system catalogs using dialect-specific method
     val actualTypeMap: Map[String, String] =
       try {
         val tableName = rsmd.getTableName(1)
         val connection = resultSet.getStatement.getConnection
         if (tableName != null && !tableName.isEmpty && connection != null) {
-          getActualColumnTypes(connection, tableName, config.getSchemaName)
+          dialect.getActualColumnTypes(connection, tableName, config.getSchemaName, config)
         } else {
           Map.empty[String, String]
         }
