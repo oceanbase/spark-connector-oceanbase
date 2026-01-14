@@ -393,9 +393,7 @@ object OBJdbcReader extends SQLConfHelper {
       // Check if this is an OceanBase complex type stored as string
       // OceanBase ARRAY and VECTOR types are stored as CHAR in JDBC
       val sqlType = if (metadata.contains("sqlType")) metadata.getLong("sqlType").toInt else -1
-      println(s"[debug] sqlType: $sqlType, et: $et")
       if (sqlType == java.sql.Types.CHAR || sqlType == java.sql.Types.VARCHAR) {
-        println(s"[debug] OceanBase ARRAY/VECTOR stored as string, parse it")
         // OceanBase ARRAY/VECTOR stored as string, parse it
         (rs: ResultSet, row: InternalRow, pos: Int) =>
           val str = rs.getString(pos + 1)
@@ -407,7 +405,6 @@ object OBJdbcReader extends SQLConfHelper {
             row.update(pos, arrayData)
           }
       } else {
-        println(s"[debug] Standard JDBC Array type")
         // Standard JDBC Array type
         val elementConversion = et match {
           case TimestampType =>
