@@ -569,3 +569,402 @@ Precautions for direct-load:
     </table>
 </div>
 
+## Data Type Mapping
+
+This section describes the mapping between OceanBase data types and Spark SQL data types when reading from and writing to OceanBase.
+
+### MySQL Mode
+
+#### Reading Data (OceanBase → Spark)
+
+Type mapping when reading data from OceanBase MySQL mode:
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">OceanBase Type</th>
+                <th class="text-left" style="width: 30%">Spark SQL Type</th>
+                <th class="text-left" style="width: 40%">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="3"><b>Basic Data Types</b></td>
+            </tr>
+            <tr>
+                <td>BIT</td>
+                <td>LongType</td>
+                <td>When size != 1</td>
+            </tr>
+            <tr>
+                <td>BIT</td>
+                <td>BooleanType</td>
+                <td>When size = 1</td>
+            </tr>
+            <tr>
+                <td>TINYINT</td>
+                <td>BooleanType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>SMALLINT</td>
+                <td>ShortType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>INT / INTEGER</td>
+                <td>IntegerType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BIGINT</td>
+                <td>LongType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>FLOAT</td>
+                <td>FloatType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DOUBLE</td>
+                <td>DoubleType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DECIMAL(p,s)</td>
+                <td>DecimalType(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>CHAR(n)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARCHAR(n)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TEXT</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY</td>
+                <td>BinaryType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DATE</td>
+                <td>DateType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DATETIME / TIMESTAMP</td>
+                <td>TimestampType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td colspan="3"><b>Complex Data Types</b></td>
+            </tr>
+            <tr>
+                <td>ARRAY(type)</td>
+                <td>ArrayType(corresponding type)</td>
+                <td>Supports up to 6 levels of nesting. Supported element types: INT, BIGINT, FLOAT, DOUBLE, BOOLEAN, STRING, etc.</td>
+            </tr>
+            <tr>
+                <td>VECTOR(n)</td>
+                <td>ArrayType(FloatType)</td>
+                <td>n represents the vector dimension</td>
+            </tr>
+            <tr>
+                <td>MAP(keyType, valueType)</td>
+                <td>MapType(keyType, valueType)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>JSON</td>
+                <td>StringType</td>
+                <td>JSON data is read as string</td>
+            </tr>
+            <tr>
+                <td>ENUM(...)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>SET(...)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+#### Writing Data (Spark → OceanBase)
+
+Type mapping when writing data to existing OceanBase MySQL mode tables:
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">Spark SQL Type</th>
+                <th class="text-left" style="width: 30%">OceanBase Type</th>
+                <th class="text-left" style="width: 40%">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="3"><b>Basic Data Types</b></td>
+            </tr>
+            <tr>
+                <td>BooleanType</td>
+                <td>BOOLEAN / TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ByteType</td>
+                <td>TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ShortType</td>
+                <td>SMALLINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>IntegerType</td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>LongType</td>
+                <td>BIGINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>FloatType</td>
+                <td>FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DoubleType</td>
+                <td>DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DecimalType(p,s)</td>
+                <td>DECIMAL(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>CHAR / VARCHAR / TEXT</td>
+                <td>Depends on the actual target column type</td>
+            </tr>
+            <tr>
+                <td>BinaryType</td>
+                <td>BINARY</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DateType</td>
+                <td>DATE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TimestampType</td>
+                <td>DATETIME / TIMESTAMP</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td colspan="3"><b>Complex Data Types</b></td>
+            </tr>
+            <tr>
+                <td>ArrayType(IntegerType)</td>
+                <td>INT[] / ARRAY(INT)</td>
+                <td>Table must be pre-created with ARRAY type columns</td>
+            </tr>
+            <tr>
+                <td>ArrayType(FloatType)</td>
+                <td>FLOAT[] / VECTOR(n)</td>
+                <td>Can write to VECTOR or FLOAT ARRAY columns</td>
+            </tr>
+            <tr>
+                <td>MapType(keyType, valueType)</td>
+                <td>MAP(keyType, valueType)</td>
+                <td>Table must be pre-created with MAP type columns</td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>JSON</td>
+                <td>JSON data is written as string</td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>ENUM / SET</td>
+                <td>Written string values must conform to ENUM/SET definition</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+### Oracle Mode
+
+#### Reading Data (OceanBase → Spark)
+
+Type mapping when reading data from OceanBase Oracle mode:
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">OceanBase Type</th>
+                <th class="text-left" style="width: 30%">Spark SQL Type</th>
+                <th class="text-left" style="width: 40%">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>NUMBER(0)</td>
+                <td>DecimalType</td>
+                <td>When precision and scale are not specified</td>
+            </tr>
+            <tr>
+                <td>NUMBER(p,s)</td>
+                <td>DecimalType(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY_FLOAT</td>
+                <td>FloatType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY_DOUBLE</td>
+                <td>DoubleType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARCHAR2(n)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>CLOB</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>RAW(n)</td>
+                <td>BinaryType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DATE</td>
+                <td>DateType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP</td>
+                <td>TimestampType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP WITH TIME ZONE</td>
+                <td>TimestampType</td>
+                <td>Supported under specific timezone configurations</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+#### Writing Data (Spark → OceanBase)
+
+Type mapping when writing data to existing OceanBase Oracle mode tables:
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">Spark SQL Type</th>
+                <th class="text-left" style="width: 30%">OceanBase Type</th>
+                <th class="text-left" style="width: 40%">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>BooleanType</td>
+                <td>NUMBER(1)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ByteType</td>
+                <td>NUMBER(3)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ShortType</td>
+                <td>NUMBER(5)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>IntegerType</td>
+                <td>NUMBER(10)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>LongType</td>
+                <td>NUMBER(19)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>FloatType</td>
+                <td>BINARY_FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DoubleType</td>
+                <td>BINARY_DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DecimalType(p,s)</td>
+                <td>NUMBER(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>VARCHAR2 / CLOB</td>
+                <td>Depends on the actual target column type</td>
+            </tr>
+            <tr>
+                <td>BinaryType</td>
+                <td>RAW</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DateType</td>
+                <td>DATE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TimestampType</td>
+                <td>TIMESTAMP</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+#### Important Notes
+
+1. **Complex type tables must be pre-created**: Create tables with complex types directly in OceanBase using SQL before reading or writing data through Spark.
+2. **Nested array limitation**: ARRAY types support up to 6 levels of nesting, such as `INT[][]` or `INT[][][]`.
+3. **JSON type handling**: JSON data is represented as StringType in Spark. Ensure the string content is valid JSON format when writing.
+4. **ENUM and SET types**: Represented as StringType in Spark. When writing, values must conform to the enumeration or set values defined in the table.
+
