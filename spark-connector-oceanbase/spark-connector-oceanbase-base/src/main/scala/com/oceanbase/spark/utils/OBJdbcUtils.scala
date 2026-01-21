@@ -34,6 +34,7 @@ import scala.math.min
 object OBJdbcUtils {
 
   private val COMPATIBLE_MODE_STATEMENT = "SHOW VARIABLES LIKE 'ob_compatibility_mode'"
+  private val SPARK_VARCHAR_TYPE_MAX_LENGTH = 65535
 
   def getDbTable(oceanBaseConfig: OceanBaseConfig): String = {
     getCompatibleMode(oceanBaseConfig).map(_.toLowerCase) match {
@@ -394,7 +395,7 @@ object OBJdbcUtils {
       case java.sql.Types.BIT => BooleanType // @see JdbcDialect for quirks
       case java.sql.Types.BLOB => BinaryType
       case java.sql.Types.BOOLEAN => BooleanType
-      case java.sql.Types.CHAR if precision != 0 =>
+      case java.sql.Types.CHAR if precision > 0 && precision <= SPARK_VARCHAR_TYPE_MAX_LENGTH =>
         if (config.getEnableSparkVarcharDataType) CharType(precision) else StringType
       case java.sql.Types.CHAR => StringType
       case java.sql.Types.CLOB => StringType
@@ -447,7 +448,7 @@ object OBJdbcUtils {
       case java.sql.Types.TIMESTAMP_WITH_TIMEZONE => null
       case java.sql.Types.TINYINT => IntegerType
       case java.sql.Types.VARBINARY => BinaryType
-      case java.sql.Types.VARCHAR if precision != 0 =>
+      case java.sql.Types.VARCHAR if precision > 0 && precision <= SPARK_VARCHAR_TYPE_MAX_LENGTH =>
         if (config.getEnableSparkVarcharDataType) VarcharType(precision) else StringType
       case java.sql.Types.VARCHAR => StringType
       case _ =>

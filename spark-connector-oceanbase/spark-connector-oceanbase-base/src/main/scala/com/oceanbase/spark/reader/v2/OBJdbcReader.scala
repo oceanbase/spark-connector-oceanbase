@@ -67,7 +67,6 @@ class OBJdbcReader(
         }
       case _ =>
     }
-    print("Query SQL: " + buildQuerySql())
     stmt.setFetchSize(config.getJdbcFetchSize)
     stmt.setQueryTimeout(config.getJdbcQueryTimeout)
     stmt.executeQuery()
