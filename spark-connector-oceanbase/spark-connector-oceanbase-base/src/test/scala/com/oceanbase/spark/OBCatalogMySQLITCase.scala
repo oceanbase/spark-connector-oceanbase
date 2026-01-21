@@ -1088,6 +1088,44 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testJdbcQueryHintDegree(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config(
+        "spark.sql.catalog.ob.jdbc.query-hint-degree",
+        "READ_CONSISTENCY(WEAK) query_timeout(10000000)")
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+    queryAndVerifyTableData(session, "products", expected)
+    session.stop()
+
+    // empty test case
+    val session1 = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.query-hint-degree", "")
+      .getOrCreate()
+
+    session1.sql("use ob;")
+    insertTestData(session1, "products")
+    queryAndVerifyTableData(session1, "products", expected)
+    session1.stop()
+  }
+
   private def queryAndVerifyTableData(
       session: SparkSession,
       tableName: String,
