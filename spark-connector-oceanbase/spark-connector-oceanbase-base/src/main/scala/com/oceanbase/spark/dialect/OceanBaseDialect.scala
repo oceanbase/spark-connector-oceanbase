@@ -443,6 +443,27 @@ abstract class OceanBaseDialect extends Logging with Serializable {
     val nullable = if (isNullable) "NULL" else "NOT NULL"
     s"ALTER TABLE $tableName ALTER COLUMN ${quoteIdentifier(columnName)} SET $nullable"
   }
+
+  /**
+   * Get actual column type names from database system catalogs. Returns COLUMN_TYPE which includes
+   * full type definition like "ARRAY(INT)", "VECTOR(3)"
+   *
+   * @param connection
+   *   The database connection
+   * @param tableName
+   *   The table name
+   * @param schemaName
+   *   The schema/database name
+   * @param config
+   *   The OceanBase configuration
+   * @return
+   *   Map of column name (uppercase) to column type
+   */
+  def getActualColumnTypes(
+      connection: Connection,
+      tableName: String,
+      schemaName: String,
+      config: OceanBaseConfig): Map[String, String]
 }
 
 case class PriKeyColumnInfo(

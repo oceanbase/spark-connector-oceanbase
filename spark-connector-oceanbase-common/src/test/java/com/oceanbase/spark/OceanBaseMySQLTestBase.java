@@ -61,7 +61,7 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public static final OceanBaseCEContainer CONTAINER =
-            new OceanBaseCEContainer("oceanbase/oceanbase-ce:4.3.3.1-101000012024102216")
+            new OceanBaseCEContainer("oceanbase/oceanbase-ce:4.5.0.0-100000012025112711")
                     .withNetwork(NETWORK)
                     .withMode(OceanBaseCEContainer.Mode.MINI)
                     .withTenantName(TEST_TENANT)

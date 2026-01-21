@@ -461,4 +461,43 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
         None
     }
   }
+
+  /**
+   * Get actual column type names from ALL_TAB_COLUMNS for Oracle mode. Returns DATA_TYPE which
+   * includes type definition
+   */
+  override def getActualColumnTypes(
+      connection: Connection,
+      tableName: String,
+      schemaName: String,
+      config: OceanBaseConfig): Map[String, String] = {
+    val sql =
+      s"""
+         |SELECT COLUMN_NAME, DATA_TYPE
+         |FROM ALL_TAB_COLUMNS
+         |WHERE OWNER = ? AND TABLE_NAME = ?
+         |""".stripMargin
+
+    val stmt = connection.prepareStatement(sql)
+    try {
+      stmt.setString(1, schemaName.toUpperCase)
+      stmt.setString(2, tableName.toUpperCase)
+      val rs = stmt.executeQuery()
+      val typeMap = scala.collection.mutable.Map[String, String]()
+      while (rs.next()) {
+        val columnName = rs.getString("COLUMN_NAME")
+        val dataType = rs.getString("DATA_TYPE").toUpperCase
+        typeMap(columnName.toUpperCase) = dataType
+      }
+      rs.close()
+      typeMap.toMap
+    } catch {
+      case e: Exception =>
+        // Log warning but don't fail - fall back to JDBC metadata
+        logWarning(s"Failed to get actual column types from ALL_TAB_COLUMNS: ${e.getMessage}")
+        Map.empty[String, String]
+    } finally {
+      stmt.close()
+    }
+  }
 }

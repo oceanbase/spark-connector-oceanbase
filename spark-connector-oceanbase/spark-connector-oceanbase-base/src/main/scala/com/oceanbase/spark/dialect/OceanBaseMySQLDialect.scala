@@ -23,7 +23,7 @@ import com.oceanbase.spark.utils.OBJdbcUtils.executeStatement
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.ExprUtils
 import org.apache.spark.sql.connector.expressions.{Expression, NullOrdering, SortDirection, Transform}
-import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MapType, MetadataBuilder, ShortType, StringType, StructType, TimestampType, VarcharType}
 
 import java.sql.{Connection, Types}
 
@@ -287,11 +287,64 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     case _ => getCommonJDBCType(dt)
   }
 
+  /**
+   * Parse OceanBase element type name to Spark DataType with nested array support. Supports up to 6
+   * levels of nesting as per OceanBase limitation.
+   *
+   * @param elementTypeName
+   *   The type name to parse (e.g., "INT", "ARRAY(INT)", "ARRAY(ARRAY(INT))")
+   * @param depth
+   *   Current nesting depth (starts from 0)
+   * @return
+   *   Corresponding Spark DataType
+   */
+  private def parseElementType(elementTypeName: String, depth: Int = 0): DataType = {
+    val upperTypeName = elementTypeName.toUpperCase.trim
+
+    // OceanBase supports maximum 6 levels of array nesting
+    // If exceeds limit, treat as StringType
+    if (depth >= 6) {
+      logWarning(
+        s"Array nesting depth exceeds OceanBase limit of 6: $upperTypeName. Treating as StringType.")
+      return StringType
+    }
+
+    // Check for nested ARRAY type
+    if (upperTypeName.startsWith("ARRAY(")) {
+      val pattern = """ARRAY\((.+)\)""".r
+      pattern.findFirstMatchIn(upperTypeName) match {
+        case Some(m) =>
+          val innerTypeName = m.group(1)
+          // Recursively parse inner type with incremented depth
+          val innerType = parseElementType(innerTypeName, depth + 1)
+          ArrayType(innerType, containsNull = true)
+        case None =>
+          logWarning(s"Failed to parse nested array type: $upperTypeName")
+          StringType
+      }
+    } else {
+      // Parse basic types
+      upperTypeName match {
+        case "INT" | "INTEGER" => IntegerType
+        case "BIGINT" | "LONG" => LongType
+        case "FLOAT" => FloatType
+        case "DOUBLE" => DoubleType
+        case "BOOLEAN" | "BOOL" => BooleanType
+        case "STRING" | "VARCHAR" | "TEXT" => StringType
+        case _ =>
+          logWarning(s"Unknown element type: $upperTypeName. Treating as StringType.")
+          StringType
+      }
+    }
+  }
+
   override def getCatalystType(
       sqlType: Int,
       typeName: String,
       size: Int,
       md: MetadataBuilder): Option[DataType] = {
+    val upperTypeName = typeName.toUpperCase
+
     if (sqlType == Types.VARBINARY && typeName.equals("BIT") && size != 1) {
       // This could instead be a BinaryType if we'd rather return bit-vectors of up to 64 bits as
       // byte arrays instead of longs.
@@ -299,7 +352,49 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       Option(LongType)
     } else if (sqlType == Types.BIT && typeName.equals("TINYINT")) {
       Option(BooleanType)
-    } else None
+    } else if (upperTypeName.startsWith("VECTOR(")) {
+      // VECTOR(n) where n is the dimension, stored as FLOAT by default
+      // Parse VECTOR(3) -> ArrayType(FloatType)
+      Option(ArrayType(FloatType, containsNull = true))
+    } else if (upperTypeName.startsWith("ARRAY(")) {
+      // Parse ARRAY(INT) to get element type
+      // Note: OceanBase uses parentheses, not angle brackets
+      val pattern = """ARRAY\((.+)\)""".r
+      pattern.findFirstMatchIn(upperTypeName) match {
+        case Some(m) =>
+          val elementTypeName = m.group(1)
+          val elementType = parseElementType(elementTypeName)
+          Option(ArrayType(elementType, containsNull = true))
+        case None =>
+          // Fallback to Array of String if parsing fails
+          logWarning(s"Failed to parse $upperTypeName, using ArrayType(StringType)")
+          Option(ArrayType(StringType, containsNull = true))
+      }
+    } else if (upperTypeName.startsWith("MAP(")) {
+      // Parse MAP(INT,INT) to get key and value types
+      // Note: OceanBase uses parentheses, not angle brackets
+      // Use non-greedy match and handle potential spaces
+      val pattern = """MAP\(([^,]+),\s*([^)]+)\)""".r
+      pattern.findFirstMatchIn(upperTypeName) match {
+        case Some(m) =>
+          val keyTypeName = m.group(1).trim
+          val valueTypeName = m.group(2).trim
+          val keyType = parseElementType(keyTypeName)
+          val valueType = parseElementType(valueTypeName)
+          Option(MapType(keyType, valueType, valueContainsNull = true))
+        case None =>
+          // Fallback to Map of String->String if parsing fails
+          Option(MapType(StringType, StringType, valueContainsNull = true))
+      }
+    } else if (upperTypeName.equals("JSON")) {
+      // JSON type is stored as StringType in Spark
+      Option(StringType)
+    } else if (upperTypeName.startsWith("ENUM(") || upperTypeName.startsWith("SET(")) {
+      // ENUM and SET are stored as StringType
+      Option(StringType)
+    } else {
+      None
+    }
   }
 
   private val distinctUnsupportedAggregateFunctions =
@@ -366,6 +461,45 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
       case NonFatal(e) =>
         logWarning("Error occurs while compiling V2 expression", e)
         None
+    }
+  }
+
+  /**
+   * Get actual column type names from information_schema.columns for MySQL mode. Returns
+   * COLUMN_TYPE which includes full type definition like "ARRAY(INT)", "VECTOR(3)"
+   */
+  override def getActualColumnTypes(
+      connection: Connection,
+      tableName: String,
+      schemaName: String,
+      config: OceanBaseConfig): Map[String, String] = {
+    val sql =
+      s"""
+         |SELECT COLUMN_NAME, COLUMN_TYPE
+         |FROM information_schema.columns
+         |WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+         |""".stripMargin
+
+    val stmt = connection.prepareStatement(sql)
+    try {
+      stmt.setString(1, schemaName)
+      stmt.setString(2, tableName)
+      val rs = stmt.executeQuery()
+      val typeMap = scala.collection.mutable.Map[String, String]()
+      while (rs.next()) {
+        val columnName = rs.getString("COLUMN_NAME")
+        val columnType = rs.getString("COLUMN_TYPE").toUpperCase
+        typeMap(columnName.toUpperCase) = columnType
+      }
+      rs.close()
+      typeMap.toMap
+    } catch {
+      case e: Exception =>
+        // Log warning but don't fail - fall back to JDBC metadata
+        logWarning(s"Failed to get actual column types from information_schema: ${e.getMessage}")
+        Map.empty[String, String]
+    } finally {
+      stmt.close()
     }
   }
 }
