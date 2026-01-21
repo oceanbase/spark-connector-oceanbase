@@ -1100,7 +1100,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
       .config(
         "spark.sql.catalog.ob.jdbc.query-hint-degree",
-        "READ_CONSISTENCY(WEAK) query_timeout(10000000)")
+        "READ_CONSISTENCY(STRONG) query_timeout(10000000)")
       .getOrCreate()
 
     session.sql("use ob;")
