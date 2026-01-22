@@ -565,3 +565,402 @@ select * from spark_catalog.default.orders;
     </table>
 </div>
 
+## 数据类型映射
+
+本节介绍在读写 OceanBase 数据时，OceanBase 数据类型与 Spark SQL 数据类型之间的映射关系。
+
+### MySQL 模式
+
+#### 读取数据时（OceanBase → Spark）
+
+从 OceanBase MySQL 模式读取数据时的类型映射：
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">OceanBase 类型</th>
+                <th class="text-left" style="width: 30%">Spark SQL 类型</th>
+                <th class="text-left" style="width: 40%">说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="3"><b>基础数据类型</b></td>
+            </tr>
+            <tr>
+                <td>BIT</td>
+                <td>LongType</td>
+                <td>当 size != 1 时</td>
+            </tr>
+            <tr>
+                <td>BIT</td>
+                <td>BooleanType</td>
+                <td>当 size = 1 时</td>
+            </tr>
+            <tr>
+                <td>TINYINT</td>
+                <td>BooleanType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>SMALLINT</td>
+                <td>ShortType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>INT / INTEGER</td>
+                <td>IntegerType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BIGINT</td>
+                <td>LongType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>FLOAT</td>
+                <td>FloatType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DOUBLE</td>
+                <td>DoubleType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DECIMAL(p,s)</td>
+                <td>DecimalType(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>CHAR(n)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARCHAR(n)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TEXT</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY</td>
+                <td>BinaryType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DATE</td>
+                <td>DateType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DATETIME / TIMESTAMP</td>
+                <td>TimestampType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td colspan="3"><b>复杂数据类型</b></td>
+            </tr>
+            <tr>
+                <td>ARRAY(type)</td>
+                <td>ArrayType(对应类型)</td>
+                <td>支持最多 6 层嵌套，支持的元素类型包括：INT, BIGINT, FLOAT, DOUBLE, BOOLEAN, STRING 等</td>
+            </tr>
+            <tr>
+                <td>VECTOR(n)</td>
+                <td>ArrayType(FloatType)</td>
+                <td>n 表示向量维度</td>
+            </tr>
+            <tr>
+                <td>MAP(keyType, valueType)</td>
+                <td>MapType(keyType, valueType)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>JSON</td>
+                <td>StringType</td>
+                <td>JSON 数据以字符串形式读取</td>
+            </tr>
+            <tr>
+                <td>ENUM(...)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>SET(...)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+#### 写入数据时（Spark → OceanBase）
+
+向已存在的 OceanBase MySQL 模式表写入数据时的类型映射：
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">Spark SQL 类型</th>
+                <th class="text-left" style="width: 30%">OceanBase 类型</th>
+                <th class="text-left" style="width: 40%">说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="3"><b>基础数据类型</b></td>
+            </tr>
+            <tr>
+                <td>BooleanType</td>
+                <td>BOOLEAN / TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ByteType</td>
+                <td>TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ShortType</td>
+                <td>SMALLINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>IntegerType</td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>LongType</td>
+                <td>BIGINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>FloatType</td>
+                <td>FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DoubleType</td>
+                <td>DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DecimalType(p,s)</td>
+                <td>DECIMAL(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>CHAR / VARCHAR / TEXT</td>
+                <td>根据目标列的实际类型</td>
+            </tr>
+            <tr>
+                <td>BinaryType</td>
+                <td>BINARY</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DateType</td>
+                <td>DATE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TimestampType</td>
+                <td>DATETIME / TIMESTAMP</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td colspan="3"><b>复杂数据类型</b></td>
+            </tr>
+            <tr>
+                <td>ArrayType(IntegerType)</td>
+                <td>INT[] / ARRAY(INT)</td>
+                <td>表必须预先创建包含 ARRAY 类型的列</td>
+            </tr>
+            <tr>
+                <td>ArrayType(FloatType)</td>
+                <td>FLOAT[] / VECTOR(n)</td>
+                <td>可以写入到 VECTOR 或 FLOAT ARRAY 列</td>
+            </tr>
+            <tr>
+                <td>MapType(keyType, valueType)</td>
+                <td>MAP(keyType, valueType)</td>
+                <td>表必须预先创建包含 MAP 类型的列</td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>JSON</td>
+                <td>JSON 数据以字符串形式写入</td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>ENUM / SET</td>
+                <td>写入的字符串值必须符合 ENUM/SET 定义</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+### Oracle 模式
+
+#### 读取数据时（OceanBase → Spark）
+
+从 OceanBase Oracle 模式读取数据时的类型映射：
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">OceanBase 类型</th>
+                <th class="text-left" style="width: 30%">Spark SQL 类型</th>
+                <th class="text-left" style="width: 40%">说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>NUMBER(0)</td>
+                <td>DecimalType</td>
+                <td>未指定精度和标度时</td>
+            </tr>
+            <tr>
+                <td>NUMBER(p,s)</td>
+                <td>DecimalType(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY_FLOAT</td>
+                <td>FloatType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY_DOUBLE</td>
+                <td>DoubleType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARCHAR2(n)</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>CLOB</td>
+                <td>StringType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>RAW(n)</td>
+                <td>BinaryType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DATE</td>
+                <td>DateType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP</td>
+                <td>TimestampType</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP WITH TIME ZONE</td>
+                <td>TimestampType</td>
+                <td>在特定时区配置下支持</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+#### 写入数据时（Spark → OceanBase）
+
+向已存在的 OceanBase Oracle 模式表写入数据时的类型映射：
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 30%">Spark SQL 类型</th>
+                <th class="text-left" style="width: 30%">OceanBase 类型</th>
+                <th class="text-left" style="width: 40%">说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>BooleanType</td>
+                <td>NUMBER(1)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ByteType</td>
+                <td>NUMBER(3)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ShortType</td>
+                <td>NUMBER(5)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>IntegerType</td>
+                <td>NUMBER(10)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>LongType</td>
+                <td>NUMBER(19)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>FloatType</td>
+                <td>BINARY_FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DoubleType</td>
+                <td>BINARY_DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DecimalType(p,s)</td>
+                <td>NUMBER(p,s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>StringType</td>
+                <td>VARCHAR2 / CLOB</td>
+                <td>根据目标列的实际类型</td>
+            </tr>
+            <tr>
+                <td>BinaryType</td>
+                <td>RAW</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DateType</td>
+                <td>DATE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TimestampType</td>
+                <td>TIMESTAMP</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+#### 重要说明
+
+1. **复杂类型表必须预先创建**：通过 SQL 直接在 OceanBase 中创建包含复杂类型的表，然后才能通过 Spark 读写数据。
+2. **嵌套数组限制**：ARRAY 类型最多支持 6 层嵌套，例如 `INT[][]` 或 `INT[][][]`。
+3. **JSON 类型处理**：JSON 数据在 Spark 中以 StringType 表示，写入时确保字符串内容是有效的 JSON 格式。
+4. **ENUM 和 SET 类型**：在 Spark 中以 StringType 表示，写入时值必须符合表定义中的枚举或集合值。
+
