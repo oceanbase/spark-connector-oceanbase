@@ -20,7 +20,7 @@ import com.oceanbase.spark.OceanBaseMySQLTestBase.{constructConfigUrlForODP, cre
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
 
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Row, SparkSession}
 import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Disabled, Test}
 import org.junit.jupiter.api.condition.{DisabledOnOs, OS}
 
@@ -42,10 +42,30 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   def testOdpDataFrameSink(): Unit = {
     val session = SparkSession.builder.master("local[*]").getOrCreate
 
-    val newContact =
-      ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
-    val newData = Seq(newContact)
-    val df = session.createDataFrame(newData).toDF()
+    import org.apache.spark.sql.types._
+
+    // Define schema using STRUCT for column families
+    val schema = StructType(
+      Seq(
+        StructField("rowkey", StringType, nullable = false),
+        StructField(
+          "family1",
+          StructType(
+            Seq(
+              StructField("address", StringType),
+              StructField("phone", StringType),
+              StructField("personalName", StringType),
+              StructField("personalPhone", DoubleType)
+            ))
+        )
+      ))
+
+    // Create data
+    val data = Seq(
+      Row("16891", Row("40 Ellis St.", "674-555-0110", "John Jackson", 121.11))
+    )
+    val df = session.createDataFrame(session.sparkContext.parallelize(data), schema)
+
     df.write
       .format("obkv-hbase")
       .option("odp-mode", true)
@@ -55,7 +75,6 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
       .option("password", getPassword)
       .option("table-name", "htable")
       .option("schema-name", getSchemaName)
-      .option("schema", OBKVHBaseConnectorITCase.schema)
       .save()
     session.stop()
 
@@ -73,11 +92,41 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   @Test
   def testOdpSqlSink(): Unit = {
     val session = SparkSession.builder.master("local[*]").getOrCreate
-    val newContact =
-      ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
-    session.createDataFrame(Seq(newContact)).createOrReplaceTempView("content")
+
+    import org.apache.spark.sql.types._
+
+    // Create source data
+    val data = Seq(
+      Row("16891", Row("40 Ellis St.", "674-555-0110", "John Jackson", 121.11))
+    )
+    val schema = StructType(
+      Seq(
+        StructField("rowkey", StringType, nullable = false),
+        StructField(
+          "family1",
+          StructType(
+            Seq(
+              StructField("address", StringType),
+              StructField("phone", StringType),
+              StructField("personalName", StringType),
+              StructField("personalPhone", DoubleType)
+            ))
+        )
+      ))
+    session
+      .createDataFrame(session.sparkContext.parallelize(data), schema)
+      .createOrReplaceTempView("content")
+
     session.sql(s"""
-                   |CREATE OR REPLACE TEMPORARY VIEW test_sink
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink (
+                   |  rowkey STRING,
+                   |  family1 STRUCT<
+                   |    address: STRING,
+                   |    phone: STRING,
+                   |    personalName: STRING,
+                   |    personalPhone: DOUBLE
+                   |  >
+                   |)
                    |USING `obkv-hbase`
                    |OPTIONS(
                    |  "odp-mode" = "true",
@@ -86,8 +135,7 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="htable",
                    |  "username"="$getUsername#$getClusterName",
-                   |  "password"="$getPassword",
-                   |  "schema"="${OBKVHBaseConnectorITCase.schemaWithSingleQuotes}"
+                   |  "password"="$getPassword"
                    |);
                    |""".stripMargin)
     session.sql("""
@@ -108,16 +156,89 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testOdpPuraSqlSink(): Unit = {
+    val session = SparkSession.builder.master("local[*]").getOrCreate
+
+    session.sql(s"""
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink (
+                   |  rowkey STRING,
+                   |  family1 STRUCT<
+                   |    address: STRING,
+                   |    phone: STRING,
+                   |    personalName: STRING,
+                   |    personalPhone: DOUBLE
+                   |  >
+                   |)
+                   |USING `obkv-hbase`
+                   |OPTIONS(
+                   |  "odp-mode" = "true",
+                   |  "odp-ip"= "${OceanBaseMySQLTestBase.ODP.getHost}",
+                   |  "odp-port" = "${OceanBaseMySQLTestBase.ODP.getRpcPort}",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="htable",
+                   |  "username"="$getUsername#$getClusterName",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+    session.sql(
+      """
+        |INSERT INTO test_sink
+        |SELECT '16891', struct('40 Ellis St.' as address, '674-555-0110' as phone, 'John Jackson' as personalName, 121.11 as personalPhone);
+        |""".stripMargin)
+    session.stop()
+
+    import scala.collection.JavaConverters._
+    val expected1 = List(
+      "16891,address,40 Ellis St.",
+      "16891,phone,674-555-0110",
+      "16891,personalName,John Jackson",
+      "16891,personalPhone,121.11").asJava
+
+    val actual1 = queryHTable("htable$family1", rowConverter)
+    assertEqualsInAnyOrder(expected1, actual1)
+  }
+
+  @Test
   @DisabledOnOs(
     value = Array[OS](OS.MAC),
     disabledReason = "Currently it can only be successfully run on the GitHub CI environment")
   def testDirectSqlSink(): Unit = {
     val session = SparkSession.builder.master("local[*]").getOrCreate
-    val newContact =
-      ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
-    session.createDataFrame(Seq(newContact)).createOrReplaceTempView("content")
+
+    import org.apache.spark.sql.types._
+
+    // Create source data with multiple column families
+    val data = Seq(
+      Row("16891", Row("40 Ellis St.", "674-555-0110"), Row("John Jackson", 121.11))
+    )
+    val schema = StructType(
+      Seq(
+        StructField("rowkey", StringType, nullable = false),
+        StructField(
+          "family1",
+          StructType(
+            Seq(
+              StructField("address", StringType),
+              StructField("phone", StringType)
+            ))),
+        StructField(
+          "family2",
+          StructType(
+            Seq(
+              StructField("personalName", StringType),
+              StructField("personalPhone", DoubleType)
+            )))
+      ))
+    session
+      .createDataFrame(session.sparkContext.parallelize(data), schema)
+      .createOrReplaceTempView("content")
+
     session.sql(s"""
-                   |CREATE OR REPLACE TEMPORARY VIEW test_sink
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink (
+                   |  rowkey STRING,
+                   |  family1 STRUCT<address: STRING, phone: STRING>,
+                   |  family2 STRUCT<personalName: STRING, personalPhone: DOUBLE>
+                   |)
                    |USING `obkv-hbase`
                    |OPTIONS(
                    |  "url" = "${OceanBaseMySQLTestBase.getSysParameter("obconfig_url")}",
@@ -126,8 +247,7 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="htable",
                    |  "username"="$getUsername#$getClusterName",
-                   |  "password"="$getPassword",
-                   |  "schema"="${OBKVHBaseConnectorITCase.multiCFSchemaSql}"
+                   |  "password"="$getPassword"
                    |);
                    |""".stripMargin)
     session.sql("""
@@ -193,45 +313,4 @@ object OBKVHBaseConnectorITCase {
       OceanBaseMySQLTestBase.ODP)
       .foreach(_.stop())
   }
-
-  val schema: String =
-    """
-      |{
-      |    "rowkey": {"cf": "rowkey","col": "rowkey","type": "string"},
-      |    "address": {"cf": "family1","col": "officeAddress","type": "string"},
-      |    "phone": {"cf": "family1","col": "officePhone","type": "string"},
-      |    "personalName": {"cf": "family1","col": "personalName","type": "string"},
-      |    "personalPhone": {"cf": "family1","col": "personalPhone","type": "double"}
-      |}
-      |""".stripMargin
-
-  val schemaWithSingleQuotes: String =
-    """
-      |{
-      |    'rowkey': {'cf': 'rowkey','col': 'rowkey','type': 'string'},
-      |    'address': {'cf': 'family1','col': 'address','type': 'string'},
-      |    'phone': {'cf': 'family1','col': 'phone','type': 'string'},
-      |    'personalName': {'cf': 'family1','col': 'personalName','type': 'string'},
-      |    'personalPhone': {'cf': 'family1','col': 'personalPhone','type': 'double'}
-      |}
-      |""".stripMargin
-
-  val multiCFSchemaSql: String =
-    """
-      |{
-      |    'rowkey': {'cf': 'rowkey','col': 'rowkey','type': 'string'},
-      |    'address': {'cf': 'family1','col': 'address','type': 'string'},
-      |    'phone': {'cf': 'family1','col': 'phone','type': 'string'},
-      |    'personalName': {'cf': 'family2','col': 'personalName','type': 'string'},
-      |    'personalPhone': {'cf': 'family2','col': 'personalPhone','type': 'double'}
-      |}
-      |""".stripMargin
 }
-
-case class ContactRecord(
-    rowkey: String,
-    officeAddress: String,
-    officePhone: String,
-    personalName: String,
-    personalPhone: Double
-)
