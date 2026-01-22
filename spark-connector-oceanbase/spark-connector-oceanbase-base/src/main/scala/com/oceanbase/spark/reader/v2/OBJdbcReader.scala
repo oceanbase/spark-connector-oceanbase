@@ -29,7 +29,7 @@ import org.apache.spark.sql.catalyst.util.{DateTimeUtils, GenericArrayData}
 import org.apache.spark.sql.connector.expressions.{NullOrdering, SortDirection, SortOrder}
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader}
 import org.apache.spark.sql.sources.Filter
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, Metadata, ShortType, StringType, StructType, TimestampType, VarcharType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, CharType, DataType, DateType, Decimal, DecimalType, DoubleType, FloatType, IntegerType, LongType, MapType, Metadata, ShortType, StringType, StructType, TimestampType, VarcharType}
 import org.apache.spark.unsafe.types.UTF8String
 
 import java.sql.{PreparedStatement, ResultSet}
@@ -67,7 +67,6 @@ class OBJdbcReader(
         }
       case _ =>
     }
-    print("Query SQL: " + buildQuerySql())
     stmt.setFetchSize(config.getJdbcFetchSize)
     stmt.setQueryTimeout(config.getJdbcQueryTimeout)
     stmt.executeQuery()
@@ -390,50 +389,79 @@ object OBJdbcReader extends SQLConfHelper {
       (rs: ResultSet, row: InternalRow, pos: Int) => row.update(pos, rs.getBytes(pos + 1))
 
     case ArrayType(et, _) =>
-      val elementConversion = et match {
-        case TimestampType =>
-          (array: Object) =>
-            array.asInstanceOf[Array[java.sql.Timestamp]].map {
-              timestamp => nullSafeConvert(timestamp, DateTimeUtils.fromJavaTimestamp)
-            }
+      // Check if this is an OceanBase complex type stored as string
+      // OceanBase ARRAY and VECTOR types are stored as CHAR in JDBC
+      val sqlType = if (metadata.contains("sqlType")) metadata.getLong("sqlType").toInt else -1
+      if (sqlType == java.sql.Types.CHAR || sqlType == java.sql.Types.VARCHAR) {
+        // OceanBase ARRAY/VECTOR stored as string, parse it
+        (rs: ResultSet, row: InternalRow, pos: Int) =>
+          val str = rs.getString(pos + 1)
+          if (str == null) {
+            row.update(pos, null)
+          } else {
+            // Parse string format like "[1,2,3]" to ArrayData
+            val arrayData = parseArrayString(str, et)
+            row.update(pos, arrayData)
+          }
+      } else {
+        // Standard JDBC Array type
+        val elementConversion = et match {
+          case TimestampType =>
+            (array: Object) =>
+              array.asInstanceOf[Array[java.sql.Timestamp]].map {
+                timestamp => nullSafeConvert(timestamp, DateTimeUtils.fromJavaTimestamp)
+              }
 
-        case StringType =>
-          (array: Object) =>
-            // some underling types are not String such as uuid, inet, cidr, etc.
-            array
-              .asInstanceOf[Array[java.lang.Object]]
-              .map(obj => if (obj == null) null else UTF8String.fromString(obj.toString))
+          case StringType =>
+            (array: Object) =>
+              // some underling types are not String such as uuid, inet, cidr, etc.
+              array
+                .asInstanceOf[Array[java.lang.Object]]
+                .map(obj => if (obj == null) null else UTF8String.fromString(obj.toString))
 
-        case DateType =>
-          (array: Object) =>
-            array.asInstanceOf[Array[java.sql.Date]].map {
-              date => nullSafeConvert(date, DateTimeUtils.fromJavaDate)
-            }
+          case DateType =>
+            (array: Object) =>
+              array.asInstanceOf[Array[java.sql.Date]].map {
+                date => nullSafeConvert(date, DateTimeUtils.fromJavaDate)
+              }
 
-        case dt: DecimalType =>
-          (array: Object) =>
-            array.asInstanceOf[Array[java.math.BigDecimal]].map {
-              decimal =>
-                nullSafeConvert[java.math.BigDecimal](
-                  decimal,
-                  d => Decimal(d, dt.precision, dt.scale))
-            }
+          case dt: DecimalType =>
+            (array: Object) =>
+              array.asInstanceOf[Array[java.math.BigDecimal]].map {
+                decimal =>
+                  nullSafeConvert[java.math.BigDecimal](
+                    decimal,
+                    d => Decimal(d, dt.precision, dt.scale))
+              }
 
-        case LongType if metadata.contains("binarylong") =>
-          throw new UnsupportedOperationException(
-            s"unsupportedArrayElementTypeBasedOnBinaryError ${dt.catalogString}")
+          case LongType if metadata.contains("binarylong") =>
+            throw new UnsupportedOperationException(
+              s"unsupportedArrayElementTypeBasedOnBinaryError ${dt.catalogString}")
 
-        case ArrayType(_, _) =>
-          throw new UnsupportedOperationException(s"Not support Array data-type now")
+          case ArrayType(_, _) =>
+            throw new UnsupportedOperationException(s"Not support Array data-type now")
 
-        case _ => (array: Object) => array.asInstanceOf[Array[Any]]
+          case _ => (array: Object) => array.asInstanceOf[Array[Any]]
+        }
+
+        (rs: ResultSet, row: InternalRow, pos: Int) =>
+          val array = nullSafeConvert[java.sql.Array](
+            input = rs.getArray(pos + 1),
+            array => new GenericArrayData(elementConversion.apply(array.getArray)))
+          row.update(pos, array)
       }
 
+    case MapType(keyType, valueType, _) =>
+      // OceanBase MAP types are stored as CHAR in JDBC
       (rs: ResultSet, row: InternalRow, pos: Int) =>
-        val array = nullSafeConvert[java.sql.Array](
-          input = rs.getArray(pos + 1),
-          array => new GenericArrayData(elementConversion.apply(array.getArray)))
-        row.update(pos, array)
+        val str = rs.getString(pos + 1)
+        if (str == null) {
+          row.update(pos, null)
+        } else {
+          // Parse string format like "{1:10,2:20}" to MapData
+          val mapData = parseMapString(str, keyType, valueType)
+          row.update(pos, mapData)
+        }
 
     case _ =>
       throw new UnsupportedOperationException(s"unsupportedJdbcTypeError ${dt.catalogString}")
@@ -445,5 +473,156 @@ object OBJdbcReader extends SQLConfHelper {
     } else {
       f(input)
     }
+  }
+
+  /**
+   * Parse OceanBase ARRAY string format to Spark ArrayData with nested array support. Supports
+   * formats like "[1,2,3]", "[[1,2],[3,4]]", "[[[1]]]" etc.
+   *
+   * @param str
+   *   The array string to parse
+   * @param elementType
+   *   The expected element type
+   * @return
+   *   GenericArrayData containing parsed elements
+   */
+  private def parseArrayString(str: String, elementType: DataType): GenericArrayData = {
+    val trimmed = str.trim
+    if (trimmed == "[]" || trimmed.isEmpty) {
+      return new GenericArrayData(Array.empty[Any])
+    }
+
+    val content = if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      trimmed.substring(1, trimmed.length - 1)
+    } else {
+      trimmed
+    }
+
+    if (content.isEmpty) {
+      return new GenericArrayData(Array.empty[Any])
+    }
+
+    // For nested arrays, we need to split carefully respecting brackets
+    val elements = if (elementType.isInstanceOf[ArrayType]) {
+      splitArrayElements(content)
+    } else {
+      content.split(",").map(_.trim)
+    }
+
+    val convertedElements = elements.map {
+      elem =>
+        if (elem == "null" || elem.isEmpty) {
+          null
+        } else {
+          elementType match {
+            case IntegerType => elem.toInt
+            case LongType => elem.toLong
+            case FloatType => elem.toFloat
+            case DoubleType => elem.toDouble
+            case StringType => UTF8String.fromString(elem)
+            case BooleanType => elem.toBoolean
+            case ArrayType(innerType, _) =>
+              // Recursively parse nested array
+              parseArrayString(elem, innerType)
+            case _ => elem
+          }
+        }
+    }
+    new GenericArrayData(convertedElements)
+  }
+
+  /**
+   * Split array elements respecting nested brackets. For example: "[1,2],[3,4]" => Array("[1,2]",
+   * "[3,4]")
+   */
+  private def splitArrayElements(content: String): Array[String] = {
+    val elements = scala.collection.mutable.ArrayBuffer[String]()
+    var currentElement = new StringBuilder()
+    var bracketDepth = 0
+
+    content.foreach {
+      char =>
+        char match {
+          case '[' =>
+            bracketDepth += 1
+            currentElement.append(char)
+          case ']' =>
+            bracketDepth -= 1
+            currentElement.append(char)
+          case ',' if bracketDepth == 0 =>
+            // Only split at top-level commas
+            if (currentElement.nonEmpty) {
+              elements += currentElement.toString.trim
+              currentElement.clear()
+            }
+          case _ =>
+            currentElement.append(char)
+        }
+    }
+
+    // Add the last element
+    if (currentElement.nonEmpty) {
+      elements += currentElement.toString.trim
+    }
+
+    elements.toArray
+  }
+
+  /** Parse OceanBase MAP string format like "{1:10,2:20}" to Spark MapData */
+  private def parseMapString(
+      str: String,
+      keyType: DataType,
+      valueType: DataType): org.apache.spark.sql.catalyst.util.ArrayBasedMapData = {
+    import org.apache.spark.sql.catalyst.util.ArrayBasedMapData
+
+    // Remove braces and split by comma
+    val trimmed = str.trim
+    if (trimmed == "{}" || trimmed.isEmpty) {
+      return ArrayBasedMapData(Array.empty[Any], Array.empty[Any])
+    }
+
+    val content = if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      trimmed.substring(1, trimmed.length - 1)
+    } else {
+      trimmed
+    }
+
+    if (content.isEmpty) {
+      return ArrayBasedMapData(Array.empty[Any], Array.empty[Any])
+    }
+
+    val pairs = content.split(",").map(_.trim)
+    val keys = scala.collection.mutable.ArrayBuffer[Any]()
+    val values = scala.collection.mutable.ArrayBuffer[Any]()
+
+    pairs.foreach {
+      pair =>
+        val parts = pair.split(":", 2)
+        if (parts.length == 2) {
+          val key = parts(0).trim
+          val value = parts(1).trim
+
+          val convertedKey = keyType match {
+            case IntegerType => key.toInt
+            case LongType => key.toLong
+            case StringType => UTF8String.fromString(key)
+            case _ => key
+          }
+
+          val convertedValue = valueType match {
+            case IntegerType => value.toInt
+            case LongType => value.toLong
+            case FloatType => value.toFloat
+            case DoubleType => value.toDouble
+            case StringType => UTF8String.fromString(value)
+            case _ => value
+          }
+
+          keys += convertedKey
+          values += convertedValue
+        }
+    }
+
+    ArrayBasedMapData(keys.toArray, values.toArray)
   }
 }

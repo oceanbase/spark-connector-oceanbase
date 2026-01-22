@@ -17,11 +17,13 @@ package com.oceanbase.spark
 
 import com.oceanbase.spark.OceanBaseMySQLConnectorITCase.expected
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
+import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.sql.SparkSession
 import org.junit.jupiter.api.{AfterAll, AfterEach, Assertions, BeforeAll, BeforeEach, Test}
 import org.junit.jupiter.api.function.ThrowingSupplier
 
+import java.sql.{Connection, ResultSet, Statement}
 import java.util
 
 class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
@@ -41,7 +43,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_unique_key",
       "products_full_unique_key",
       "products_pri_and_unique_key",
-      "products_with_decimal"
+      "products_with_decimal",
+      "products_complex_types",
+      "products_nested_arrays"
     )
   }
 
@@ -176,7 +180,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products_unique_key,false]",
       "[test,products_full_unique_key,false]",
       "[test,products_pri_and_unique_key,false]",
-      "[test,products_with_decimal,false]"
+      "[test,products_with_decimal,false]",
+      "[test,products_complex_types,false]",
+      "[test,products_nested_arrays,false]"
     ).toList.asJava
     assertEqualsInAnyOrder(expectedTableList, tableList)
 
@@ -850,6 +856,235 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .toList
       .asJava
     assertEqualsInAnyOrder(expected, actual)
+    session.stop()
+  }
+
+  @Test
+  def testComplexTypesMetadata(): Unit = {
+    var conn: Connection = null
+    var stmt: Statement = null
+    var rs: ResultSet = null
+    try {
+      conn = getJdbcConnection
+      stmt = conn.createStatement()
+
+      // Insert sample data
+      stmt.execute(
+        s"""INSERT INTO $getSchemaName.products_complex_types VALUES
+           |(100, [1, 2], '[1.0, 2.0, 3.0]', 'red', 'red', '{"test": "value"}', map(1, 10))""".stripMargin)
+
+      // Query and verify metadata
+      rs = stmt.executeQuery(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id = 100")
+      val metaData = rs.getMetaData
+
+      // Helper function to verify column metadata
+      def verifyColumn(name: String, sqlType: Int, typeName: String): Unit = {
+        val idx = (1 to metaData.getColumnCount)
+          .find(i => metaData.getColumnName(i) == name)
+          .getOrElse(throw new AssertionError(s"Column $name not found"))
+        Assertions.assertEquals(sqlType, metaData.getColumnType(idx))
+        Assertions.assertEquals(typeName, metaData.getColumnTypeName(idx))
+      }
+
+      // Verify type mappings
+      verifyColumn("id", 4, "INT")
+      verifyColumn("int_array", 1, "CHAR")
+      verifyColumn("vector_col", 1, "CHAR")
+      verifyColumn("enum_col", 1, "CHAR")
+      verifyColumn("set_col", 1, "CHAR")
+      verifyColumn("json_col", -1, "JSON")
+      verifyColumn("map_col", 1, "CHAR")
+    } finally {
+      if (rs != null) rs.close()
+      if (stmt != null) stmt.close()
+      if (conn != null) conn.close()
+    }
+  }
+
+  @Test
+  def testComplexTypes(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+    session.sql("use ob;")
+
+    // Use Spark SQL syntax for complex types
+    // ARRAY: array(1, 2, 3)
+    // MAP: map(key1, value1, key2, value2)
+    session.sql(
+      s"""
+         |INSERT INTO $getSchemaName.products_complex_types VALUES
+         |(1, array(1, 2, 3), array(1.0, 2.0, 3.0), 'red', 'red', '{"brand": "Dell", "price": 999.99}', map(1, 10, 2, 20)),
+         |(2, array(4, 5), array(4.0, 5.0, 6.0), 'yellow', 'red,yellow', '{"brand": "Apple", "price": 799.99}', map(3, 30)),
+         |(3, array(6), array(7.0, 8.0, 9.0), 'red', 'yellow', '{"title": "Spark Guide"}', map(4, 40, 5, 50));
+         |""".stripMargin)
+
+    // Query and verify complex types are read correctly
+    import scala.collection.JavaConverters._
+    val actual = session
+      .sql(s"SELECT * FROM $getSchemaName.products_complex_types ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "1,WrappedArray(1, 2, 3),WrappedArray(1.0, 2.0, 3.0),red,red,{\"brand\": \"Dell\", \"price\": 999.99},Map(1 -> 10, 2 -> 20)",
+      "2,WrappedArray(4, 5),WrappedArray(4.0, 5.0, 6.0),yellow,red,yellow,{\"brand\": \"Apple\", \"price\": 799.99},Map(3 -> 30)",
+      "3,WrappedArray(6),WrappedArray(7.0, 8.0, 9.0),red,yellow,{\"title\": \"Spark Guide\"},Map(4 -> 40, 5 -> 50)"
+    )
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+  }
+
+  @Test
+  def testComplexTypesWrite(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+
+    // Create DataFrame with real Spark complex types
+    import org.apache.spark.sql.Row
+    import org.apache.spark.sql.types._
+    import scala.collection.JavaConverters._
+
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("int_array", ArrayType(IntegerType), nullable = true),
+        StructField("vector_col", ArrayType(FloatType), nullable = true),
+        StructField("enum_col", StringType, nullable = true),
+        StructField("set_col", StringType, nullable = true),
+        StructField("json_col", StringType, nullable = true),
+        StructField("map_col", MapType(IntegerType, IntegerType), nullable = true)
+      ))
+
+    val data = Seq(
+      Row(
+        100,
+        Array(10, 20, 30),
+        Array(10.0f, 20.0f, 30.0f),
+        "red",
+        "red",
+        """{"name": "Product1"}""",
+        Map(1 -> 100)),
+      Row(
+        101,
+        Array(40, 50),
+        Array(40.0f, 50.0f, 60.0f),
+        "yellow",
+        "red,yellow",
+        """{"name": "Product2", "price": 99.99}""",
+        Map(2 -> 200, 3 -> 300))
+    )
+
+    val df = session.createDataFrame(data.asJava, schema)
+
+    // Write using DataFrame API - now should work with type mapping
+    df.writeTo(s"$getSchemaName.products_complex_types").append()
+
+    // Query and verify the written data
+    val actual = session
+      .sql(s"SELECT * FROM $getSchemaName.products_complex_types WHERE id >= 100 ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "100,WrappedArray(10, 20, 30),WrappedArray(10.0, 20.0, 30.0),red,red,{\"name\": \"Product1\"},Map(1 -> 100)",
+      "101,WrappedArray(40, 50),WrappedArray(40.0, 50.0, 60.0),yellow,red,yellow,{\"name\": \"Product2\", \"price\": 99.99},Map(2 -> 200, 3 -> 300)"
+    )
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+  }
+
+  @Test
+  def testNestedArrayTypes(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+
+    // Create DataFrame with nested arrays (up to 4 levels)
+    import org.apache.spark.sql.Row
+    import org.apache.spark.sql.types._
+    import scala.collection.JavaConverters._
+
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("array_level1", ArrayType(IntegerType), nullable = true),
+        StructField("array_level2", ArrayType(ArrayType(IntegerType)), nullable = true),
+        StructField("array_level3", ArrayType(ArrayType(ArrayType(IntegerType))), nullable = true),
+        StructField(
+          "array_level4",
+          ArrayType(ArrayType(ArrayType(ArrayType(IntegerType)))),
+          nullable = true),
+        StructField("float_array_level2", ArrayType(ArrayType(FloatType)), nullable = true)
+      ))
+
+    val data = Seq(
+      Row(
+        1,
+        Array(1, 2, 3), // Level 1: [1,2,3]
+        Array(Array(1, 2), Array(3, 4)), // Level 2: [[1,2],[3,4]]
+        Array(Array(Array(1, 2)), Array(Array(3))), // Level 3: [[[1,2]],[[3]]]
+        Array(Array(Array(Array(1)))), // Level 4: [[[[1]]]]
+        Array(Array(1.0f, 2.0f), Array(3.0f)) // Float Level 2: [[1.0,2.0],[3.0]]
+      ),
+      Row(
+        2,
+        Array(5, 6),
+        Array(Array(7, 8, 9)),
+        Array(Array(Array(10))),
+        Array(Array(Array(Array(11), Array(12)))),
+        Array(Array(4.0f, 5.0f))
+      )
+    )
+
+    val df = session.createDataFrame(data.asJava, schema)
+
+    // Write using DataFrame API
+    df.writeTo(s"$getSchemaName.products_nested_arrays").append()
+
+    // Query and verify the written data
+    val actual = session
+      .sql(s"SELECT * FROM $getSchemaName.products_nested_arrays ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+
+    val expected: util.List[String] = util.Arrays.asList(
+      "1,WrappedArray(1, 2, 3),WrappedArray(WrappedArray(1, 2), WrappedArray(3, 4)),WrappedArray(WrappedArray(WrappedArray(1, 2)), WrappedArray(WrappedArray(3))),WrappedArray(WrappedArray(WrappedArray(WrappedArray(1)))),WrappedArray(WrappedArray(1.0, 2.0), WrappedArray(3.0))",
+      "2,WrappedArray(5, 6),WrappedArray(WrappedArray(7, 8, 9)),WrappedArray(WrappedArray(WrappedArray(10))),WrappedArray(WrappedArray(WrappedArray(WrappedArray(11), WrappedArray(12)))),WrappedArray(WrappedArray(4.0, 5.0))"
+    )
+    assertEqualsInAnyOrder(expected, actual)
+
     session.stop()
   }
 
