@@ -156,6 +156,49 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testOdpPuraSqlSink(): Unit = {
+    val session = SparkSession.builder.master("local[*]").getOrCreate
+
+    session.sql(s"""
+                   |CREATE OR REPLACE TEMPORARY VIEW test_sink (
+                   |  rowkey STRING,
+                   |  family1 STRUCT<
+                   |    address: STRING,
+                   |    phone: STRING,
+                   |    personalName: STRING,
+                   |    personalPhone: DOUBLE
+                   |  >
+                   |)
+                   |USING `obkv-hbase`
+                   |OPTIONS(
+                   |  "odp-mode" = "true",
+                   |  "odp-ip"= "${OceanBaseMySQLTestBase.ODP.getHost}",
+                   |  "odp-port" = "${OceanBaseMySQLTestBase.ODP.getRpcPort}",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="htable",
+                   |  "username"="$getUsername#$getClusterName",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+    session.sql(
+      """
+        |INSERT INTO test_sink
+        |SELECT '16891', struct('40 Ellis St.' as address, '674-555-0110' as phone, 'John Jackson' as personalName, 121.11 as personalPhone);
+        |""".stripMargin)
+    session.stop()
+
+    import scala.collection.JavaConverters._
+    val expected1 = List(
+      "16891,address,40 Ellis St.",
+      "16891,phone,674-555-0110",
+      "16891,personalName,John Jackson",
+      "16891,personalPhone,121.11").asJava
+
+    val actual1 = queryHTable("htable$family1", rowConverter)
+    assertEqualsInAnyOrder(expected1, actual1)
+  }
+
+  @Test
   @DisabledOnOs(
     value = Array[OS](OS.MAC),
     disabledReason = "Currently it can only be successfully run on the GitHub CI environment")
