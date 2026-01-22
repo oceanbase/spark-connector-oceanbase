@@ -117,14 +117,6 @@ public class OBKVHbaseConfig extends Config {
                     .checkValue(size -> size > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(10_000);
 
-    public static final ConfigEntry<String> SCHEMA =
-            new ConfigBuilder("schema")
-                    .doc("The schema of the obkv-hbase table")
-                    .version(ConfigConstants.VERSION_1_0_0)
-                    .stringConf()
-                    .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-                    .create();
-
     public String getURL() {
         return get(URL);
     }
@@ -171,10 +163,6 @@ public class OBKVHbaseConfig extends Config {
 
     public Integer getBatchSize() {
         return get(BATCH_SIZE);
-    }
-
-    public String getSchema() {
-        return get(SCHEMA);
     }
 
     public OBKVHbaseConfig(Map<String, String> properties) {
