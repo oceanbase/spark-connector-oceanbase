@@ -374,7 +374,7 @@ Precautions for direct-load:
                 <td>Control the query timeout by adding /*+ query_timeout(N) */ hint to the generated SQL. This parameter can be used to specify the timeout in microseconds. The default value is -1, which means that the hint is not added.</td>
             </tr>
             <tr>
-                <td>spark.sql.catalog.your_catalog_name.jdbc.query-hint-degree</td>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.query-hints</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>

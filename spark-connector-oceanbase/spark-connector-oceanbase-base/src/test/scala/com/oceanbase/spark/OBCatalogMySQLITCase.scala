@@ -1089,7 +1089,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
-  def testJdbcQueryHintDegree(): Unit = {
+  def testJdbcQueryHints(): Unit = {
     val session = SparkSession
       .builder()
       .master("local[*]")
@@ -1099,7 +1099,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.password", getPassword)
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
       .config(
-        "spark.sql.catalog.ob.jdbc.query-hint-degree",
+        "spark.sql.catalog.ob.jdbc.query-hints",
         "READ_CONSISTENCY(STRONG) query_timeout(10000000)")
       .getOrCreate()
 
@@ -1117,7 +1117,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.username", getUsername)
       .config("spark.sql.catalog.ob.password", getPassword)
       .config("spark.sql.catalog.ob.schema-name", getSchemaName)
-      .config("spark.sql.catalog.ob.jdbc.query-hint-degree", "")
+      .config("spark.sql.catalog.ob.jdbc.query-hints", "")
       .getOrCreate()
 
     session1.sql("use ob;")

@@ -286,7 +286,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .createWithDefault(-1);
 
     public static final ConfigEntry<String> JDBC_QUERY_HINT_DEGREE =
-            new ConfigBuilder("jdbc.query-hint-degree")
+            new ConfigBuilder("jdbc.query-hints")
                     .doc(
                             "Additional OceanBase query hints added to SELECT query statements. Multiple hints can be specified separated by spaces, e.g. 'READ_CONSISTENCY(WEAK) query_timeout(10000000)'.")
                     .version(ConfigConstants.VERSION_1_4_0)
