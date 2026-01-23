@@ -181,7 +181,7 @@ abstract class OceanBaseDialect extends Logging with Serializable {
       tableName: String,
       config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo]
 
-  def getInsertIntoStatement(tableName: String, schema: StructType): String
+  def getInsertIntoStatement(tableName: String, schema: StructType, config: OceanBaseConfig): String
 
   def getUpsertIntoStatement(
       tableName: String,

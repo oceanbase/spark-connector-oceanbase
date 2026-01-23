@@ -29,6 +29,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public class OceanBaseConfig extends Config implements Serializable {
+    public static final String EMPTY_STRING = "";
 
     public static final ConfigEntry<String> URL =
             new ConfigBuilder("url")
@@ -291,6 +292,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .version(ConfigConstants.VERSION_1_2_0)
                     .intConf()
                     .createWithDefault(4);
+
+    public static final ConfigEntry<String> JDBC_WRITE_HINTS =
+            new ConfigBuilder("jdbc.pushdown-write-hints")
+                    .doc(
+                            "Controls the parallelism level for statistical queries (e.g., COUNT, MIN, MAX) by adding /*+ PARALLEL(N) */ hint to generated SQL.")
+                    .version(ConfigConstants.VERSION_1_2_0)
+                    .stringConf()
+                    .createWithDefault(EMPTY_STRING);
 
     public static final ConfigEntry<Integer> JDBC_PARTITION_COMPUTE_PARALLELISM =
             new ConfigBuilder("jdbc.partition-compute-parallelism")
@@ -619,6 +628,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcPartitionComputeParallelism() {
         return get(JDBC_PARTITION_COMPUTE_PARALLELISM);
+    }
+
+    public String getJdbcWriteHintsPushdown() {
+        return get(JDBC_WRITE_HINTS);
     }
 
     public Integer getJdbcPartitionComputeTimeoutMinutes() {

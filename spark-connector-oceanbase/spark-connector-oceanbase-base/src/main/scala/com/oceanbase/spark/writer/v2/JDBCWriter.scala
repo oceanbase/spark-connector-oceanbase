@@ -39,6 +39,7 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
   val buffer: ArrayBuffer[InternalRow] = ArrayBuffer[InternalRow]()
   lazy val conn: Connection = OBJdbcUtils.getConnection(config)
   lazy val sql: String = getInsertSql
+  println(sql)
   private val setters: Array[OBValueSetter] =
     schema.fields.map(f => OBJdbcUtils.makeSetter(f.dataType))
 
@@ -125,7 +126,7 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
     if (upsertColInfos.nonEmpty) {
       dialect.getUpsertIntoStatement(tableName, schema, upsertColInfos, config)
     } else {
-      dialect.getInsertIntoStatement(tableName, schema)
+      dialect.getInsertIntoStatement(tableName, schema, config)
     }
   }
 
