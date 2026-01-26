@@ -35,7 +35,7 @@ under the License.
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <revision>1.4</revision>
+        <revision>1.5-SNAPSHOT</revision>
         <gpg.skip>true</gpg.skip>
         <scala.version>2.12.15</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
