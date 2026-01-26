@@ -39,7 +39,6 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
   val buffer: ArrayBuffer[InternalRow] = ArrayBuffer[InternalRow]()
   lazy val conn: Connection = OBJdbcUtils.getConnection(config)
   lazy val sql: String = getInsertSql
-  println(sql)
   private val setters: Array[OBValueSetter] =
     schema.fields.map(f => OBJdbcUtils.makeSetter(f.dataType))
 
