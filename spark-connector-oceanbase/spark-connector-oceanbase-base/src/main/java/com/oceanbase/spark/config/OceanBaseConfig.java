@@ -285,6 +285,14 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .createWithDefault(-1);
 
+    public static final ConfigEntry<String> JDBC_QUERY_HINT_DEGREE =
+            new ConfigBuilder("jdbc.query-hints")
+                    .doc(
+                            "Additional OceanBase query hints added to SELECT query statements. Multiple hints can be specified separated by spaces, e.g. 'READ_CONSISTENCY(WEAK) query_timeout(10000000)'.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .stringConf()
+                    .createWithDefault(EMPTY_STRING);
+
     public static final ConfigEntry<Integer> JDBC_STATISTICS_PARALLEL_HINT_DEGREE =
             new ConfigBuilder("jdbc.statistics-parallel-hint-degree")
                     .doc(
@@ -620,6 +628,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getQueryTimeoutHintDegree() {
         return get(JDBC_QUERY_TIMEOUT_HINT_DEGREE);
+    }
+
+    public String getQueryHintDegree() {
+        return get(JDBC_QUERY_HINT_DEGREE);
     }
 
     public Integer getJdbcStatsParallelHintDegree() {
