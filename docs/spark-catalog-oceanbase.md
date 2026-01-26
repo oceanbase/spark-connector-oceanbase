@@ -353,6 +353,20 @@ Precautions for direct-load:
                 <td>Controls the parallelism level for statistical queries (e.g., COUNT, MIN, MAX) by adding /*+ PARALLEL(N) */ hint to generated SQL.</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.pushdown-query-hints</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>Specifies hints to be pushed down to OceanBase SELECT statements. These hints will be added to the final SQL sent to OceanBase for execution. Supports multiple hints (separated by spaces), e.g., 'READ_CONSISTENCY(WEAK) query_timeout(10000000)'.</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.pushdown-write-hints</td>
+                <td>No</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>Specifies hints to be pushed down to OceanBase INSERT statements. These hints will be added to the final SQL sent to OceanBase for execution. Supports multiple hints (separated by spaces), e.g., 'append parallel(16)'.</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.partition-compute-parallelism</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;">32</td>
@@ -372,13 +386,6 @@ Precautions for direct-load:
                 <td style="word-wrap: break-word;">-1</td>
                 <td>Int</td>
                 <td>Control the query timeout by adding /*+ query_timeout(N) */ hint to the generated SQL. This parameter can be used to specify the timeout in microseconds. The default value is -1, which means that the hint is not added.</td>
-            </tr>
-            <tr>
-                <td>spark.sql.catalog.your_catalog_name.jdbc.query-hints</td>
-                <td>No</td>
-                <td style="word-wrap: break-word;"></td>
-                <td>String</td>
-                <td>Additional OceanBase query hints added to SELECT query statements. Multiple hints can be specified separated by spaces, e.g. 'READ_CONSISTENCY(WEAK) query_timeout(10000000)'.</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.disable-pk-table-use-where-partition</td>
