@@ -179,14 +179,14 @@ class OBJdbcReader(
           else
             ""
         val useHiddenPKColumnHint = if (part.useHiddenPKColumn) {
-          s", opt_param('hidden_column_visible', 'true') "
+          s" opt_param('hidden_column_visible', 'true') "
         } else {
           ""
         }
         (myLimitClause, useHiddenPKColumnHint)
       case part: OBOraclePartition =>
         val useHiddenPKColumnHint = if (part.useHiddenPKColumn) {
-          s", opt_param('hidden_column_visible', 'true') "
+          s" opt_param('hidden_column_visible', 'true') "
         } else {
           ""
         }
@@ -194,12 +194,12 @@ class OBJdbcReader(
       case _ => throw new RuntimeException(s"Unsupported partition type: ${partition.getClass}")
     }
     val queryTimeoutHint = if (config.getQueryTimeoutHintDegree > 0) {
-      s", query_timeout(${config.getQueryTimeoutHintDegree}) "
+      s" query_timeout(${config.getQueryTimeoutHintDegree}) "
     } else {
       ""
     }
     val hint =
-      s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) $useHiddenPKColumnHint $queryTimeoutHint */"
+      s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) $useHiddenPKColumnHint $queryTimeoutHint ${config.getQueryHintDegree} */"
 
     val partitionClause = partition match {
       case part: OBMySQLPartition => part.partitionClause

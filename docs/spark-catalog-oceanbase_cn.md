@@ -370,6 +370,13 @@ select * from spark_catalog.default.orders;
                 <td>通过向生成的 SQL 添加 /*+ query_timeout(n) */ hint 来控制查询超时时间。通过该参数可以设置超时时间，单位为微妙。默认为-1，表示不添加该Hint。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.query-hints</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>向SELECT查询语句添加额外的OceanBase查询提示。可指定多个提示，用空格分隔，如'READ_CONSISTENCY(WEAK) query_timeout(10000000)'。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.disable-pk-table-use-where-partition</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">false</td>
