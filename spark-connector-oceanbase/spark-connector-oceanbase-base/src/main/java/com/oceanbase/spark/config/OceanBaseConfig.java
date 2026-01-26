@@ -29,7 +29,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public class OceanBaseConfig extends Config implements Serializable {
-    private static final String EMPTY_STRING = "";
+    public static final String EMPTY_STRING = "";
 
     public static final ConfigEntry<String> URL =
             new ConfigBuilder("url")
@@ -253,7 +253,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .createWithDefault(false);
 
     public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_PREDICATE =
-            new ConfigBuilder("jdbc.push-down-predicate")
+            new ConfigBuilder("jdbc.pushdown-predicate")
                     .doc(
                             "The option to enable or disable predicate push-down into the JDBC data source. The default value is true, in which case Spark will push down filters to the JDBC data source as much as possible.")
                     .version(ConfigConstants.VERSION_1_1_0)
@@ -261,7 +261,7 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .createWithDefault(false);
 
     public static final ConfigEntry<Boolean> JDBC_PUSH_DOWN_AGGREGATE =
-            new ConfigBuilder("jdbc.push-down-aggregate")
+            new ConfigBuilder("jdbc.pushdown-aggregate")
                     .doc(
                             "The option to enable or disable aggregate push-down into the JDBC data source.")
                     .version(ConfigConstants.VERSION_1_3_0)
@@ -285,14 +285,6 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .createWithDefault(-1);
 
-    public static final ConfigEntry<String> JDBC_QUERY_HINT_DEGREE =
-            new ConfigBuilder("jdbc.query-hints")
-                    .doc(
-                            "Additional OceanBase query hints added to SELECT query statements. Multiple hints can be specified separated by spaces, e.g. 'READ_CONSISTENCY(WEAK) query_timeout(10000000)'.")
-                    .version(ConfigConstants.VERSION_1_4_0)
-                    .stringConf()
-                    .createWithDefault(EMPTY_STRING);
-
     public static final ConfigEntry<Integer> JDBC_STATISTICS_PARALLEL_HINT_DEGREE =
             new ConfigBuilder("jdbc.statistics-parallel-hint-degree")
                     .doc(
@@ -300,6 +292,22 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .version(ConfigConstants.VERSION_1_2_0)
                     .intConf()
                     .createWithDefault(4);
+
+    public static final ConfigEntry<String> JDBC_PUSHDOWN_WRITE_HINTS =
+            new ConfigBuilder("jdbc.pushdown-write-hints")
+                    .doc(
+                            "Allows users to specify custom hints for writing data (INSERT statements), such as /*+ APPEND */ or /*+ PARALLEL(N) */.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .stringConf()
+                    .createWithDefault(EMPTY_STRING);
+
+    public static final ConfigEntry<String> JDBC_PUSHDOWN_QUERY_HINTS =
+            new ConfigBuilder("jdbc.pushdown-query-hints")
+                    .doc(
+                            "Additional OceanBase query hints added to SELECT query statements. Multiple hints can be specified separated by spaces, e.g. 'READ_CONSISTENCY(WEAK) query_timeout(10000000)'.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .stringConf()
+                    .createWithDefault(EMPTY_STRING);
 
     public static final ConfigEntry<Integer> JDBC_PARTITION_COMPUTE_PARALLELISM =
             new ConfigBuilder("jdbc.partition-compute-parallelism")
@@ -324,14 +332,6 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .version(ConfigConstants.VERSION_1_1_0)
                     .longConf()
                     .create();
-
-    public static final ConfigEntry<Boolean> JDBC_ENABLE_REWRITE_QUERY_SQL =
-            new ConfigBuilder("jdbc.enable-rewrite-query-sql")
-                    .doc(
-                            "Whether to enable rewriting query SQL through inner join to optimize deep paging performance.")
-                    .version(ConfigConstants.VERSION_1_1_0)
-                    .booleanConf()
-                    .createWithDefault(false);
 
     public static final ConfigEntry<Boolean> JDBC_ENABLE_PUSH_DOWN_LIMIT =
             new ConfigBuilder("jdbc.enable-pushdown-limit")
@@ -558,10 +558,6 @@ public class OceanBaseConfig extends Config implements Serializable {
         return get(DRIVER);
     }
 
-    public Boolean getEnableRewriteQuerySql() {
-        return get(JDBC_ENABLE_REWRITE_QUERY_SQL);
-    }
-
     public Boolean getEnablePushdownLimit() {
         return get(JDBC_ENABLE_PUSH_DOWN_LIMIT);
     }
@@ -622,16 +618,20 @@ public class OceanBaseConfig extends Config implements Serializable {
         return get(JDBC_QUERY_TIMEOUT_HINT_DEGREE);
     }
 
-    public String getQueryHintDegree() {
-        return get(JDBC_QUERY_HINT_DEGREE);
-    }
-
     public Integer getJdbcStatsParallelHintDegree() {
         return get(JDBC_STATISTICS_PARALLEL_HINT_DEGREE);
     }
 
     public Integer getJdbcPartitionComputeParallelism() {
         return get(JDBC_PARTITION_COMPUTE_PARALLELISM);
+    }
+
+    public String getJdbcWriteHintsPushdown() {
+        return get(JDBC_PUSHDOWN_WRITE_HINTS);
+    }
+
+    public String getJdbcPushdownQueryHint() {
+        return get(JDBC_PUSHDOWN_QUERY_HINTS);
     }
 
     public Integer getJdbcPartitionComputeTimeoutMinutes() {

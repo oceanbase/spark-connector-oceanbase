@@ -349,6 +349,20 @@ select * from spark_catalog.default.orders;
                 <td>通过向生成的 SQL 添加 /*+ PARALLEL(N) */ hint 来控制统计查询（例如 COUNT、MIN、MAX）的并行级别。</td>
             </tr>
             <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.pushdown-query-hints</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>指定下推到 OceanBase SELECT 语句中的 Hint。这些 Hint 会被添加到最终发送给 OceanBase 执行的 SQL 中。支持多个 Hint（空格分隔），例如：'READ_CONSISTENCY(WEAK) query_timeout(10000000)'。</td>
+            </tr>
+            <tr>
+                <td>spark.sql.catalog.your_catalog_name.jdbc.pushdown-write-hints</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;"></td>
+                <td>String</td>
+                <td>指定下推到 OceanBase INSERT 语句中的 Hint。这些 Hint 会被添加到最终发送给 OceanBase 执行的 SQL 中。支持多个 Hint（空格分隔），例如：'append parallel(16)'。</td>
+            </tr>
+            <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.partition-compute-parallelism</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">32</td>
@@ -368,13 +382,6 @@ select * from spark_catalog.default.orders;
                 <td style="word-wrap: break-word;">-1</td>
                 <td>Int</td>
                 <td>通过向生成的 SQL 添加 /*+ query_timeout(n) */ hint 来控制查询超时时间。通过该参数可以设置超时时间，单位为微妙。默认为-1，表示不添加该Hint。</td>
-            </tr>
-            <tr>
-                <td>spark.sql.catalog.your_catalog_name.jdbc.query-hints</td>
-                <td>否</td>
-                <td style="word-wrap: break-word;"></td>
-                <td>String</td>
-                <td>向SELECT查询语句添加额外的OceanBase查询提示。可指定多个提示，用空格分隔，如'READ_CONSISTENCY(WEAK) query_timeout(10000000)'。</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.disable-pk-table-use-where-partition</td>

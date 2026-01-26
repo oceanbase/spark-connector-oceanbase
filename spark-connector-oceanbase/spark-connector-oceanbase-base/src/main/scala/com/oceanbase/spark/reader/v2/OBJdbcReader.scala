@@ -199,7 +199,7 @@ class OBJdbcReader(
       ""
     }
     val hint =
-      s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) $useHiddenPKColumnHint $queryTimeoutHint ${config.getQueryHintDegree} */"
+      s"/*+ PARALLEL(${config.getJdbcParallelHintDegree}) $useHiddenPKColumnHint $queryTimeoutHint ${config.getJdbcPushdownQueryHint} */"
 
     val partitionClause = partition match {
       case part: OBMySQLPartition => part.partitionClause
