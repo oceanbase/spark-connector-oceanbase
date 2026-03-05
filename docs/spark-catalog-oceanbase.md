@@ -7,13 +7,14 @@ By using Spark Catalog, users can access and operate OceanBase databases in a mo
 
 ## Currently supported features
 
-- Currently only supports OceanBase MySQL mode.
+- Supports OceanBase MySQL mode and Oracle mode. When connecting to an Oracle tenant, use the OceanBase Connector/J driver and `jdbc:oceanbase://` URL; see "Using Oracle tenant" below.
 - Supports Spark adaptive partitioning and parallel reading of OceanBase (via JDBC).
   - Predicate pushdown support.
-- Supports writing OceanBase through direct load.
+- Supports writing OceanBase through direct load (direct load supports both MySQL and Oracle tenants).
 - Supports writing OceanBase through JDBC.
   - For primary key tables, supports writing in upsert mode.
     - MySQL mode is based on: `INSERT INTO ... ON DUPLICATE KEY UPDATE` syntax.
+    - Oracle mode is based on: `MERGE` syntax.
   - For non-primary key tables, write through `INSERT INTO`.
 - Supports managing databases and tables in OceanBase through Spark-SQL, including: show databases, show tables, drop table, drop database and other syntax support.
   - Supports CTAS syntax to create and write OceanBase tables.
@@ -141,6 +142,58 @@ val spark = SparkSession
   .config("spark.sql.defaultCatalog", "your_catalog_name")
   .getOrCreate()
 ```
+
+## Using Oracle tenant
+
+When connecting to an Oracle tenant, add the **OceanBase Connector/J** driver to Spark's CLASSPATH and use the following configuration.
+
+### Driver and connection configuration
+
+- **URL**: `jdbc:oceanbase://host:port/schema` (port is typically 2881; schema is the Oracle username/schema).
+- **driver** (optional): `com.oceanbase.jdbc.Driver`; if omitted, Spark selects the driver from the URL.
+- **username / password**: Oracle tenant username and password.
+- **schema-name**: In Oracle mode, schema equals the username; set it to the schema (user) you want to use as the default.
+
+### Configuration examples
+
+**Spark-SQL CLI startup options:**
+
+```shell
+./bin/spark-sql \
+--conf "spark.sql.catalog.your_catalog_name=com.oceanbase.spark.catalog.OceanBaseCatalog" \
+--conf "spark.sql.catalog.your_catalog_name.url=jdbc:oceanbase://localhost:2881/your_schema" \
+--conf "spark.sql.catalog.your_catalog_name.driver=com.oceanbase.jdbc.Driver" \
+--conf "spark.sql.catalog.your_catalog_name.username=your_oracle_user" \
+--conf "spark.sql.catalog.your_catalog_name.password=******" \
+--conf "spark.sql.catalog.your_catalog_name.schema-name=your_schema" \
+--conf "spark.sql.defaultCatalog=your_catalog_name"
+```
+
+**spark-defaults.conf snippet (with optional direct load):**
+
+```shell
+spark.sql.catalog.your_catalog_name=com.oceanbase.spark.catalog.OceanBaseCatalog
+spark.sql.catalog.your_catalog_name.url=jdbc:oceanbase://localhost:2881/your_schema
+spark.sql.catalog.your_catalog_name.driver=com.oceanbase.jdbc.Driver
+spark.sql.catalog.your_catalog_name.username=your_oracle_user
+spark.sql.catalog.your_catalog_name.password=******
+spark.sql.catalog.your_catalog_name.schema-name=your_schema
+spark.sql.defaultCatalog=your_catalog_name
+
+# Direct load (optional; supports both MySQL and Oracle tenants)
+spark.sql.catalog.your_catalog_name.direct-load.enabled=true
+spark.sql.catalog.your_catalog_name.direct-load.host=localhost
+spark.sql.catalog.your_catalog_name.direct-load.rpc-port=2882
+```
+
+### Differences and limitations vs MySQL
+
+- **Create/drop schema**: In Oracle, this corresponds to creating a user (create database) and `DROP USER ... CASCADE` (drop database).
+- **Primary key table upsert**: Uses `MERGE` syntax; columns in the ON clause must not appear in the UPDATE SET list.
+- **Table properties on create**: `replica_num` and `compression` are not supported; if specified in CTAS or CREATE TABLE, they are ignored.
+- **Aggregate pushdown**: Disabled in Oracle mode.
+
+Direct load supports both MySQL and Oracle mode; use the same configuration as above, with URL, username, etc. set to your Oracle connection details.
 
 ## Usage examples
 
@@ -287,7 +340,7 @@ Precautions for direct-load:
                 <td>Yes</td>
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
-                <td>The JDBC url to connect to OceanBase.</td>
+                <td>The JDBC url to connect to OceanBase. For Oracle mode, use jdbc:oceanbase://host:port/schema.</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.username</td>
@@ -308,14 +361,14 @@ Precautions for direct-load:
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
-                <td>The class name of the JDBC driver to use to connect to this URL.</td>
+                <td>The class name of the JDBC driver to use to connect to this URL. For Oracle mode, use OceanBase Connector/J: com.oceanbase.jdbc.Driver.</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.schema-name</td>
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
-                <td>Set the default schema for the OceanBase Catalog.</td>
+                <td>Set the default schema for the OceanBase Catalog. In Oracle mode, schema equals the username; set it to the schema (user) you want to access.</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.fetch-size</td>
