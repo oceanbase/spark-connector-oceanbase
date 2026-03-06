@@ -185,15 +185,6 @@ spark.sql.catalog.your_catalog_name.direct-load.host=localhost
 spark.sql.catalog.your_catalog_name.direct-load.rpc-port=2882
 ```
 
-### 与 MySQL 的差异与限制
-
-- **创建/删除 schema**：在 Oracle 中对应创建用户（create database）与 `DROP USER ... CASCADE`（drop database）。
-- **主键表 upsert**：使用 `MERGE` 语法；ON 子句中出现的列不能出现在 UPDATE 的 SET 列表中。
-- **建表表属性**：不支持 `replica_num`、`compression`，在 CTAS 或建表时指定会被忽略。
-- **聚合下推**：Oracle 模式下为关闭状态。
-
-旁路导入同时支持 MySQL 与 Oracle 模式，配置方式与上述示例一致，仅将 URL、用户名等改为 Oracle 连接信息即可。
-
 ## 使用示例
 
 ### 通过Spark-SQL管理OceanBase中的数据库和表

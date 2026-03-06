@@ -186,15 +186,6 @@ spark.sql.catalog.your_catalog_name.direct-load.host=localhost
 spark.sql.catalog.your_catalog_name.direct-load.rpc-port=2882
 ```
 
-### Differences and limitations vs MySQL
-
-- **Create/drop schema**: In Oracle, this corresponds to creating a user (create database) and `DROP USER ... CASCADE` (drop database).
-- **Primary key table upsert**: Uses `MERGE` syntax; columns in the ON clause must not appear in the UPDATE SET list.
-- **Table properties on create**: `replica_num` and `compression` are not supported; if specified in CTAS or CREATE TABLE, they are ignored.
-- **Aggregate pushdown**: Disabled in Oracle mode.
-
-Direct load supports both MySQL and Oracle mode; use the same configuration as above, with URL, username, etc. set to your Oracle connection details.
-
 ## Usage examples
 
 ### Manage databases and tables in OceanBase through Spark-SQL
