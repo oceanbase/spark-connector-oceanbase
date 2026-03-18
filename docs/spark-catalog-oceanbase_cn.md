@@ -360,7 +360,7 @@ select * from spark_catalog.default.orders;
                 <td>否</td>
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
-                <td>指定下推到 OceanBase INSERT 语句中的 Hint。这些 Hint 会被添加到最终发送给 OceanBase 执行的 SQL 中。支持多个 Hint（空格分隔），例如：'append parallel(16)'。</td>
+                <td>指定下推到 OceanBase INSERT 语句中的 Hint。这些 Hint 会被添加到最终发送给 OceanBase 执行的 SQL 中。支持多个 Hint（空格分隔），例如：'enable_parallel_dml parallel(8)'。</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.partition-compute-parallelism</td>
