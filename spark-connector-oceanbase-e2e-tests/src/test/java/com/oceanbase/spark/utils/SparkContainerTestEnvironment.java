@@ -72,7 +72,8 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
                 + "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
                 + "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
                 + "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
-                + "--add-opens=java.management/sun.management=ALL-UNNAMED";
+                + "--add-opens=java.management/sun.management=ALL-UNNAMED "
+                + "-XX:-UseContainerSupport";
     }
 
     @TempDir public java.nio.file.Path temporaryFolder;
