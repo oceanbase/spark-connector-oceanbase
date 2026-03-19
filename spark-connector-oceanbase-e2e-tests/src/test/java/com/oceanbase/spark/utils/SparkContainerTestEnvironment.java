@@ -214,7 +214,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "/opt/spark/bin/spark-sql --driver-java-options '%s' %s",
+                        "SPARK_SUBMIT_OPTS='%s' /opt/spark/bin/spark-sql %s",
                         getSparkDriverOpts(), String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
@@ -244,7 +244,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "timeout 2m /opt/spark/bin/spark-shell --driver-java-options '%s' %s",
+                        "timeout 2m SPARK_SUBMIT_OPTS='%s' /opt/spark/bin/spark-shell %s",
                         getSparkDriverOpts(), String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
