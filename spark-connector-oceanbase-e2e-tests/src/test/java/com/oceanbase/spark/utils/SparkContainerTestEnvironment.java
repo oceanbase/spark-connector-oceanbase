@@ -57,6 +57,23 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         return String.format("apache/spark:%s", SPARK_VERSION);
     }
 
+    private String getSparkDriverOpts() {
+        return "--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED "
+                + "--add-opens=java.base/java.lang=ALL-UNNAMED "
+                + "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
+                + "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "
+                + "--add-opens=java.base/java.io=ALL-UNNAMED "
+                + "--add-opens=java.base/java.net=ALL-UNNAMED "
+                + "--add-opens=java.base/java.nio=ALL-UNNAMED "
+                + "--add-opens=java.base/java.util=ALL-UNNAMED "
+                + "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
+                + "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED "
+                + "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
+                + "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
+                + "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
+                + "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED";
+    }
+
     @TempDir public java.nio.file.Path temporaryFolder;
 
     public GenericContainer<?> sparkContainer;
@@ -70,7 +87,8 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withLogConsumer(new Slf4jLogConsumer(LOG))
-                        .withCommand("bash", "-lc", "sleep infinity");
+                        .withCommand("bash", "-lc", "sleep infinity")
+                        .withEnv("SPARK_DRIVER_OPTS", getSparkDriverOpts());
 
         Startables.deepStart(Stream.of(sparkContainer)).join();
         // Ensure a generic jars directory exists regardless of image layout
