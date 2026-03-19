@@ -94,6 +94,16 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         // Ensure a generic jars directory exists regardless of image layout
         sparkContainer.execInContainer("bash", "-lc", "mkdir -p /tmp/jars");
         LOG.info("Spark containers started");
+
+        // Debug: print Java version and Spark info
+        Container.ExecResult javaVersionResult = sparkContainer.execInContainer("bash", "-c", "java -version 2>&1");
+        LOG.info("Java version in container:\n{}", javaVersionResult.getStdout());
+
+        Container.ExecResult sparkSubmitHelp = sparkContainer.execInContainer("bash", "-c", "head -50 /opt/spark/bin/spark-sql");
+        LOG.info("spark-sql script head:\n{}", sparkSubmitHelp.getStdout());
+
+        Container.ExecResult cgroupInfo = sparkContainer.execInContainer("bash", "-c", "cat /proc/1/cgroup 2>&1 | head -5");
+        LOG.info("Cgroup info:\n{}", cgroupInfo.getStdout());
     }
 
     @AfterEach
@@ -214,12 +224,19 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "SPARK_SUBMIT_OPTS='%s' /opt/spark/bin/spark-sql %s",
+                        "JAVA_TOOL_OPTIONS='%s' /opt/spark/bin/spark-sql %s",
                         getSparkDriverOpts(), String.join(" ", commands));
-        LOG.info(command);
+        LOG.info("Executing command: {}", command);
+
+        // Debug: test if JAVA_TOOL_OPTIONS works with a simple java command
+        Container.ExecResult testJavaOpts = sparkContainer.execInContainer("bash", "-c",
+                "JAVA_TOOL_OPTIONS='--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED' java -XshowSettings:vm -version 2>&1 | head -20");
+        LOG.info("Test JAVA_TOOL_OPTIONS with java:\n{}", testJavaOpts.getStdout());
+        LOG.error("Test JAVA_TOOL_OPTIONS stderr:\n{}", testJavaOpts.getStderr());
+
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
-        LOG.info(execResult.getStdout());
-        LOG.error(execResult.getStderr());
+        LOG.info("spark-sql stdout:\n{}", execResult.getStdout());
+        LOG.error("spark-sql stderr:\n{}", execResult.getStderr());
         if (execResult.getExitCode() != 0) {
             throw new AssertionError("Failed when submitting the SQL job.");
         }
@@ -244,7 +261,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "timeout 2m SPARK_SUBMIT_OPTS='%s' /opt/spark/bin/spark-shell %s",
+                        "timeout 2m JAVA_TOOL_OPTIONS='%s' /opt/spark/bin/spark-shell %s",
                         getSparkDriverOpts(), String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
