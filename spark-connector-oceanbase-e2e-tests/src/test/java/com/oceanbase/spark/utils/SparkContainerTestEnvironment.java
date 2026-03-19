@@ -71,7 +71,8 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
                 + "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
                 + "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
                 + "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
-                + "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED";
+                + "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
+                + "--add-opens=java.management/sun.management=ALL-UNNAMED";
     }
 
     @TempDir public java.nio.file.Path temporaryFolder;
@@ -213,7 +214,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "/opt/spark/bin/spark-sql --driver-java-options \"%s\" %s",
+                        "/opt/spark/bin/spark-sql --driver-java-options '%s' %s",
                         getSparkDriverOpts(), String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
@@ -243,7 +244,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "timeout 2m /opt/spark/bin/spark-shell --driver-java-options \"%s\" %s",
+                        "timeout 2m /opt/spark/bin/spark-shell --driver-java-options '%s' %s",
                         getSparkDriverOpts(), String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
