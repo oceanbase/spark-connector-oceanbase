@@ -26,9 +26,10 @@ import scala.collection.mutable.ArrayBuffer
 
 /**
  * Unit tests for OceanBase Oracle dialect. Each test covers a specific behavior (e.g. write-hints
- * pushdown in upsert/MERGE); more cases can be added as needed.
+ * pushdown in upsert/MERGE); more cases can be added as needed. Does not extend
+ * OceanBaseOracleTestBase so it runs without env (PORT, HOST, etc.).
  */
-class OceanBaseOracleUnitTest extends OceanBaseOracleTestBase {
+class OceanBaseOracleUnitTest {
 
   @Test
   def testWriteHintsInUpsertStatement(): Unit = {
@@ -41,11 +42,11 @@ class OceanBaseOracleUnitTest extends OceanBaseOracleTestBase {
     val priKeyColumnInfo = ArrayBuffer(
       PriKeyColumnInfo("\"ID\"", "NUMBER(10)", "PRI", "NUMBER", "")
     )
-    val options = new java.util.HashMap[String, String](getOptions)
+    val options = new java.util.HashMap[String, String]()
     options.put("table-name", "PRODUCTS")
     options.put("jdbc.pushdown-write-hints", "MONITOR PARALLEL(2)")
     val config = new OceanBaseConfig(options)
-    val tableName = s"${config.getSchemaName}.PRODUCTS"
+    val tableName = "test.PRODUCTS"
     val sql = dialect.getUpsertIntoStatement(tableName, schema, priKeyColumnInfo, config)
     Assertions.assertTrue(
       sql.contains("/*+ MONITOR PARALLEL(2) */"),
