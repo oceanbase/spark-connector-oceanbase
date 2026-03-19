@@ -96,13 +96,16 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         LOG.info("Spark containers started");
 
         // Debug: print Java version and Spark info
-        Container.ExecResult javaVersionResult = sparkContainer.execInContainer("bash", "-c", "java -version 2>&1");
+        Container.ExecResult javaVersionResult =
+                sparkContainer.execInContainer("bash", "-c", "java -version 2>&1");
         LOG.info("Java version in container:\n{}", javaVersionResult.getStdout());
 
-        Container.ExecResult sparkSubmitHelp = sparkContainer.execInContainer("bash", "-c", "head -50 /opt/spark/bin/spark-sql");
+        Container.ExecResult sparkSubmitHelp =
+                sparkContainer.execInContainer("bash", "-c", "head -50 /opt/spark/bin/spark-sql");
         LOG.info("spark-sql script head:\n{}", sparkSubmitHelp.getStdout());
 
-        Container.ExecResult cgroupInfo = sparkContainer.execInContainer("bash", "-c", "cat /proc/1/cgroup 2>&1 | head -5");
+        Container.ExecResult cgroupInfo =
+                sparkContainer.execInContainer("bash", "-c", "cat /proc/1/cgroup 2>&1 | head -5");
         LOG.info("Cgroup info:\n{}", cgroupInfo.getStdout());
     }
 
@@ -229,8 +232,11 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         LOG.info("Executing command: {}", command);
 
         // Debug: test if JAVA_TOOL_OPTIONS works with a simple java command
-        Container.ExecResult testJavaOpts = sparkContainer.execInContainer("bash", "-c",
-                "JAVA_TOOL_OPTIONS='--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED' java -XshowSettings:vm -version 2>&1 | head -20");
+        Container.ExecResult testJavaOpts =
+                sparkContainer.execInContainer(
+                        "bash",
+                        "-c",
+                        "JAVA_TOOL_OPTIONS='--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED' java -XshowSettings:vm -version 2>&1 | head -20");
         LOG.info("Test JAVA_TOOL_OPTIONS with java:\n{}", testJavaOpts.getStdout());
         LOG.error("Test JAVA_TOOL_OPTIONS stderr:\n{}", testJavaOpts.getStderr());
 
