@@ -87,8 +87,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withLogConsumer(new Slf4jLogConsumer(LOG))
-                        .withCommand("bash", "-lc", "sleep infinity")
-                        .withEnv("SPARK_DRIVER_OPTS", getSparkDriverOpts());
+                        .withCommand("bash", "-lc", "sleep infinity");
 
         Startables.deepStart(Stream.of(sparkContainer)).join();
         // Ensure a generic jars directory exists regardless of image layout
@@ -212,7 +211,10 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         commands.add(jarStr);
         commands.add("-f /tmp/script.sql");
 
-        String command = String.format("/opt/spark/bin/spark-sql %s", String.join(" ", commands));
+        String command =
+                String.format(
+                        "/opt/spark/bin/spark-sql --driver-java-options \"%s\" %s",
+                        getSparkDriverOpts(), String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
         LOG.info(execResult.getStdout());
@@ -241,7 +243,8 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "timeout 2m /opt/spark/bin/spark-shell %s", String.join(" ", commands));
+                        "timeout 2m /opt/spark/bin/spark-shell --driver-java-options \"%s\" %s",
+                        getSparkDriverOpts(), String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
         LOG.info(execResult.getStdout());
