@@ -57,10 +57,6 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         return String.format("apache/spark:%s", SPARK_VERSION);
     }
 
-    private String getSparkDriverOpts() {
-        return "-XX:-UseContainerSupport";
-    }
-
     @TempDir public java.nio.file.Path temporaryFolder;
 
     public GenericContainer<?> sparkContainer;
@@ -200,8 +196,8 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "JAVA_TOOL_OPTIONS='%s' /opt/spark/bin/spark-sql %s",
-                        getSparkDriverOpts(), String.join(" ", commands));
+                        "JAVA_TOOL_OPTIONS='-XX:-UseContainerSupport' /opt/spark/bin/spark-sql %s",
+                        String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
         LOG.info(execResult.getStdout());
@@ -230,8 +226,8 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
 
         String command =
                 String.format(
-                        "timeout 2m JAVA_TOOL_OPTIONS='%s' /opt/spark/bin/spark-shell %s",
-                        getSparkDriverOpts(), String.join(" ", commands));
+                        "timeout 2m JAVA_TOOL_OPTIONS='-XX:-UseContainerSupport' /opt/spark/bin/spark-shell %s",
+                        String.join(" ", commands));
         LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
         LOG.info(execResult.getStdout());
