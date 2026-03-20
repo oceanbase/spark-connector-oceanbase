@@ -18,9 +18,9 @@ package com.oceanbase.spark.catalog
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.OceanBaseDialect
 import com.oceanbase.spark.reader.JDBCLimitScanBuilder
-import com.oceanbase.spark.reader.v2.OBJdbcScanBuilder
+import com.oceanbase.spark.reader.v2.{OBJdbcScanBuilder, OBKVScanBuilder}
 import com.oceanbase.spark.utils.OBJdbcUtils
-import com.oceanbase.spark.writer.v2.{DirectLoadWriteBuilderV2, JDBCWriteBuilder}
+import com.oceanbase.spark.writer.v2.{DirectLoadWriteBuilderV2, JDBCWriteBuilder, OBKVWriteBuilder}
 
 import org.apache.spark.sql.ExprUtils.compileFilter
 import org.apache.spark.sql.SparkSession
@@ -56,20 +56,34 @@ case class OceanBaseTable(
   }
 
   override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
-    val mergedOptions = new JDBCOptions(
-      config.getProperties.asScala.toMap ++ options.asCaseSensitiveMap().asScala)
+    if (config.getObkvEnabled) {
+      // In Catalog mode, retrieve primary key info via JDBC
+      val primaryKeys = OBJdbcUtils.withConnection(config) {
+        conn =>
+          dialect
+            .getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
+            .map(_.columnName)
+            .toArray
+      }
+      OBKVScanBuilder(schema, config, primaryKeys)
+    } else {
+      val mergedOptions = new JDBCOptions(
+        config.getProperties.asScala.toMap ++ options.asCaseSensitiveMap().asScala)
 
-    mergedOptions.parameters
-      .get(OceanBaseConfig.ENABLE_LEGACY_BATCH_READER)
-      .map(_.toBoolean) match {
-      case Some(true) => JDBCLimitScanBuilder(SparkSession.active, schema, mergedOptions)
-      case _ => OBJdbcScanBuilder(schema, config, dialect)
+      mergedOptions.parameters
+        .get(OceanBaseConfig.ENABLE_LEGACY_BATCH_READER)
+        .map(_.toBoolean) match {
+        case Some(true) =>
+          JDBCLimitScanBuilder(SparkSession.active, schema, mergedOptions)
+        case _ => OBJdbcScanBuilder(schema, config, dialect)
+      }
     }
   }
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-
-    if (config.getDirectLoadEnable) {
+    if (config.getObkvEnabled) {
+      new OBKVWriteBuilder(schema, config)
+    } else if (config.getDirectLoadEnable) {
       DirectLoadWriteBuilderV2(schema, config)
     } else {
       new JDBCWriteBuilder(schema, config, dialect)
