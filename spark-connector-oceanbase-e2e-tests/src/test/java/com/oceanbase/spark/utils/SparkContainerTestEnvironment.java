@@ -58,22 +58,7 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
     }
 
     private String getSparkDriverOpts() {
-        return "--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED "
-                + "--add-opens=java.base/java.lang=ALL-UNNAMED "
-                + "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
-                + "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "
-                + "--add-opens=java.base/java.io=ALL-UNNAMED "
-                + "--add-opens=java.base/java.net=ALL-UNNAMED "
-                + "--add-opens=java.base/java.nio=ALL-UNNAMED "
-                + "--add-opens=java.base/java.util=ALL-UNNAMED "
-                + "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
-                + "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED "
-                + "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
-                + "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
-                + "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
-                + "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
-                + "--add-opens=java.management/sun.management=ALL-UNNAMED "
-                + "-XX:-UseContainerSupport";
+        return "-XX:-UseContainerSupport";
     }
 
     @TempDir public java.nio.file.Path temporaryFolder;
@@ -95,19 +80,6 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
         // Ensure a generic jars directory exists regardless of image layout
         sparkContainer.execInContainer("bash", "-lc", "mkdir -p /tmp/jars");
         LOG.info("Spark containers started");
-
-        // Debug: print Java version and Spark info
-        Container.ExecResult javaVersionResult =
-                sparkContainer.execInContainer("bash", "-c", "java -version 2>&1");
-        LOG.info("Java version in container:\n{}", javaVersionResult.getStdout());
-
-        Container.ExecResult sparkSubmitHelp =
-                sparkContainer.execInContainer("bash", "-c", "head -50 /opt/spark/bin/spark-sql");
-        LOG.info("spark-sql script head:\n{}", sparkSubmitHelp.getStdout());
-
-        Container.ExecResult cgroupInfo =
-                sparkContainer.execInContainer("bash", "-c", "cat /proc/1/cgroup 2>&1 | head -5");
-        LOG.info("Cgroup info:\n{}", cgroupInfo.getStdout());
     }
 
     @AfterEach
@@ -230,20 +202,10 @@ public abstract class SparkContainerTestEnvironment extends OceanBaseMySQLTestBa
                 String.format(
                         "JAVA_TOOL_OPTIONS='%s' /opt/spark/bin/spark-sql %s",
                         getSparkDriverOpts(), String.join(" ", commands));
-        LOG.info("Executing command: {}", command);
-
-        // Debug: test if JAVA_TOOL_OPTIONS works with a simple java command
-        Container.ExecResult testJavaOpts =
-                sparkContainer.execInContainer(
-                        "bash",
-                        "-c",
-                        "JAVA_TOOL_OPTIONS='--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED' java -XshowSettings:vm -version 2>&1 | head -20");
-        LOG.info("Test JAVA_TOOL_OPTIONS with java:\n{}", testJavaOpts.getStdout());
-        LOG.error("Test JAVA_TOOL_OPTIONS stderr:\n{}", testJavaOpts.getStderr());
-
+        LOG.info(command);
         Container.ExecResult execResult = sparkContainer.execInContainer("bash", "-c", command);
-        LOG.info("spark-sql stdout:\n{}", execResult.getStdout());
-        LOG.error("spark-sql stderr:\n{}", execResult.getStderr());
+        LOG.info(execResult.getStdout());
+        LOG.error(execResult.getStderr());
         if (execResult.getExitCode() != 0) {
             throw new AssertionError("Failed when submitting the SQL job.");
         }
