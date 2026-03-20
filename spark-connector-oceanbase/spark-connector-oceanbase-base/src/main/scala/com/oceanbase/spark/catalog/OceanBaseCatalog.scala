@@ -23,6 +23,7 @@ import com.oceanbase.spark.utils.OBJdbcUtils
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.SQLConfHelper
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException
 import org.apache.spark.sql.connector.catalog._
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.types.StructType
@@ -114,6 +115,10 @@ class OceanBaseCatalog
 
   override def loadTable(ident: Identifier): Table = {
     checkNamespace(ident.namespace())
+    // Check if table exists first to support UNCACHE TABLE IF EXISTS in Spark 3.3+
+    if (!tableExists(ident)) {
+      throw new NoSuchTableException(ident)
+    }
     val config = genNewOceanBaseConfig(this.config, ident)
     try {
       val schema = resolveTable(config, dialect)
