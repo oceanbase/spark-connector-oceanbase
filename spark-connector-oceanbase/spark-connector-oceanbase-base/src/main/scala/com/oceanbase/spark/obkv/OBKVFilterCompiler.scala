@@ -16,10 +16,10 @@
 
 package com.oceanbase.spark.obkv
 
-import scala.collection.mutable
-
 import com.alipay.oceanbase.rpc.filter.{ObCompareOp, ObTableFilter, ObTableFilterList, ObTableValueFilter}
 import org.apache.spark.sql.sources._
+
+import scala.collection.mutable
 
 /**
  * Compiles Spark [[Filter]] instances into OBKV server-side filters ([[ObTableFilter]]).
@@ -49,9 +49,7 @@ class OBKVFilterCompiler(primaryKeys: Array[String]) {
     val serverFilter = if (compiledFilters.size == 1) {
       compiledFilters.head
     } else if (compiledFilters.size > 1) {
-      new ObTableFilterList(
-        ObTableFilterList.operator.AND,
-        compiledFilters.toArray: _*)
+      new ObTableFilterList(ObTableFilterList.operator.AND, compiledFilters.toArray: _*)
     } else {
       null
     }
