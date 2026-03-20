@@ -417,6 +417,119 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .booleanConf()
                     .createWithDefault(false);
 
+    // ======== OBKV Related =========
+    public static final ConfigEntry<Boolean> OBKV_ENABLED =
+            new ConfigBuilder("obkv.enabled")
+                    .doc("Enable OBKV read/write mode")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
+    public static final ConfigEntry<String> OBKV_PARAM_URL =
+            new ConfigBuilder("obkv.param-url")
+                    .doc(
+                            "The OceanBase config server URL for direct connection mode (required when obkv.odp-mode is false)")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .create();
+
+    public static final ConfigEntry<String> OBKV_FULL_USER_NAME =
+            new ConfigBuilder("obkv.full-user-name")
+                    .doc("The full user name for OBKV connection, format: user@tenant#cluster")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .create();
+
+    public static final ConfigEntry<String> OBKV_PASSWORD =
+            new ConfigBuilder("obkv.password")
+                    .doc("The password for OBKV connection. If not set, reuses the global password")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .create();
+
+    public static final ConfigEntry<String> OBKV_SYS_USER_NAME =
+            new ConfigBuilder("obkv.sys-user-name")
+                    .doc("The system tenant user name for OBKV (optional)")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .create();
+
+    public static final ConfigEntry<String> OBKV_SYS_PASSWORD =
+            new ConfigBuilder("obkv.sys-password")
+                    .doc("The system tenant password for OBKV (optional)")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .create();
+
+    public static final ConfigEntry<Boolean> OBKV_ODP_MODE =
+            new ConfigBuilder("obkv.odp-mode")
+                    .doc("Whether to use ODP proxy for OBKV connection")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .booleanConf()
+                    .createWithDefault(false);
+
+    public static final ConfigEntry<String> OBKV_ODP_ADDR =
+            new ConfigBuilder("obkv.odp-addr")
+                    .doc("The ODP address for OBKV proxy mode")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .create();
+
+    public static final ConfigEntry<Integer> OBKV_ODP_PORT =
+            new ConfigBuilder("obkv.odp-port")
+                    .doc("The ODP port for OBKV proxy mode")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .intConf()
+                    .checkValue(port -> port > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(2882);
+
+    public static final ConfigEntry<Integer> OBKV_BATCH_SIZE =
+            new ConfigBuilder("obkv.batch-size")
+                    .doc("The batch size for OBKV read/write operations")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .intConf()
+                    .checkValue(size -> size > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(1024);
+
+    public static final ConfigEntry<Integer> OBKV_RPC_EXECUTE_TIMEOUT =
+            new ConfigBuilder("obkv.rpc-execute-timeout")
+                    .doc("The RPC execute timeout in milliseconds for OBKV operations")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .intConf()
+                    .checkValue(v -> v > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(3000);
+
+    public static final ConfigEntry<Integer> OBKV_OPERATION_TIMEOUT =
+            new ConfigBuilder("obkv.operation-timeout")
+                    .doc("The operation timeout in milliseconds for OBKV client")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .intConf()
+                    .checkValue(v -> v > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(10000);
+
+    public static final ConfigEntry<String> OBKV_DUP_ACTION =
+            new ConfigBuilder("obkv.dup-action")
+                    .doc(
+                            "The action when there is a duplicate record during OBKV write. Can be INSERT_OR_UPDATE, INSERT, REPLACE or PUT")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .createWithDefault("INSERT_OR_UPDATE");
+
+    public static final ConfigEntry<String> OBKV_READ_CONSISTENCY =
+            new ConfigBuilder("obkv.read-consistency")
+                    .doc("The read consistency level for OBKV queries. Can be STRONG or WEAK")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .createWithDefault("STRONG");
+
+    public static final ConfigEntry<String> OBKV_PRIMARY_KEY =
+            new ConfigBuilder("obkv.primary-key")
+                    .doc(
+                            "The primary key column names for OBKV, comma-separated. Required in non-Catalog mode")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .stringConf()
+                    .create();
+
     public static final String DB_TABLE = "dbTable";
     public static final String TABLE_COMMENT = "tableComment";
     public static final String ENABLE_LEGACY_BATCH_READER = "enable_legacy_batch_reader";
@@ -640,6 +753,72 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Optional<Long> getJdbcMaxRecordsPrePartition() {
         return Optional.ofNullable(get(JDBC_MAX_RECORDS_PER_PARTITION));
+    }
+
+    // ======== OBKV Getters =========
+
+    public Boolean getObkvEnabled() {
+        return get(OBKV_ENABLED);
+    }
+
+    public String getObkvParamUrl() {
+        return get(OBKV_PARAM_URL);
+    }
+
+    public String getObkvFullUserName() {
+        return get(OBKV_FULL_USER_NAME);
+    }
+
+    public String getObkvPassword() {
+        String password = get(OBKV_PASSWORD);
+        if (password == null || password.isEmpty()) {
+            return getPassword();
+        }
+        return password;
+    }
+
+    public String getObkvSysUserName() {
+        return get(OBKV_SYS_USER_NAME);
+    }
+
+    public String getObkvSysPassword() {
+        return get(OBKV_SYS_PASSWORD);
+    }
+
+    public Boolean getObkvOdpMode() {
+        return get(OBKV_ODP_MODE);
+    }
+
+    public String getObkvOdpAddr() {
+        return get(OBKV_ODP_ADDR);
+    }
+
+    public Integer getObkvOdpPort() {
+        return get(OBKV_ODP_PORT);
+    }
+
+    public Integer getObkvBatchSize() {
+        return get(OBKV_BATCH_SIZE);
+    }
+
+    public Integer getObkvRpcExecuteTimeout() {
+        return get(OBKV_RPC_EXECUTE_TIMEOUT);
+    }
+
+    public Integer getObkvOperationTimeout() {
+        return get(OBKV_OPERATION_TIMEOUT);
+    }
+
+    public String getObkvDupAction() {
+        return get(OBKV_DUP_ACTION);
+    }
+
+    public String getObkvReadConsistency() {
+        return get(OBKV_READ_CONSISTENCY);
+    }
+
+    public String getObkvPrimaryKey() {
+        return get(OBKV_PRIMARY_KEY);
     }
 
     public Optional<String> getJdbcReaderPartitionColumn(OceanBaseDialect dialect) {
