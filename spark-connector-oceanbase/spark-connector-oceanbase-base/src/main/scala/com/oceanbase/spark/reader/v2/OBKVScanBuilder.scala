@@ -41,7 +41,7 @@ case class OBKVScanBuilder(schema: StructType, config: OceanBaseConfig, primaryK
   override def pushFilters(filters: Array[Filter]): Array[Filter] = {
     val compiler = new OBKVFilterCompiler(primaryKeys)
     val result = compiler.compile(filters)
-    val unhandled = result.getUnhandledFilters
+    val unhandled = result.unhandledFilters
     this.pushedFilter = filters.diff(unhandled)
     unhandled
   }
@@ -128,8 +128,8 @@ class OBKVReader(
     // 3. Apply server-side filter from pushed filters
     val compiler = new OBKVFilterCompiler(primaryKeys)
     val compileResult = compiler.compile(pushedFilters)
-    if (compileResult.getServerFilter != null) {
-      query.setFilter(compileResult.getServerFilter)
+    if (compileResult.serverFilter != null) {
+      query.setFilter(compileResult.serverFilter)
     }
 
     // 4. Set batch size for streaming

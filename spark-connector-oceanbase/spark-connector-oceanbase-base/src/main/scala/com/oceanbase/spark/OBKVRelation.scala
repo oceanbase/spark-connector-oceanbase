@@ -76,8 +76,8 @@ case class OBKVRelation(
 
           val compiler = new OBKVFilterCompiler(pks)
           val result = compiler.compile(fltrs)
-          if (result.getServerFilter != null) {
-            query.setFilter(result.getServerFilter)
+          if (result.serverFilter != null) {
+            query.setFilter(result.serverFilter)
           }
 
           query.setBatchSize(cfg.getObkvBatchSize)
