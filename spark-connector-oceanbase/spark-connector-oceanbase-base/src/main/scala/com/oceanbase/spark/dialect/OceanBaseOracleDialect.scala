@@ -318,6 +318,11 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     val nonUniqueFields =
       schema.fieldNames.filterNot(fieldName => uniqueKeys.contains(quoteIdentifier(fieldName)))
 
+    val hints = config.getJdbcWriteHintsPushdown match {
+      case hint if hint.trim.nonEmpty => s"/*+ $hint */"
+      case _ => OceanBaseConfig.EMPTY_STRING
+    }
+
     val columns = schema.fieldNames.map(quoteIdentifier).mkString(", ")
     val keyColumns = priKeyColumnInfo.map(_.columnName).mkString(", ")
 
@@ -339,7 +344,7 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     }
 
     s"""
-       |MERGE INTO $tableName t
+       |MERGE $hints INTO $tableName t
        |USING (SELECT $selectClause FROM DUAL) s
        |ON (${keyColumns.split(", ").map(col => s"t.$col = s.$col").mkString(" AND ")})
        |$whenMatchedClause
