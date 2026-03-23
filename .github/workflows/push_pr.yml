@@ -26,7 +26,7 @@ jobs:
     uses: ./.github/workflows/test.yml
     with:
       module: spark-connector-oceanbase/spark-connector-oceanbase-base
-      maven_opts: "-Dtest=com.oceanbase.spark.OBKVConnectorITCase"
+      maven_opts: "-Dtest=com.oceanbase.spark.OBKVConnectorITCase -DfailIfNoTests=false"
 
   spark-connector-obkv-hbase:
     uses: ./.github/workflows/test.yml
