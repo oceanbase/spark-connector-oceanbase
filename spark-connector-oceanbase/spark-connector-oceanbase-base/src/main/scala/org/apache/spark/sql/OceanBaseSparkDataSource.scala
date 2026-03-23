@@ -15,20 +15,22 @@
  */
 package org.apache.spark.sql
 
+import com.oceanbase.spark.OBKVRelation
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.utils.OBJdbcUtils
 import com.oceanbase.spark.utils.OBJdbcUtils.{getCompatibleMode, getDbTable}
 import com.oceanbase.spark.writer.DirectLoadWriter
 
-import OceanBaseSparkDataSource.{writeDataViaDirectLoad, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import OceanBaseSparkDataSource.{writeDataViaDirectLoad, writeDataViaObkv, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
 import org.apache.spark.sql
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelation, JdbcRelationProvider}
 import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import org.apache.spark.sql.sources._
+import org.apache.spark.sql.types.StructType
 
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
-class OceanBaseSparkDataSource extends JdbcRelationProvider {
+class OceanBaseSparkDataSource extends JdbcRelationProvider with SchemaRelationProvider {
 
   override def shortName(): String = SHORT_NAME
 
@@ -40,8 +42,26 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
     val resolver = sqlContext.conf.resolver
     val timeZoneId = sqlContext.conf.sessionLocalTimeZone
     val schema = JDBCRelation.getSchema(resolver, jdbcOptions)
-    val parts = JDBCRelation.columnPartition(schema, resolver, timeZoneId, jdbcOptions)
+    val parts =
+      JDBCRelation.columnPartition(schema, resolver, timeZoneId, jdbcOptions)
     new OceanBaseJDBCRelation(schema, parts, jdbcOptions)(sqlContext.sparkSession)
+  }
+
+  /** Non-Catalog mode with user-declared schema (for OBKV). */
+  override def createRelation(
+      sqlContext: SQLContext,
+      parameters: Map[String, String],
+      schema: StructType): BaseRelation = {
+    val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
+    if (oceanBaseConfig.getObkvEnabled) {
+      val pk = oceanBaseConfig.getObkvPrimaryKey
+      require(pk != null && pk.nonEmpty, "obkv.primary-key is required in non-Catalog mode")
+      val primaryKeys = pk.split(",").map(_.trim)
+      OBKVRelation(parameters, Some(schema), primaryKeys)(sqlContext)
+    } else {
+      // Fallback to JDBC-based relation
+      createRelation(sqlContext, parameters)
+    }
   }
 
   override def createRelation(
@@ -50,13 +70,15 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       parameters: Map[String, String],
       dataFrame: DataFrame): BaseRelation = {
     val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
-    val enableDirectLoadWrite = oceanBaseConfig.getDirectLoadEnable
-    if (!enableDirectLoadWrite) {
-      val param = buildJDBCOptions(parameters, oceanBaseConfig)._2
-      super.createRelation(sqlContext, mode, param, dataFrame)
-    } else {
+    if (oceanBaseConfig.getObkvEnabled) {
+      writeDataViaObkv(mode, dataFrame, oceanBaseConfig)
+      createRelation(sqlContext, parameters, dataFrame.schema)
+    } else if (oceanBaseConfig.getDirectLoadEnable) {
       writeDataViaDirectLoad(mode, dataFrame, oceanBaseConfig)
       createRelation(sqlContext, parameters)
+    } else {
+      val param = buildJDBCOptions(parameters, oceanBaseConfig)._2
+      super.createRelation(sqlContext, mode, param, dataFrame)
     }
   }
 
@@ -80,7 +102,8 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
 
     // Set dialect
     getCompatibleMode(oceanBaseConfig).map(_.toLowerCase) match {
-      case Some("oracle") => JdbcDialects.registerDialect(OceanBaseOracleDialect)
+      case Some("oracle") =>
+        JdbcDialects.registerDialect(OceanBaseOracleDialect)
       case _ => JdbcDialects.registerDialect(OceanBaseMySQLDialect)
     }
 
@@ -123,5 +146,25 @@ object OceanBaseSparkDataSource {
         throw new NotImplementedError(s"${mode.name()} mode is not currently supported.")
     }
     DirectLoadWriter.savaTable(dataFrame, oceanBaseConfig)
+  }
+
+  /**
+   * Writes DataFrame data using OBKV (OceanBase KV protocol).
+   *   - Append mode: Directly appends data without pre-checking
+   *   - Overwrite mode: Truncates target table before writing
+   *   - Other modes: Throws NotImplementedError
+   */
+  def writeDataViaObkv(
+      mode: SaveMode,
+      dataFrame: DataFrame,
+      oceanBaseConfig: OceanBaseConfig): Unit = {
+    mode match {
+      case sql.SaveMode.Append => // do nothing
+      case sql.SaveMode.Overwrite =>
+        OBJdbcUtils.truncateTable(oceanBaseConfig)
+      case _ =>
+        throw new NotImplementedError(s"${mode.name()} mode is not currently supported for OBKV.")
+    }
+    OBKVRelation.writeDataFrame(dataFrame, oceanBaseConfig)
   }
 }
