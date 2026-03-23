@@ -46,6 +46,7 @@ public class OBKVClientUtils {
                 client.setOdpMode(true);
                 client.setOdpAddr(config.getObkvOdpAddr());
                 client.setOdpPort(config.getObkvOdpPort());
+                client.setDatabase(config.getSchemaName());
             } else {
                 client.setParamURL(config.getObkvParamUrl());
                 String sysUserName = config.getObkvSysUserName();
