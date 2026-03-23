@@ -58,11 +58,13 @@ case class OceanBaseTable(
   override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
     if (config.getObkvEnabled) {
       // In Catalog mode, retrieve primary key info via JDBC
+      // Note: getPriKeyInfo returns quoted column names (e.g. `id`),
+      // but OBKV operations need unquoted names to match Spark schema fields.
       val primaryKeys = OBJdbcUtils.withConnection(config) {
         conn =>
           dialect
             .getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
-            .map(_.columnName)
+            .map(pk => dialect.unQuoteIdentifier(pk.columnName))
             .toArray
       }
       OBKVScanBuilder(schema, config, primaryKeys)
@@ -86,7 +88,7 @@ case class OceanBaseTable(
         conn =>
           dialect
             .getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
-            .map(_.columnName)
+            .map(pk => dialect.unQuoteIdentifier(pk.columnName))
             .toArray
       }
       new OBKVWriteBuilder(schema, config, primaryKeys)
