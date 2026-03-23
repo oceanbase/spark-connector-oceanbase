@@ -26,7 +26,10 @@ import org.apache.spark.sql.types.StructType
 
 import scala.collection.mutable.ArrayBuffer
 
-class OBKVWriter(schema: StructType, config: OceanBaseConfig)
+class OBKVWriter(
+    schema: StructType,
+    config: OceanBaseConfig,
+    catalogPrimaryKeys: Array[String] = Array.empty)
   extends DataWriter[InternalRow]
   with Logging {
 
@@ -37,11 +40,15 @@ class OBKVWriter(schema: StructType, config: OceanBaseConfig)
   private val tableName: String = config.getTableName
 
   private val primaryKeys: Array[String] = {
-    val pk = config.getObkvPrimaryKey
-    if (pk != null && pk.nonEmpty) {
-      pk.split(",").map(_.trim)
+    if (catalogPrimaryKeys.nonEmpty) {
+      catalogPrimaryKeys
     } else {
-      Array.empty[String]
+      val pk = config.getObkvPrimaryKey
+      if (pk != null && pk.nonEmpty) {
+        pk.split(",").map(_.trim)
+      } else {
+        Array.empty[String]
+      }
     }
   }
 

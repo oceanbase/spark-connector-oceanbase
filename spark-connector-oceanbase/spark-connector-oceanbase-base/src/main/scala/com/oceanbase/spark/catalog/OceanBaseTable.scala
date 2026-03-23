@@ -82,7 +82,14 @@ case class OceanBaseTable(
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     if (config.getObkvEnabled) {
-      new OBKVWriteBuilder(schema, config)
+      val primaryKeys = OBJdbcUtils.withConnection(config) {
+        conn =>
+          dialect
+            .getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
+            .map(_.columnName)
+            .toArray
+      }
+      new OBKVWriteBuilder(schema, config, primaryKeys)
     } else if (config.getDirectLoadEnable) {
       DirectLoadWriteBuilderV2(schema, config)
     } else {

@@ -22,10 +22,13 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.{BatchWrite, DataWriter, DataWriterFactory, PhysicalWriteInfo, SupportsTruncate, Write, WriteBuilder, WriterCommitMessage}
 import org.apache.spark.sql.types.StructType
 
-class OBKVWriteBuilder(schema: StructType, config: OceanBaseConfig)
+class OBKVWriteBuilder(
+    schema: StructType,
+    config: OceanBaseConfig,
+    primaryKeys: Array[String] = Array.empty)
   extends WriteBuilder
   with SupportsTruncate {
-  override def build(): Write = new OBKVWrite(schema, config)
+  override def build(): Write = new OBKVWrite(schema, config, primaryKeys)
 
   override def truncate(): WriteBuilder = {
     OBJdbcUtils.truncateTable(config)
@@ -33,11 +36,12 @@ class OBKVWriteBuilder(schema: StructType, config: OceanBaseConfig)
   }
 }
 
-class OBKVWrite(schema: StructType, config: OceanBaseConfig) extends Write {
-  override def toBatch: BatchWrite = new OBKVBatchWrite(schema, config)
+class OBKVWrite(schema: StructType, config: OceanBaseConfig, primaryKeys: Array[String])
+  extends Write {
+  override def toBatch: BatchWrite = new OBKVBatchWrite(schema, config, primaryKeys)
 }
 
-class OBKVBatchWrite(schema: StructType, config: OceanBaseConfig)
+class OBKVBatchWrite(schema: StructType, config: OceanBaseConfig, primaryKeys: Array[String])
   extends BatchWrite
   with DataWriterFactory {
 
@@ -48,5 +52,5 @@ class OBKVBatchWrite(schema: StructType, config: OceanBaseConfig)
   override def abort(messages: Array[WriterCommitMessage]): Unit = {}
 
   override def createWriter(partitionId: Int, taskId: Long): DataWriter[InternalRow] =
-    new OBKVWriter(schema, config)
+    new OBKVWriter(schema, config, primaryKeys)
 }
