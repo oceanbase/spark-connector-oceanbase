@@ -19,10 +19,11 @@ import com.oceanbase.spark.OceanBaseMySQLTestBase.{constructConfigUrlForODP, cre
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
 
 import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.junit.jupiter.api.{AfterAll, AfterEach, Assertions, BeforeAll, BeforeEach, Test}
+import org.junit.jupiter.api.{AfterAll, AfterEach, Assertions, BeforeAll, BeforeEach, Tag, Test}
 
 import java.util
 
+@Tag("obkv-it")
 class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
 
   @BeforeEach
@@ -50,9 +51,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.obkv.odp-mode", "true")
       .config("spark.sql.catalog.ob.obkv.odp-addr", OceanBaseMySQLTestBase.ODP.getHost)
       .config("spark.sql.catalog.ob.obkv.odp-port", OceanBaseMySQLTestBase.ODP.getRpcPort.toString)
-      .config(
-        "spark.sql.catalog.ob.obkv.full-user-name",
-        s"$getUsername@$getTenantName#$getClusterName")
+      .config("spark.sql.catalog.ob.obkv.full-user-name", s"$getUsername#$getClusterName")
       .config("spark.sql.catalog.ob.obkv.password", getPassword)
       .getOrCreate()
   }
@@ -169,7 +168,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
       .option("obkv.odp-mode", "true")
       .option("obkv.odp-addr", OceanBaseMySQLTestBase.ODP.getHost)
       .option("obkv.odp-port", OceanBaseMySQLTestBase.ODP.getRpcPort)
-      .option("obkv.full-user-name", s"$getUsername@$getTenantName#$getClusterName")
+      .option("obkv.full-user-name", s"$getUsername#$getClusterName")
       .option("obkv.password", getPassword)
       .option("obkv.primary-key", "id")
       .save()
@@ -196,7 +195,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
       .option("obkv.odp-mode", "true")
       .option("obkv.odp-addr", OceanBaseMySQLTestBase.ODP.getHost)
       .option("obkv.odp-port", OceanBaseMySQLTestBase.ODP.getRpcPort)
-      .option("obkv.full-user-name", s"$getUsername@$getTenantName#$getClusterName")
+      .option("obkv.full-user-name", s"$getUsername#$getClusterName")
       .option("obkv.password", getPassword)
       .option("obkv.primary-key", "id")
       .load()
@@ -326,9 +325,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
       .config("spark.sql.catalog.ob.obkv.odp-mode", "true")
       .config("spark.sql.catalog.ob.obkv.odp-addr", OceanBaseMySQLTestBase.ODP.getHost)
       .config("spark.sql.catalog.ob.obkv.odp-port", OceanBaseMySQLTestBase.ODP.getRpcPort.toString)
-      .config(
-        "spark.sql.catalog.ob.obkv.full-user-name",
-        s"$getUsername@$getTenantName#$getClusterName")
+      .config("spark.sql.catalog.ob.obkv.full-user-name", s"$getUsername#$getClusterName")
       .config("spark.sql.catalog.ob.obkv.password", getPassword)
       .config("spark.sql.catalog.ob.obkv.batch-size", "5")
       .getOrCreate()
@@ -430,7 +427,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
-  private def getTenantName: String = "spark"
 }
 
 object OBKVConnectorITCase {
