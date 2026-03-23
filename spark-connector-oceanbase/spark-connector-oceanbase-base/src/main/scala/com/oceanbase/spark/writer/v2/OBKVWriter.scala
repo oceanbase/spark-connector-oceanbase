@@ -35,7 +35,7 @@ class OBKVWriter(
 
   private val batchSize = config.getObkvBatchSize
   private val buffer: ArrayBuffer[InternalRow] = ArrayBuffer[InternalRow]()
-  private lazy val client: ObTableClient = OBKVClientUtils.createClient(config)
+  private lazy val client: ObTableClient = OBKVClientUtils.createClient(config, primaryKeys)
   private val dupAction: String = config.getObkvDupAction
   private val tableName: String = config.getTableName
 

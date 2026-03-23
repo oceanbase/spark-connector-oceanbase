@@ -37,6 +37,19 @@ public class OBKVClientUtils {
      * @return an initialized ObTableClient
      */
     public static ObTableClient createClient(OceanBaseConfig config) {
+        return createClient(config, null);
+    }
+
+    /**
+     * Creates and initializes an {@link ObTableClient} from the given config with explicit primary
+     * keys.
+     *
+     * @param config the OceanBase configuration
+     * @param primaryKeys primary key column names (used in Catalog mode where obkv.primary-key is
+     *     not configured)
+     * @return an initialized ObTableClient
+     */
+    public static ObTableClient createClient(OceanBaseConfig config, String[] primaryKeys) {
         try {
             ObTableClient client = new ObTableClient();
             client.setFullUserName(config.getObkvFullUserName());
@@ -58,15 +71,20 @@ public class OBKVClientUtils {
 
             client.setRpcExecuteTimeout(config.getObkvRpcExecuteTimeout());
 
-            // Register row key elements if primary keys are specified
-            String primaryKey = config.getObkvPrimaryKey();
-            if (primaryKey != null && !primaryKey.isEmpty()) {
-                String tableName = config.getTableName();
-                String[] pkColumns = primaryKey.split(",");
-                for (int i = 0; i < pkColumns.length; i++) {
-                    pkColumns[i] = pkColumns[i].trim();
+            // Register row key elements: use explicit primaryKeys if provided,
+            // otherwise fall back to config
+            String tableName = config.getTableName();
+            if (primaryKeys != null && primaryKeys.length > 0) {
+                client.addRowKeyElement(tableName, primaryKeys);
+            } else {
+                String primaryKey = config.getObkvPrimaryKey();
+                if (primaryKey != null && !primaryKey.isEmpty()) {
+                    String[] pkColumns = primaryKey.split(",");
+                    for (int i = 0; i < pkColumns.length; i++) {
+                        pkColumns[i] = pkColumns[i].trim();
+                    }
+                    client.addRowKeyElement(tableName, pkColumns);
                 }
-                client.addRowKeyElement(tableName, pkColumns);
             }
 
             client.init();

@@ -213,7 +213,7 @@ class OBKVTypeConverterTest {
     val row = new SpecificInternalRow(Array[DataType](dt))
     row.update(0, Decimal.apply(new JBigDecimal("123.45"), dt.precision, dt.scale))
     val result = OBKVTypeConverter.toObkvValue(row, 0, dt)
-    assertEquals(new JBigDecimal("123.45"), result)
+    assertEquals("123.45", result)
   }
 
   @Test
