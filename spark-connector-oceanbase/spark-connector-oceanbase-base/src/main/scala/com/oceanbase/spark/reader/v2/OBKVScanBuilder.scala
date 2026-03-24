@@ -143,7 +143,7 @@ class OBKVReader(
       query.setReadConsistency(ObReadConsistency.WEAK)
     }
 
-    resultSet = query.execute()
+    resultSet = query.asyncExecute()
     initialized = true
   }
 

@@ -87,7 +87,7 @@ case class OBKVRelation(
             query.setReadConsistency(ObReadConsistency.WEAK)
           }
 
-          val resultSet = query.execute()
+          val resultSet = query.asyncExecute()
           val rows = new scala.collection.mutable.ArrayBuffer[Row]()
 
           while (resultSet.next()) {
@@ -179,6 +179,22 @@ object OBKVRelation extends Logging {
     }
   }
 
+  /**
+   * Converts a value to an OBKV-compatible type. The OBKV client does not support BigDecimal, so
+   * DecimalType values are converted to Double.
+   */
+  def convertForObkv(value: Any, dataType: org.apache.spark.sql.types.DataType): Object = {
+    if (value == null) return null
+    dataType match {
+      case _: DecimalType =>
+        value match {
+          case bd: java.math.BigDecimal => java.lang.Double.valueOf(bd.doubleValue())
+          case other => other.asInstanceOf[Object]
+        }
+      case _ => value.asInstanceOf[Object]
+    }
+  }
+
   /** Writes a DataFrame to OceanBase via OBKV batch operations. */
   def writeDataFrame(dataFrame: DataFrame, config: OceanBaseConfig): Unit = {
     val schema = dataFrame.schema
@@ -212,7 +228,8 @@ object OBKVRelation extends Logging {
                 case (field, idx) =>
                   val value =
                     if (row.isNullAt(idx)) null
-                    else row.get(idx).asInstanceOf[Object]
+                    else
+                      OBKVRelation.convertForObkv(row.get(idx), field.dataType)
                   if (pkSet.contains(field.name)) {
                     rowKeyValues += value
                   } else {

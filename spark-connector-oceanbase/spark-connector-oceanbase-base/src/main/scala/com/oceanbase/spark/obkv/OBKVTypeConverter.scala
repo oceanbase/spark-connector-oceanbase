@@ -92,7 +92,7 @@ object OBKVTypeConverter {
       case DoubleType => row.getDouble(pos)
       case StringType => row.getUTF8String(pos).toString
       case dt: DecimalType =>
-        row.getDecimal(pos, dt.precision, dt.scale).toJavaBigDecimal.toPlainString
+        java.lang.Double.valueOf(row.getDecimal(pos, dt.precision, dt.scale).toDouble)
       case DateType => DateTimeUtils.toJavaDate(row.getInt(pos))
       case TimestampType => DateTimeUtils.toJavaTimestamp(row.getLong(pos))
       case BinaryType => row.getBinary(pos)

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS obkv_products (
   id          INTEGER      NOT NULL,
   name        VARCHAR(255) NOT NULL DEFAULT 'default',
   description VARCHAR(512),
-  weight      DECIMAL(20, 10),
+  weight      DOUBLE,
   PRIMARY KEY(id)
 );
 
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS obkv_all_types (
   col_bigint  BIGINT,
   col_float   FLOAT,
   col_double  DOUBLE,
-  col_decimal DECIMAL(20, 5),
+  col_decimal DOUBLE,
   col_varchar VARCHAR(255),
   col_date    DATE,
   col_ts      TIMESTAMP    NULL DEFAULT NULL

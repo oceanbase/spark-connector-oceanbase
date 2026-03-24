@@ -69,8 +69,8 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
 
     import scala.collection.JavaConverters._
     val expected = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000"
+      "101,scooter,Small 2-wheel scooter,3.14",
+      "102,car battery,12V car battery,8.1"
     )
     val actual = session
       .sql(s"SELECT * FROM $getSchemaName.obkv_products")
@@ -100,9 +100,9 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     waitingAndAssertTableCount("obkv_products", 3)
     import scala.collection.JavaConverters._
     val expected = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000",
-      "103,hammer,12oz hammer,0.7500000000"
+      "101,scooter,Small 2-wheel scooter,3.14",
+      "102,car battery,12V car battery,8.1",
+      "103,hammer,12oz hammer,0.75"
     )
     val actual = queryTable("obkv_products")
     assertEqualsInAnyOrder(expected, actual)
@@ -130,8 +130,8 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
 
     import scala.collection.JavaConverters._
     val expected = util.Arrays.asList(
-      "201,widget,A small widget,1.5000000000",
-      "202,gadget,A fancy gadget,2.5000000000"
+      "201,widget,A small widget,1.5",
+      "202,gadget,A fancy gadget,2.5"
     )
     val actual = session
       .sql(s"SELECT * FROM $getSchemaName.obkv_products")
@@ -177,8 +177,8 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     waitingAndAssertTableCount("obkv_products", 2)
     import scala.collection.JavaConverters._
     val expected = util.Arrays.asList(
-      "101,scooter,Small 2-wheel scooter,3.1400000000",
-      "102,car battery,12V car battery,8.1000000000"
+      "101,scooter,Small 2-wheel scooter,3.14",
+      "102,car battery,12V car battery,8.1"
     )
     val actual = queryTable("obkv_products")
     assertEqualsInAnyOrder(expected, actual)
@@ -362,7 +362,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
                    |""".stripMargin)
 
     import scala.collection.JavaConverters._
-    val expected = util.Arrays.asList("101,scooter_v2,Updated scooter,5.0000000000")
+    val expected = util.Arrays.asList("101,scooter_v2,Updated scooter,5.0")
     val actual = session
       .sql(s"SELECT * FROM $getSchemaName.obkv_products")
       .collect()
