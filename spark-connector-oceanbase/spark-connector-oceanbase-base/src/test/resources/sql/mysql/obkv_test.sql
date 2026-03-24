@@ -41,3 +41,16 @@ CREATE TABLE IF NOT EXISTS obkv_all_types (
   col_date    DATE,
   col_ts      TIMESTAMP    NULL DEFAULT NULL
 );
+
+-- Partitioned table for testing parallel reading
+CREATE TABLE IF NOT EXISTS obkv_partitioned (
+  id          BIGINT       NOT NULL,
+  name        VARCHAR(255) NOT NULL,
+  value       DOUBLE,
+  PRIMARY KEY(id)
+) PARTITION BY RANGE(id) (
+  PARTITION p0 VALUES LESS THAN (1000),
+  PARTITION p1 VALUES LESS THAN (2000),
+  PARTITION p2 VALUES LESS THAN (3000),
+  PARTITION p3 VALUES LESS THAN MAXVALUE
+);

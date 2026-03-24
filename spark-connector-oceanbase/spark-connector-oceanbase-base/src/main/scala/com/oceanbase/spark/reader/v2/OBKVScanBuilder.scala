@@ -19,6 +19,7 @@ import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.obkv.{OBKVClientUtils, OBKVFilterCompiler, OBKVPartition, OBKVTypeConverter}
 
 import com.alipay.oceanbase.rpc.ObTableClient
+import com.alipay.oceanbase.rpc.location.model.partition.Partition
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObReadConsistency
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
@@ -28,6 +29,8 @@ import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 
 import java.util.{Map => JMap}
+
+import scala.collection.JavaConverters._
 
 case class OBKVScanBuilder(schema: StructType, config: OceanBaseConfig, primaryKeys: Array[String])
   extends ScanBuilder
@@ -63,17 +66,57 @@ case class OBKVBatchScan(
     pushedFilters: Array[Filter],
     primaryKeys: Array[String])
   extends Scan
-  with Batch {
+  with Batch
+  with Logging {
 
   override def readSchema(): StructType = schema
 
   override def toBatch: Batch = this
 
   override def planInputPartitions(): Array[InputPartition] = {
-    // For the first version, use a single full-scan partition.
-    // Partition-aware splitting can be added later based on
-    // ObTableClient partition information.
-    Array(OBKVPartition.fullScan())
+    // Try to get partition information for parallel reading
+    val partitions: java.util.List[Partition] =
+      try {
+        getPartitionsFromOBKV()
+      } catch {
+        case e: Exception =>
+          logWarning(
+            s"Failed to get partition info, falling back to single partition: ${e.getMessage}")
+          // Fall back to single full-scan partition
+          return Array(OBKVPartition.fullScan())
+      }
+
+    if (partitions == null || partitions.isEmpty) {
+      // Non-partitioned table, use single full-scan partition
+      Array(OBKVPartition.fullScan())
+    } else {
+      // Partitioned table, create one partition per OBKV partition
+      val partitionList = partitions.asScala.toList
+      logInfo(s"Creating ${partitionList.length} input partitions for parallel reading")
+      partitionList.zipWithIndex.map {
+        case (p, idx) =>
+          OBKVPartition.ofPartition(
+            idx,
+            p.getPartitionId,
+            p.getPartId,
+            p.getTableId,
+            p.getIp,
+            p.getPort,
+            p.getLsId
+          )
+      }.toArray
+    }
+  }
+
+  private def getPartitionsFromOBKV(): java.util.List[Partition] = {
+    val client = OBKVClientUtils.createClient(config, primaryKeys)
+    try {
+      val tableName = config.getTableName
+      // Get all partitions for the table
+      client.getPartition(tableName, false)
+    } finally {
+      OBKVClientUtils.closeClient(client)
+    }
   }
 
   override def createReaderFactory(): PartitionReaderFactory =

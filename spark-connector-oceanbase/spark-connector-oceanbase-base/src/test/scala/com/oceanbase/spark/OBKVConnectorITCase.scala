@@ -33,7 +33,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
 
   @AfterEach
   def after(): Unit = {
-    dropTables("obkv_products", "obkv_composite_pk", "obkv_all_types")
+    dropTables("obkv_products", "obkv_composite_pk", "obkv_all_types", "obkv_partitioned")
   }
 
   val OB_CATALOG_CLASS = "com.oceanbase.spark.catalog.OceanBaseCatalog"
@@ -425,6 +425,85 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals("hello world", row.getString(9)) // col_varchar
 
     session.stop()
+  }
+
+  @Test
+  def testPartitionedTableReadWrite(): Unit = {
+    val session = createObkvCatalogSession()
+    session.sql("use ob;")
+
+    // Insert data across multiple partitions
+    // p0: id < 1000
+    // p1: id >= 1000 and id < 2000
+    // p2: id >= 2000 and id < 3000
+    // p3: id >= 3000
+    session.sql(s"""
+                   |INSERT INTO $getSchemaName.obkv_partitioned VALUES
+                   |(100, 'item_p0_a', 1.0),
+                   |(500, 'item_p0_b', 2.0),
+                   |(1000, 'item_p1_a', 3.0),
+                   |(1500, 'item_p1_b', 4.0),
+                   |(2000, 'item_p2_a', 5.0),
+                   |(2500, 'item_p2_b', 6.0),
+                   |(3000, 'item_p3_a', 7.0),
+                   |(4000, 'item_p3_b', 8.0);
+                   |""".stripMargin)
+
+    import scala.collection.JavaConverters._
+    val expected = util.Arrays.asList(
+      "100,item_p0_a,1.0",
+      "500,item_p0_b,2.0",
+      "1000,item_p1_a,3.0",
+      "1500,item_p1_b,4.0",
+      "2000,item_p2_a,5.0",
+      "2500,item_p2_b,6.0",
+      "3000,item_p3_a,7.0",
+      "4000,item_p3_b,8.0"
+    )
+    val actual = session
+      .sql(s"SELECT * FROM $getSchemaName.obkv_partitioned ORDER BY id")
+      .collect()
+      .map(_.toString().drop(1).dropRight(1))
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+
+    // Test predicate pushdown on partitioned table
+    val filtered = session
+      .sql(s"SELECT * FROM $getSchemaName.obkv_partitioned WHERE id >= 1000 AND id < 2000")
+      .collect()
+    Assertions.assertEquals(2, filtered.length)
+
+    session.stop()
+  }
+
+  @Test
+  def testPartitionedTableWithJdbcVerify(): Unit = {
+    val session = createObkvCatalogSession()
+    session.sql("use ob;")
+
+    // Insert data across multiple partitions
+    session.sql(s"""
+                   |INSERT INTO $getSchemaName.obkv_partitioned VALUES
+                   |(100, 'item_p0', 1.0),
+                   |(1500, 'item_p1', 2.0),
+                   |(2500, 'item_p2', 3.0),
+                   |(3500, 'item_p3', 4.0);
+                   |""".stripMargin)
+
+    session.stop()
+
+    // Verify via JDBC
+    waitingAndAssertTableCount("obkv_partitioned", 4)
+    import scala.collection.JavaConverters._
+    val expected = util.Arrays.asList(
+      "100,item_p0,1.0",
+      "1500,item_p1,2.0",
+      "2500,item_p2,3.0",
+      "3500,item_p3,4.0"
+    )
+    val actual = queryTable("obkv_partitioned")
+    assertEqualsInAnyOrder(expected, actual)
   }
 
 }
