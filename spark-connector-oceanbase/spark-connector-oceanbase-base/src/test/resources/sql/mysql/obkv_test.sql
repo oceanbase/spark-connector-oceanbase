@@ -39,10 +39,8 @@ CREATE TABLE IF NOT EXISTS obkv_all_types (
   col_decimal DECIMAL(20, 5),
   col_varchar VARCHAR(255),
   col_char    CHAR(50),
-  col_text    TEXT,
   col_date    DATE,
-  col_ts      TIMESTAMP    NULL DEFAULT NULL,
-  col_binary  VARBINARY(255)
+  col_ts      TIMESTAMP    NULL DEFAULT NULL
 );
 
 -- Table for comprehensive type write test
@@ -59,8 +57,7 @@ CREATE TABLE IF NOT EXISTS obkv_type_write_test (
   col_varchar     VARCHAR(100),
   col_char        CHAR(20),
   col_date        DATE,
-  col_timestamp   TIMESTAMP     NULL DEFAULT NULL,
-  col_binary      VARBINARY(100)
+  col_timestamp   TIMESTAMP     NULL DEFAULT NULL
 );
 
 -- Table for boundary value test
