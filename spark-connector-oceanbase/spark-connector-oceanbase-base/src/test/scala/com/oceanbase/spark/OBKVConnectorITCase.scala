@@ -696,41 +696,61 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
   def testBoundaryValues(): Unit = {
     // Note: OBKV has strict type checking. Spark SQL parses numbers as INT by default,
     // which causes type mismatch for TINYINT and SMALLINT columns.
-    // So we only test INT and BIGINT boundary values here.
-    val session = createObkvCatalogSession()
-    session.sql("use ob;")
+    // We test INT and BIGINT boundary values via JDBC insert and OBKV read.
 
-    // Write boundary values for INT and BIGINT only
-    session.sql(
-      s"""
-         |INSERT INTO $getSchemaName.obkv_boundary_test (id, min_int, max_int, min_bigint, max_bigint) VALUES
-         |(1, -2147483648, 2147483647, -9223372036854775808, 9223372036854775807),
-         |(2, 0, 0, 0, 0);
-         |""".stripMargin)
-
-    session.stop()
-
-    // Verify via JDBC
-    waitingAndAssertTableCount("obkv_boundary_test", 2)
-
+    // Insert boundary values via JDBC
     val conn = getJdbcConnection()
     try {
       val stmt = conn.createStatement()
       try {
-        val rs = stmt.executeQuery(s"SELECT * FROM $getSchemaName.obkv_boundary_test ORDER BY id")
-        Assertions.assertTrue(rs.next())
-
-        // Verify boundary values for INT and BIGINT
-        Assertions.assertEquals(-2147483648, rs.getInt("min_int"))
-        Assertions.assertEquals(2147483647, rs.getInt("max_int"))
-        Assertions.assertEquals(Long.MinValue, rs.getLong("min_bigint"))
-        Assertions.assertEquals(Long.MaxValue, rs.getLong("max_bigint"))
+        stmt.executeUpdate(
+          s"""
+             |INSERT INTO $getSchemaName.obkv_boundary_test VALUES
+             |(1, -128, 127, -32768, 32767, -2147483648, 2147483647, -9223372036854775808, 9223372036854775807),
+             |(2, 0, 0, 0, 0, 0, 0, 0, 0);
+             |""".stripMargin)
       } finally {
         stmt.close()
       }
     } finally {
       conn.close()
     }
+
+    // Read via OBKV and verify
+    val session = createObkvCatalogSession()
+    session.sql("use ob;")
+
+    val result = session
+      .sql(s"SELECT * FROM $getSchemaName.obkv_boundary_test ORDER BY id")
+      .collect()
+
+    Assertions.assertEquals(2, result.length)
+
+    // Verify row 1 (boundary values)
+    val row1 = result(0)
+    Assertions.assertEquals(1, row1.getInt(0))
+    Assertions.assertEquals(-128, row1.getByte(1)) // min_tinyint
+    Assertions.assertEquals(127, row1.getByte(2)) // max_tinyint
+    Assertions.assertEquals(-32768, row1.getShort(3)) // min_small
+    Assertions.assertEquals(32767, row1.getShort(4)) // max_small
+    Assertions.assertEquals(-2147483648, row1.getInt(5)) // min_int
+    Assertions.assertEquals(2147483647, row1.getInt(6)) // max_int
+    Assertions.assertEquals(Long.MinValue, row1.getLong(7)) // min_bigint
+    Assertions.assertEquals(Long.MaxValue, row1.getLong(8)) // max_bigint
+
+    // Verify row 2 (zeros)
+    val row2 = result(1)
+    Assertions.assertEquals(2, row2.getInt(0))
+    Assertions.assertEquals(0, row2.getByte(1))
+    Assertions.assertEquals(0, row2.getByte(2))
+    Assertions.assertEquals(0, row2.getShort(3))
+    Assertions.assertEquals(0, row2.getShort(4))
+    Assertions.assertEquals(0, row2.getInt(5))
+    Assertions.assertEquals(0, row2.getInt(6))
+    Assertions.assertEquals(0L, row2.getLong(7))
+    Assertions.assertEquals(0L, row2.getLong(8))
+
+    session.stop()
   }
 
   @Test
