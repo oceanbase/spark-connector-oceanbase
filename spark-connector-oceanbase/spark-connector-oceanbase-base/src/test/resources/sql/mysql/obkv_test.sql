@@ -36,10 +36,52 @@ CREATE TABLE IF NOT EXISTS obkv_all_types (
   col_bigint  BIGINT,
   col_float   FLOAT,
   col_double  DOUBLE,
-  col_decimal DOUBLE,
+  col_decimal DECIMAL(20, 5),
   col_varchar VARCHAR(255),
+  col_char    CHAR(50),
+  col_text    TEXT,
   col_date    DATE,
-  col_ts      TIMESTAMP    NULL DEFAULT NULL
+  col_ts      TIMESTAMP    NULL DEFAULT NULL,
+  col_binary  VARBINARY(255)
+);
+
+-- Table for comprehensive type write test
+CREATE TABLE IF NOT EXISTS obkv_type_write_test (
+  id              INT           NOT NULL PRIMARY KEY,
+  col_bool        BOOLEAN,
+  col_tinyint     TINYINT,
+  col_smallint    SMALLINT,
+  col_int         INT,
+  col_bigint      BIGINT,
+  col_float       FLOAT,
+  col_double      DOUBLE,
+  col_decimal     DECIMAL(15, 4),
+  col_varchar     VARCHAR(100),
+  col_char        CHAR(20),
+  col_date        DATE,
+  col_timestamp   TIMESTAMP     NULL DEFAULT NULL,
+  col_binary      VARBINARY(100)
+);
+
+-- Table for boundary value test
+CREATE TABLE IF NOT EXISTS obkv_boundary_test (
+  id          INT NOT NULL PRIMARY KEY,
+  min_tinyint TINYINT,
+  max_tinyint TINYINT,
+  min_small   SMALLINT,
+  max_small   SMALLINT,
+  min_int     INT,
+  max_int     INT,
+  min_bigint  BIGINT,
+  max_bigint  BIGINT
+);
+
+-- Table for null handling test
+CREATE TABLE IF NOT EXISTS obkv_null_test (
+  id    INT NOT NULL PRIMARY KEY,
+  name  VARCHAR(100),
+  value DOUBLE,
+  ts    TIMESTAMP NULL DEFAULT NULL
 );
 
 -- Partitioned table for testing parallel reading
