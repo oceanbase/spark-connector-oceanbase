@@ -405,13 +405,14 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
   @Test
   def testAllDataTypes(): Unit = {
     // Insert via JDBC to test OBKV read for multiple types
+    // Note: TEXT, VARBINARY, and DECIMAL types are NOT supported by OBKV protocol
     val conn = getJdbcConnection()
     try {
       val stmt = conn.createStatement()
       try {
         stmt.executeUpdate(s"""INSERT INTO $getSchemaName.obkv_all_types VALUES
                               |(1, true, 127, 32000, 100000, 9999999999, 3.14, 2.718281828,
-                              | 12345.67890, 'hello world', '2024-01-15', '2024-01-15 10:30:00')
+                              | 'hello world', '2024-01-15', '2024-01-15 10:30:00')
                               |""".stripMargin)
       } finally {
         stmt.close()
@@ -430,7 +431,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
 
     val row = result(0)
     Assertions.assertEquals(1, row.getInt(0)) // pk_id
-    Assertions.assertEquals("hello world", row.getString(9)) // col_varchar
+    Assertions.assertEquals("hello world", row.getString(8)) // col_varchar
 
     session.stop()
   }
@@ -519,7 +520,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
   @Test
   def testAllTypesRead(): Unit = {
     // Insert all types via JDBC to test OBKV read
-    // Note: TEXT and VARBINARY types are NOT supported by OBKV protocol
+    // Note: TEXT, VARBINARY, and DECIMAL types are NOT supported by OBKV protocol
     val conn = getJdbcConnection()
     try {
       val stmt = conn.createStatement()
@@ -534,7 +535,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
                               |  9223372036854775807,        -- col_bigint (max)
                               |  3.14159,                    -- col_float
                               |  2.718281828459045,          -- col_double
-                              |  123456789.12345,            -- col_decimal
                               |  'hello world',              -- col_varchar
                               |  'fixed char',               -- col_char
                               |  '2024-03-24',               -- col_date
@@ -551,7 +551,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
                               |  -9223372036854775808,       -- col_bigint (min)
                               |  -3.14159,                   -- col_float
                               |  -2.718281828459045,         -- col_double
-                              |  -99999.99999,               -- col_decimal
                               |  'negative values',          -- col_varchar
                               |  'negative',                 -- col_char
                               |  '2020-01-01',               -- col_date
@@ -569,7 +568,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
                               |  NULL,        -- col_bigint
                               |  NULL,        -- col_float
                               |  NULL,        -- col_double
-                              |  NULL,        -- col_decimal
                               |  NULL,        -- col_varchar
                               |  NULL,        -- col_char
                               |  NULL,        -- col_date
@@ -593,8 +591,8 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
 
     // Verify row 1 (max values)
     // Column indices: 0:pk_id, 1:col_bool, 2:col_tinyint, 3:col_small, 4:col_int,
-    //                 5:col_bigint, 6:col_float, 7:col_double, 8:col_decimal,
-    //                 9:col_varchar, 10:col_char, 11:col_date, 12:col_ts
+    //                 5:col_bigint, 6:col_float, 7:col_double,
+    //                 8:col_varchar, 9:col_char, 10:col_date, 11:col_ts
     val row1 = result(0)
     Assertions.assertEquals(1, row1.getInt(0)) // pk_id
     Assertions.assertEquals(true, row1.getBoolean(1)) // col_bool
@@ -604,9 +602,9 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals(9223372036854775807L, row1.getLong(5)) // col_bigint
     Assertions.assertEquals(3.14159f, row1.getFloat(6), 0.001f) // col_float
     Assertions.assertEquals(2.718281828459045, row1.getDouble(7), 0.0001) // col_double
-    Assertions.assertEquals("hello world", row1.getString(9)) // col_varchar
-    Assertions.assertTrue(row1.getString(10).startsWith("fixed char")) // col_char (padded)
-    Assertions.assertEquals("2024-03-24", row1.getDate(11).toString) // col_date
+    Assertions.assertEquals("hello world", row1.getString(8)) // col_varchar
+    Assertions.assertTrue(row1.getString(9).startsWith("fixed char")) // col_char (padded)
+    Assertions.assertEquals("2024-03-24", row1.getDate(10).toString) // col_date
 
     // Verify row 2 (min/negative values)
     val row2 = result(1)
@@ -615,8 +613,8 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals(-128, row2.getByte(2))
     Assertions.assertEquals(-32768, row2.getShort(3))
     Assertions.assertEquals(-2147483648, row2.getInt(4))
-    Assertions.assertEquals("negative values", row2.getString(9)) // col_varchar
-    Assertions.assertTrue(row2.getString(10).startsWith("negative")) // col_char
+    Assertions.assertEquals("negative values", row2.getString(8)) // col_varchar
+    Assertions.assertTrue(row2.getString(9).startsWith("negative")) // col_char
 
     // Verify row 3 (null values)
     val row3 = result(2)
@@ -628,11 +626,10 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertTrue(row3.isNullAt(5)) // col_bigint
     Assertions.assertTrue(row3.isNullAt(6)) // col_float
     Assertions.assertTrue(row3.isNullAt(7)) // col_double
-    Assertions.assertTrue(row3.isNullAt(8)) // col_decimal
-    Assertions.assertTrue(row3.isNullAt(9)) // col_varchar
-    Assertions.assertTrue(row3.isNullAt(10)) // col_char
-    Assertions.assertTrue(row3.isNullAt(11)) // col_date
-    Assertions.assertTrue(row3.isNullAt(12)) // col_ts
+    Assertions.assertTrue(row3.isNullAt(8)) // col_varchar
+    Assertions.assertTrue(row3.isNullAt(9)) // col_char
+    Assertions.assertTrue(row3.isNullAt(10)) // col_date
+    Assertions.assertTrue(row3.isNullAt(11)) // col_ts
 
     session.stop()
   }
@@ -643,13 +640,13 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     session.sql("use ob;")
 
     // Write all types via OBKV
-    // Note: VARBINARY type is NOT supported by OBKV protocol
+    // Note: TEXT, VARBINARY, and DECIMAL types are NOT supported by OBKV protocol
     session.sql(
       s"""
          |INSERT INTO $getSchemaName.obkv_type_write_test VALUES
-         |(1, true, 100, 10000, 1000000, 10000000000, 1.5, 2.5, 123.4567, 'test varchar', 'test char', '2024-03-24', '2024-03-24 10:30:00'),
-         |(2, false, -50, -5000, -500000, -5000000000, -1.5, -2.5, -999.9999, 'negative', 'neg', '2020-01-01', '2020-01-01 00:00:00'),
-         |(3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+         |(1, true, 100, 10000, 1000000, 10000000000, 1.5, 2.5, 'test varchar', 'test char', DATE '2024-03-24', TIMESTAMP '2024-03-24 10:30:00'),
+         |(2, false, -50, -5000, -500000, -5000000000, -1.5, -2.5, 'negative', 'neg', DATE '2020-01-01', TIMESTAMP '2020-01-01 00:00:00'),
+         |(3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
          |""".stripMargin)
 
     session.stop()
