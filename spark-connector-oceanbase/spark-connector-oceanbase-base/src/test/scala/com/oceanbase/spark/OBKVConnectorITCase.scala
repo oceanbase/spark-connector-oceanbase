@@ -597,6 +597,9 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals(3, result.length)
 
     // Verify row 1 (max values)
+    // Column indices: 0:pk_id, 1:col_bool, 2:col_tinyint, 3:col_small, 4:col_int,
+    //                 5:col_bigint, 6:col_float, 7:col_double, 8:col_decimal,
+    //                 9:col_varchar, 10:col_char, 11:col_text, 12:col_date, 13:col_ts, 14:col_binary
     val row1 = result(0)
     Assertions.assertEquals(1, row1.getInt(0)) // pk_id
     Assertions.assertEquals(true, row1.getBoolean(1)) // col_bool
@@ -607,6 +610,8 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals(3.14159f, row1.getFloat(6), 0.001f) // col_float
     Assertions.assertEquals(2.718281828459045, row1.getDouble(7), 0.0001) // col_double
     Assertions.assertEquals("hello world", row1.getString(9)) // col_varchar
+    Assertions.assertTrue(row1.getString(10).startsWith("fixed char")) // col_char (padded)
+    Assertions.assertEquals("this is a text field", row1.getString(11)) // col_text
     Assertions.assertEquals("2024-03-24", row1.getDate(12).toString) // col_date
 
     // Verify row 2 (min/negative values)
@@ -616,6 +621,9 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals(-128, row2.getByte(2))
     Assertions.assertEquals(-32768, row2.getShort(3))
     Assertions.assertEquals(-2147483648, row2.getInt(4))
+    Assertions.assertEquals("negative values", row2.getString(9)) // col_varchar
+    Assertions.assertTrue(row2.getString(10).startsWith("negative")) // col_char
+    Assertions.assertEquals("testing negatives", row2.getString(11)) // col_text
 
     // Verify row 3 (null values)
     val row3 = result(2)
@@ -629,8 +637,11 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertTrue(row3.isNullAt(7)) // col_double
     Assertions.assertTrue(row3.isNullAt(8)) // col_decimal
     Assertions.assertTrue(row3.isNullAt(9)) // col_varchar
+    Assertions.assertTrue(row3.isNullAt(10)) // col_char
+    Assertions.assertTrue(row3.isNullAt(11)) // col_text
     Assertions.assertTrue(row3.isNullAt(12)) // col_date
     Assertions.assertTrue(row3.isNullAt(13)) // col_ts
+    Assertions.assertTrue(row3.isNullAt(14)) // col_binary
 
     session.stop()
   }
