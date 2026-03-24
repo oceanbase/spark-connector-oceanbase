@@ -58,6 +58,9 @@ object OBKVTypeConverter {
             row.setInt(pos, DateTimeUtils.fromJavaDate(v))
           case v: LocalDate =>
             row.setInt(pos, DateTimeUtils.fromJavaDate(Date.valueOf(v)))
+          case v: java.util.Date =>
+            // OBKV ObDateTimeType.decode() returns java.util.Date, not java.sql.Date
+            row.setInt(pos, DateTimeUtils.fromJavaDate(new Date(v.getTime)))
           case _ =>
             row.setInt(pos, DateTimeUtils.fromJavaDate(Date.valueOf(value.toString)))
         }
