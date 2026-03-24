@@ -491,13 +491,21 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .checkValue(size -> size > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(1024);
 
+    public static final ConfigEntry<Integer> OBKV_RPC_CONNECT_TIMEOUT =
+            new ConfigBuilder("obkv.rpc-connect-timeout")
+                    .doc("The RPC connect timeout in milliseconds for OBKV connections")
+                    .version(ConfigConstants.VERSION_1_5_0)
+                    .intConf()
+                    .checkValue(v -> v > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(5000);
+
     public static final ConfigEntry<Integer> OBKV_RPC_EXECUTE_TIMEOUT =
             new ConfigBuilder("obkv.rpc-execute-timeout")
                     .doc("The RPC execute timeout in milliseconds for OBKV operations")
                     .version(ConfigConstants.VERSION_1_5_0)
                     .intConf()
                     .checkValue(v -> v > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-                    .createWithDefault(3000);
+                    .createWithDefault(10000);
 
     public static final ConfigEntry<Integer> OBKV_OPERATION_TIMEOUT =
             new ConfigBuilder("obkv.operation-timeout")
@@ -799,6 +807,10 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getObkvBatchSize() {
         return get(OBKV_BATCH_SIZE);
+    }
+
+    public Integer getObkvRpcConnectTimeout() {
+        return get(OBKV_RPC_CONNECT_TIMEOUT);
     }
 
     public Integer getObkvRpcExecuteTimeout() {

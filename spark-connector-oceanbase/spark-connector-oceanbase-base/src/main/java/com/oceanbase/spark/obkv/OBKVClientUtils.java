@@ -69,6 +69,7 @@ public class OBKVClientUtils {
                 }
             }
 
+            client.setRpcConnectTimeout(config.getObkvRpcConnectTimeout());
             client.setRpcExecuteTimeout(config.getObkvRpcExecuteTimeout());
 
             // Register row key elements: use explicit primaryKeys if provided,

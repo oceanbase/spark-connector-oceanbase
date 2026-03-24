@@ -35,7 +35,7 @@ class OBKVWriter(
 
   private val batchSize = config.getObkvBatchSize
   private val buffer: ArrayBuffer[InternalRow] = ArrayBuffer[InternalRow]()
-  private lazy val client: ObTableClient = OBKVClientUtils.createClient(config, primaryKeys)
+  private var client: ObTableClient = _
   private val dupAction: String = config.getObkvDupAction
   private val tableName: String = config.getTableName
 
@@ -52,6 +52,13 @@ class OBKVWriter(
     }
   }
 
+  private def ensureClient(): ObTableClient = {
+    if (client == null) {
+      client = OBKVClientUtils.createClient(config, primaryKeys)
+    }
+    client
+  }
+
   override def write(record: InternalRow): Unit = {
     buffer += record.copy()
     if (buffer.length >= batchSize) flush()
@@ -61,7 +68,7 @@ class OBKVWriter(
     if (buffer.isEmpty) return
 
     try {
-      val batchOps = client.batch(tableName)
+      val batchOps = ensureClient().batch(tableName)
 
       buffer.foreach {
         row =>
@@ -117,6 +124,8 @@ class OBKVWriter(
   override def abort(): Unit = {}
 
   override def close(): Unit = {
-    OBKVClientUtils.closeClient(client)
+    if (client != null) {
+      OBKVClientUtils.closeClient(client)
+    }
   }
 }
