@@ -412,7 +412,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
       try {
         stmt.executeUpdate(s"""INSERT INTO $getSchemaName.obkv_all_types VALUES
                               |(1, true, 127, 32000, 100000, 9999999999, 3.14, 2.718281828,
-                              | 'hello world', '2024-01-15', '2024-01-15 10:30:00')
+                              | 'hello world', 'fixed char', '2024-01-15', '2024-01-15 10:30:00')
                               |""".stripMargin)
       } finally {
         stmt.close()
@@ -601,7 +601,8 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals(32767, row1.getInt(3)) // col_small (mapped to IntegerType)
     Assertions.assertEquals(2147483647, row1.getInt(4)) // col_int
     Assertions.assertEquals(9223372036854775807L, row1.getLong(5)) // col_bigint
-    Assertions.assertEquals(3.14159f, row1.getFloat(6), 0.001f) // col_float
+    // Note: FLOAT type is mapped to DoubleType in Spark schema
+    Assertions.assertEquals(3.14159, row1.getDouble(6), 0.0001) // col_float
     Assertions.assertEquals(2.718281828459045, row1.getDouble(7), 0.0001) // col_double
     Assertions.assertEquals("hello world", row1.getString(8)) // col_varchar
     Assertions.assertTrue(row1.getString(9).startsWith("fixed char")) // col_char (padded)
@@ -641,13 +642,16 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     session.sql("use ob;")
 
     // Write all types via OBKV
-    // Note: TEXT, VARBINARY, and DECIMAL types are NOT supported by OBKV protocol
+    // Note: TEXT, VARBINARY, DECIMAL, and DATE types are NOT supported by OBKV protocol
+    // DATE type is not supported because OBKV client maps java.sql.Date to ObDateTimeType,
+    // not ObDateType. This causes type mismatch when writing to DATE columns.
     session.sql(
       s"""
-         |INSERT INTO $getSchemaName.obkv_type_write_test VALUES
-         |(1, true, 100, 10000, 1000000, 10000000000, 1.5, 2.5, 'test varchar', 'test char', DATE '2024-03-24', TIMESTAMP '2024-03-24 10:30:00'),
-         |(2, false, -50, -5000, -500000, -5000000000, -1.5, -2.5, 'negative', 'neg', DATE '2020-01-01', TIMESTAMP '2020-01-01 00:00:00'),
-         |(3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+         |INSERT INTO $getSchemaName.obkv_type_write_test (id, col_bool, col_tinyint, col_smallint, col_int, col_bigint, col_float, col_double, col_varchar, col_char, col_timestamp)
+         |VALUES
+         |(1, true, 100, 10000, 1000000, 10000000000, 1.5, 2.5, 'test varchar', 'test char', TIMESTAMP '2024-03-24 10:30:00'),
+         |(2, false, -50, -5000, -500000, -5000000000, -1.5, -2.5, 'negative', 'neg', TIMESTAMP '2020-01-01 00:00:00'),
+         |(3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
          |""".stripMargin)
 
     session.stop()
@@ -672,7 +676,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
         Assertions.assertEquals(1.5f, rs.getFloat("col_float"), 0.001f)
         Assertions.assertEquals(2.5, rs.getDouble("col_double"), 0.001)
         Assertions.assertEquals("test varchar", rs.getString("col_varchar"))
-        Assertions.assertEquals("2024-03-24", rs.getDate("col_date").toString)
 
         Assertions.assertTrue(rs.next())
         // Verify row 2
