@@ -1004,7 +1004,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
       .option("password", getPassword)
       .option("obkv.enabled", "true")
       .option("obkv.param-url", getJdbcUrl.replace("jdbc:oceanbase://", "jdbc:mysql://"))
-      .option("obkv.full-user-name", s"$getUsername#$getTenantName")
+      .option("obkv.full-user-name", s"$getUsername#$getClusterName")
       .option("obkv.password", getPassword)
       .option("obkv.primary-key", "id")
       .save()
