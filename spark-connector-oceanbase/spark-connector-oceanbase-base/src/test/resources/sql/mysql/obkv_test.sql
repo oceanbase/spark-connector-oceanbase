@@ -89,18 +89,5 @@ CREATE TABLE IF NOT EXISTS obkv_partitioned (
   PARTITION p3 VALUES LESS THAN MAXVALUE
 );
 
--- Table for testing string-to-type conversion using DataFrame API with StringType schema
--- This tests if OBKV server can convert VARCHAR input to target column types when bypassing Spark type checking
-CREATE TABLE IF NOT EXISTS obkv_string_schema_test (
-  id              INT           NOT NULL PRIMARY KEY,
-  col_tinyint     TINYINT,
-  col_smallint    SMALLINT,
-  col_int         INT,
-  col_bigint      BIGINT,
-  col_float       FLOAT,
-  col_double      DOUBLE,
-  col_varchar     VARCHAR(100),
-  col_timestamp   TIMESTAMP     NULL DEFAULT NULL
-);
 
 
