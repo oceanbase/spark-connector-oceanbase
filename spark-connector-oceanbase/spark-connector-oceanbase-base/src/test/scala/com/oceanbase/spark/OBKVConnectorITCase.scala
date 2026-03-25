@@ -641,14 +641,14 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     // - TEXT, VARBINARY: OBKV protocol decoding issues
     // - DECIMAL: OBKV client throws FeatureNotSupportedException for ObNumberType
     // - DATE: OBKV client maps java.sql.Date to ObDateTimeType, not ObDateType
-    // - TINYINT, SMALLINT: Spark SQL parses number literals as INT, causing type mismatch
+    // - TINYINT, SMALLINT, FLOAT: Spark SQL parses number literals as INT/DOUBLE, causing type mismatch
     session.sql(
       s"""
-         |INSERT INTO $getSchemaName.obkv_type_write_test (id, col_bool, col_int, col_bigint, col_float, col_double, col_varchar, col_char, col_timestamp)
+         |INSERT INTO $getSchemaName.obkv_type_write_test (id, col_bool, col_int, col_bigint, col_double, col_varchar, col_char, col_timestamp)
          |VALUES
-         |(1, true, 1000000, 10000000000, 1.5, 2.5, 'test varchar', 'test char', TIMESTAMP '2024-03-24 10:30:00'),
-         |(2, false, -500000, -5000000000, -1.5, -2.5, 'negative', 'neg', TIMESTAMP '2020-01-01 00:00:00'),
-         |(3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+         |(1, true, 1000000, 10000000000, 2.5, 'test varchar', 'test char', TIMESTAMP '2024-03-24 10:30:00'),
+         |(2, false, -500000, -5000000000, -2.5, 'negative', 'neg', TIMESTAMP '2020-01-01 00:00:00'),
+         |(3, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
          |""".stripMargin)
 
     session.stop()
@@ -668,7 +668,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
         Assertions.assertEquals(true, rs.getBoolean("col_bool"))
         Assertions.assertEquals(1000000, rs.getInt("col_int"))
         Assertions.assertEquals(10000000000L, rs.getLong("col_bigint"))
-        Assertions.assertEquals(1.5, rs.getDouble("col_float"), 0.001)
         Assertions.assertEquals(2.5, rs.getDouble("col_double"), 0.001)
         Assertions.assertEquals("test varchar", rs.getString("col_varchar"))
 

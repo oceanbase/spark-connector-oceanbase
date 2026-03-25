@@ -42,14 +42,13 @@ CREATE TABLE IF NOT EXISTS obkv_all_types (
 );
 
 -- Table for comprehensive type write test
--- Note: TINYINT and SMALLINT columns are removed because OBKV has strict type checking.
--- Spark SQL parses number literals as INT by default, causing type mismatch for these columns.
+-- Note: TINYINT, SMALLINT, and FLOAT columns are removed because OBKV has strict type checking.
+-- Spark SQL parses number literals as INT/DOUBLE by default, causing type mismatch for these columns.
 CREATE TABLE IF NOT EXISTS obkv_type_write_test (
   id              INT           NOT NULL PRIMARY KEY,
   col_bool        BOOLEAN,
   col_int         INT,
   col_bigint      BIGINT,
-  col_float       FLOAT,
   col_double      DOUBLE,
   col_varchar     VARCHAR(100),
   col_char        CHAR(20),
