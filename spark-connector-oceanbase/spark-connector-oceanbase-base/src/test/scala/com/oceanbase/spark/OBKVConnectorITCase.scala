@@ -941,6 +941,128 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testStringSchemaWriteToOBKV(): Unit = {
+    // Test writing to OBKV using DataFrame API with StringType schema
+    // This bypasses Spark's type checking by declaring all columns as StringType
+    // and relies on OBKV server to convert VARCHAR to target column types
+    import org.apache.spark.sql.types._
+    import scala.collection.JavaConverters._
+
+    val spark = SparkSession.builder().master("local[*]").getOrCreate()
+    import spark.implicits._
+
+    // Define schema with all columns as StringType
+    val schema = StructType(
+      Seq(
+        StructField("id", StringType, nullable = false),
+        StructField("col_tinyint", StringType, nullable = true),
+        StructField("col_smallint", StringType, nullable = true),
+        StructField("col_int", StringType, nullable = true),
+        StructField("col_bigint", StringType, nullable = true),
+        StructField("col_float", StringType, nullable = true),
+        StructField("col_double", StringType, nullable = true),
+        StructField("col_varchar", StringType, nullable = true),
+        StructField("col_timestamp", StringType, nullable = true)
+      ))
+
+    // Create data with string values
+    val data = Seq(
+      Row(
+        "1",
+        "127",
+        "32767",
+        "1000000",
+        "9223372036854775807",
+        "3.14",
+        "2.71828",
+        "test1",
+        "2024-03-24 10:30:00"),
+      Row(
+        "2",
+        "-128",
+        "-32768",
+        "-1000000",
+        "-9223372036854775808",
+        "-3.14",
+        "-2.71828",
+        "test2",
+        "2020-01-01 00:00:00"),
+      Row("3", null, null, null, null, null, null, null, null)
+    ).asJava
+
+    val df = spark.createDataFrame(data, schema)
+
+    // Write using DataFrame API with OBKV options
+    df.write
+      .format("oceanbase")
+      .mode(SaveMode.Append)
+      .option("url", getJdbcUrl)
+      .option("table-name", s"$getSchemaName.obkv_string_schema_test")
+      .option("username", getUsername)
+      .option("password", getPassword)
+      .option("obkv.enabled", "true")
+      .option("obkv.param-url", getJdbcUrl.replace("jdbc:oceanbase://", "jdbc:mysql://"))
+      .option("obkv.full-user-name", s"$getUsername#$getTenantName")
+      .option("obkv.password", getPassword)
+      .option("obkv.primary-key", "id")
+      .save()
+
+    spark.stop()
+
+    // Verify via JDBC
+    waitingAndAssertTableCount("obkv_string_schema_test", 3)
+
+    val conn = getJdbcConnection()
+    try {
+      val stmt = conn.createStatement()
+      try {
+        val rs =
+          stmt.executeQuery(s"SELECT * FROM $getSchemaName.obkv_string_schema_test ORDER BY id")
+        Assertions.assertTrue(rs.next())
+
+        // Verify row 1
+        Assertions.assertEquals(1, rs.getInt("id"))
+        Assertions.assertEquals(127, rs.getInt("col_tinyint"))
+        Assertions.assertEquals(32767, rs.getInt("col_smallint"))
+        Assertions.assertEquals(1000000, rs.getInt("col_int"))
+        Assertions.assertEquals(9223372036854775807L, rs.getLong("col_bigint"))
+        Assertions.assertEquals(3.14, rs.getDouble("col_float"), 0.01)
+        Assertions.assertEquals(2.71828, rs.getDouble("col_double"), 0.0001)
+        Assertions.assertEquals("test1", rs.getString("col_varchar"))
+        Assertions.assertTrue(rs.getTimestamp("col_timestamp").toString.startsWith("2024-03-24"))
+
+        Assertions.assertTrue(rs.next())
+        // Verify row 2
+        Assertions.assertEquals(2, rs.getInt("id"))
+        Assertions.assertEquals(-128, rs.getInt("col_tinyint"))
+        Assertions.assertEquals(-32768, rs.getInt("col_smallint"))
+        Assertions.assertEquals(-1000000, rs.getInt("col_int"))
+        Assertions.assertEquals(-9223372036854775808L, rs.getLong("col_bigint"))
+        Assertions.assertEquals(-3.14, rs.getDouble("col_float"), 0.01)
+        Assertions.assertEquals(-2.71828, rs.getDouble("col_double"), 0.0001)
+        Assertions.assertEquals("test2", rs.getString("col_varchar"))
+        Assertions.assertTrue(rs.getTimestamp("col_timestamp").toString.startsWith("2020-01-01"))
+
+        Assertions.assertTrue(rs.next())
+        // Verify row 3 (nulls)
+        Assertions.assertEquals(3, rs.getInt("id"))
+        Assertions.assertTrue(rs.getObject("col_tinyint") == null)
+        Assertions.assertTrue(rs.getObject("col_smallint") == null)
+        Assertions.assertTrue(rs.getObject("col_int") == null)
+        Assertions.assertTrue(rs.getObject("col_bigint") == null)
+        Assertions.assertTrue(rs.getObject("col_float") == null)
+        Assertions.assertTrue(rs.getObject("col_double") == null)
+        Assertions.assertTrue(rs.getObject("col_varchar") == null)
+        Assertions.assertTrue(rs.getObject("col_timestamp") == null)
+      } finally {
+        stmt.close()
+      }
+    } finally {
+      conn.close()
+    }
+  }
+
 }
 
 object OBKVConnectorITCase {
