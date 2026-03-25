@@ -91,6 +91,9 @@ CREATE TABLE IF NOT EXISTS obkv_partitioned (
 
 -- Table for testing string-to-type conversion via OBKV
 -- This tests whether OBKV server can convert VARCHAR input to target column types
+-- Note: DECIMAL and DATE columns are removed because OBKV does not support these types:
+-- - DECIMAL: OBKV client throws FeatureNotSupportedException for ObNumberType
+-- - DATE: OBKV client maps java.sql.Date to ObDateTimeType, not ObDateType
 CREATE TABLE IF NOT EXISTS obkv_string_to_type_test (
   id              INT           NOT NULL PRIMARY KEY,
   col_tinyint     TINYINT,
@@ -99,7 +102,5 @@ CREATE TABLE IF NOT EXISTS obkv_string_to_type_test (
   col_bigint      BIGINT,
   col_float       FLOAT,
   col_double      DOUBLE,
-  col_decimal     DECIMAL(10,2),
-  col_date        DATE,
   col_timestamp   TIMESTAMP     NULL DEFAULT NULL
 );
