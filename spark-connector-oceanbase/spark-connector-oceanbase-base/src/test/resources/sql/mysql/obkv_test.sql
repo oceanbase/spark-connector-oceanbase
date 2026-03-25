@@ -38,7 +38,6 @@ CREATE TABLE IF NOT EXISTS obkv_all_types (
   col_double  DOUBLE,
   col_varchar VARCHAR(255),
   col_char    CHAR(50),
-  col_date    DATE,
   col_ts      TIMESTAMP    NULL DEFAULT NULL
 );
 
@@ -54,7 +53,6 @@ CREATE TABLE IF NOT EXISTS obkv_type_write_test (
   col_double      DOUBLE,
   col_varchar     VARCHAR(100),
   col_char        CHAR(20),
-  col_date        DATE,
   col_timestamp   TIMESTAMP     NULL DEFAULT NULL
 );
 

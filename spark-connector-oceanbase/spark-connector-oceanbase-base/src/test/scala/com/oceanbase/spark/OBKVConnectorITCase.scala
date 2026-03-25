@@ -405,14 +405,14 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
   @Test
   def testAllDataTypes(): Unit = {
     // Insert via JDBC to test OBKV read for multiple types
-    // Note: TEXT, VARBINARY, and DECIMAL types are NOT supported by OBKV protocol
+    // Note: TEXT, VARBINARY, DECIMAL, and DATE types are NOT supported by OBKV protocol
     val conn = getJdbcConnection()
     try {
       val stmt = conn.createStatement()
       try {
         stmt.executeUpdate(s"""INSERT INTO $getSchemaName.obkv_all_types VALUES
                               |(1, true, 127, 32000, 100000, 9999999999, 3.14, 2.718281828,
-                              | 'hello world', 'fixed char', '2024-01-15', '2024-01-15 10:30:00')
+                              | 'hello world', 'fixed char', '2024-01-15 10:30:00')
                               |""".stripMargin)
       } finally {
         stmt.close()
@@ -520,7 +520,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
   @Test
   def testAllTypesRead(): Unit = {
     // Insert all types via JDBC to test OBKV read
-    // Note: TEXT, VARBINARY, and DECIMAL types are NOT supported by OBKV protocol
+    // Note: TEXT, VARBINARY, DECIMAL, and DATE types are NOT supported by OBKV protocol
     val conn = getJdbcConnection()
     try {
       val stmt = conn.createStatement()
@@ -537,7 +537,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
                               |  2.718281828459045,          -- col_double
                               |  'hello world',              -- col_varchar
                               |  'fixed char',               -- col_char
-                              |  '2024-03-24',               -- col_date
                               |  '2024-03-24 10:30:45.123'   -- col_ts
                               |)
                               |""".stripMargin)
@@ -553,7 +552,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
                               |  -2.718281828459045,         -- col_double
                               |  'negative values',          -- col_varchar
                               |  'negative',                 -- col_char
-                              |  '2020-01-01',               -- col_date
                               |  '2020-01-01 00:00:00'       -- col_ts
                               |)
                               |""".stripMargin)
@@ -570,7 +568,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
                               |  NULL,        -- col_double
                               |  NULL,        -- col_varchar
                               |  NULL,        -- col_char
-                              |  NULL,        -- col_date
                               |  NULL         -- col_ts
                               |)
                               |""".stripMargin)
@@ -592,7 +589,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     // Verify row 1 (max values)
     // Column indices: 0:pk_id, 1:col_bool, 2:col_tinyint, 3:col_small, 4:col_int,
     //                 5:col_bigint, 6:col_float, 7:col_double,
-    //                 8:col_varchar, 9:col_char, 10:col_date, 11:col_ts
+    //                 8:col_varchar, 9:col_char, 10:col_ts
     // Note: TINYINT and SMALLINT are mapped to IntegerType in Spark schema
     val row1 = result(0)
     Assertions.assertEquals(1, row1.getInt(0)) // pk_id
@@ -606,7 +603,6 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertEquals(2.718281828459045, row1.getDouble(7), 0.0001) // col_double
     Assertions.assertEquals("hello world", row1.getString(8)) // col_varchar
     Assertions.assertTrue(row1.getString(9).startsWith("fixed char")) // col_char (padded)
-    Assertions.assertEquals("2024-03-24", row1.getDate(10).toString) // col_date
 
     // Verify row 2 (min/negative values)
     val row2 = result(1)
@@ -630,8 +626,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     Assertions.assertTrue(row3.isNullAt(7)) // col_double
     Assertions.assertTrue(row3.isNullAt(8)) // col_varchar
     Assertions.assertTrue(row3.isNullAt(9)) // col_char
-    Assertions.assertTrue(row3.isNullAt(10)) // col_date
-    Assertions.assertTrue(row3.isNullAt(11)) // col_ts
+    Assertions.assertTrue(row3.isNullAt(10)) // col_ts
 
     session.stop()
   }
