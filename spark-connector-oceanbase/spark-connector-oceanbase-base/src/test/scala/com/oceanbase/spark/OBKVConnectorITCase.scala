@@ -941,6 +941,113 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     session.stop()
   }
 
+  @Test
+  def testStringToTypeConversion(): Unit = {
+    // Test whether OBKV server can convert VARCHAR input to target column types
+    // This is a workaround for OBKV's strict type checking
+    val session = createObkvCatalogSession()
+    session.sql("use ob;")
+
+    // Write using string values via DataFrame API
+    // This tests if OBKV can convert string to target types
+    import session.implicits._
+
+    // Create DataFrame with string values for all columns
+    val df = Seq(
+      (
+        1,
+        "127",
+        "32767",
+        "1000000",
+        "9223372036854775807",
+        "3.14",
+        "2.71828",
+        "12345.67",
+        "2024-03-24",
+        "2024-03-24 10:30:00"),
+      (
+        2,
+        "-128",
+        "-32768",
+        "-1000000",
+        "-9223372036854775808",
+        "-3.14",
+        "-2.71828",
+        "-12345.67",
+        "2020-01-01",
+        "2020-01-01 00:00:00"),
+      (3, null, null, null, null, null, null, null, null, null)
+    ).toDF(
+      "id",
+      "col_tinyint",
+      "col_smallint",
+      "col_int",
+      "col_bigint",
+      "col_float",
+      "col_double",
+      "col_decimal",
+      "col_date",
+      "col_timestamp"
+    )
+
+    // Write to OBKV table
+    df.write
+      .format("oceanbase")
+      .option("url", getJdbcUrl)
+      .option("schema", getSchemaName)
+      .option("table", "obkv_string_to_type_test")
+      .option("username", getUsername)
+      .option("password", getPassword)
+      .option("connect-mode", "obkv")
+      .option("obkv-log-level", "INFO")
+      .mode("append")
+      .save()
+
+    session.stop()
+
+    // Verify via JDBC
+    waitingAndAssertTableCount("obkv_string_to_type_test", 3)
+
+    val conn = getJdbcConnection()
+    try {
+      val stmt = conn.createStatement()
+      try {
+        val rs =
+          stmt.executeQuery(s"SELECT * FROM $getSchemaName.obkv_string_to_type_test ORDER BY id")
+        Assertions.assertTrue(rs.next())
+
+        // Verify row 1
+        Assertions.assertEquals(1, rs.getInt("id"))
+        Assertions.assertEquals(127, rs.getByte("col_tinyint"))
+        Assertions.assertEquals(32767, rs.getShort("col_smallint"))
+        Assertions.assertEquals(1000000, rs.getInt("col_int"))
+        Assertions.assertEquals(9223372036854775807L, rs.getLong("col_bigint"))
+        Assertions.assertEquals(3.14f, rs.getFloat("col_float"), 0.01f)
+        Assertions.assertEquals(2.71828, rs.getDouble("col_double"), 0.0001)
+        Assertions.assertEquals(
+          new java.math.BigDecimal("12345.67"),
+          rs.getBigDecimal("col_decimal"))
+        Assertions.assertEquals(java.sql.Date.valueOf("2024-03-24"), rs.getDate("col_date"))
+        Assertions.assertTrue(rs.getTimestamp("col_timestamp").toString.startsWith("2024-03-24"))
+
+        Assertions.assertTrue(rs.next())
+        // Verify row 2
+        Assertions.assertEquals(2, rs.getInt("id"))
+        Assertions.assertEquals(-128, rs.getByte("col_tinyint"))
+        Assertions.assertEquals(-32768, rs.getShort("col_smallint"))
+
+        Assertions.assertTrue(rs.next())
+        // Verify row 3 (nulls)
+        Assertions.assertEquals(3, rs.getInt("id"))
+        Assertions.assertTrue(rs.getObject("col_tinyint") == null)
+      } finally {
+        stmt.close()
+      }
+    } finally {
+      conn.close()
+    }
+  }
+
 }
 
 object OBKVConnectorITCase {
