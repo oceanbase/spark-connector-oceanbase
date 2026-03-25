@@ -946,6 +946,7 @@ class OBKVConnectorITCase extends OceanBaseMySQLTestBase {
     // Test writing to OBKV using DataFrame API with StringType schema
     // This bypasses Spark's type checking by declaring all columns as StringType
     // and relies on OBKV server to convert VARCHAR to target column types
+    import org.apache.spark.sql.Row
     import org.apache.spark.sql.types._
     import scala.collection.JavaConverters._
 
