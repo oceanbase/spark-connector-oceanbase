@@ -240,12 +240,21 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     }
   }
 
-  def getInsertIntoStatement(tableName: String, schema: StructType): String = {
+  def getInsertIntoStatement(
+      tableName: String,
+      schema: StructType,
+      config: OceanBaseConfig): String = {
     val columnClause =
       schema.fieldNames.map(columnName => quoteIdentifier(columnName)).mkString(", ")
     val placeholders = schema.fieldNames.map(_ => "?").mkString(", ")
+
+    val hints = config.getJdbcWriteHintsPushdown match {
+      case hint if hint.trim.nonEmpty => s"/*+ $hint */"
+      case _ => OceanBaseConfig.EMPTY_STRING
+    }
+
     s"""
-       |INSERT INTO $tableName ($columnClause)
+       |INSERT $hints INTO $tableName ($columnClause)
        |VALUES ($placeholders)
        |""".stripMargin
   }
@@ -259,10 +268,15 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
     val nonUniqueFields =
       schema.fieldNames.filterNot(fieldName => uniqueKeys.contains(quoteIdentifier(fieldName)))
 
+    val hints = config.getJdbcWriteHintsPushdown match {
+      case hint if hint.trim.nonEmpty => s"/*+ $hint */"
+      case _ => OceanBaseConfig.EMPTY_STRING
+    }
+
     val baseInsert = {
       val columns = schema.fieldNames.map(quoteIdentifier).mkString(", ")
       val placeholders = schema.fieldNames.map(_ => "?").mkString(", ")
-      s"INSERT INTO $tableName ($columns) VALUES ($placeholders)"
+      s"INSERT $hints INTO $tableName ($columns) VALUES ($placeholders)"
     }
 
     // Force INSERT IGNORE if explicitly configured

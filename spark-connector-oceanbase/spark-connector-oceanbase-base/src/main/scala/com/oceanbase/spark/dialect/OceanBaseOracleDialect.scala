@@ -290,12 +290,21 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     }
   }
 
-  override def getInsertIntoStatement(tableName: String, schema: StructType): String = {
+  override def getInsertIntoStatement(
+      tableName: String,
+      schema: StructType,
+      config: OceanBaseConfig): String = {
     val columnClause =
       schema.fieldNames.map(columnName => quoteIdentifier(columnName)).mkString(", ")
     val placeholders = schema.fieldNames.map(_ => "?").mkString(", ")
+
+    val hints = config.getJdbcWriteHintsPushdown match {
+      case hint if hint.trim.nonEmpty => s"/*+ $hint */"
+      case _ => OceanBaseConfig.EMPTY_STRING
+    }
+
     s"""
-       |INSERT INTO $tableName ($columnClause)
+       |INSERT $hints INTO $tableName ($columnClause)
        |VALUES ($placeholders)
        |""".stripMargin
   }
@@ -308,6 +317,11 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     val uniqueKeys = priKeyColumnInfo.map(_.columnName).toSet
     val nonUniqueFields =
       schema.fieldNames.filterNot(fieldName => uniqueKeys.contains(quoteIdentifier(fieldName)))
+
+    val hints = config.getJdbcWriteHintsPushdown match {
+      case hint if hint.trim.nonEmpty => s"/*+ $hint */"
+      case _ => OceanBaseConfig.EMPTY_STRING
+    }
 
     val columns = schema.fieldNames.map(quoteIdentifier).mkString(", ")
     val keyColumns = priKeyColumnInfo.map(_.columnName).mkString(", ")
@@ -330,7 +344,7 @@ class OceanBaseOracleDialect extends OceanBaseDialect {
     }
 
     s"""
-       |MERGE INTO $tableName t
+       |MERGE $hints INTO $tableName t
        |USING (SELECT $selectClause FROM DUAL) s
        |ON (${keyColumns.split(", ").map(col => s"t.$col = s.$col").mkString(" AND ")})
        |$whenMatchedClause

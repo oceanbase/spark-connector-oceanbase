@@ -98,7 +98,7 @@ case class HBaseRelation(
     buffer.foreach {
       row =>
         // First field is rowkey
-        val rowKey: Array[Byte] = convertToBytes(row.get(0))
+        val rowKeyBytes: Array[Byte] = convertToBytes(row.get(0))
 
         // Group columns by family
         val columnsByFamily = new mutable.HashMap[String, ArrayBuffer[(String, Array[Byte])]]()
@@ -132,7 +132,7 @@ case class HBaseRelation(
         // Create one Put per family with the same rowKey
         columnsByFamily.foreach {
           case (cfName, columns) =>
-            val put: Put = new Put(rowKey)
+            val put: Put = new Put(rowKeyBytes)
             val familyName: Array[Byte] = Bytes.toBytes(cfName)
             columns.foreach {
               case (colName, colValue) =>

@@ -153,6 +153,38 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testUncacheTableIfExists(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+
+    // Test UNCACHE TABLE IF EXISTS with existing table - should succeed
+    Assertions.assertDoesNotThrow(new ThrowingSupplier[Unit] {
+      override def get(): Unit = {
+        session.sql("UNCACHE TABLE IF EXISTS products")
+      }
+    })
+
+    // Test UNCACHE TABLE IF EXISTS with non-existing table - should not throw exception
+    Assertions.assertDoesNotThrow(new ThrowingSupplier[Unit] {
+      override def get(): Unit = {
+        session.sql("UNCACHE TABLE IF EXISTS non_existing_table")
+      }
+    })
+
+    session.stop()
+  }
+
+  @Test
   def testCatalogOp(): Unit = {
     val session = SparkSession
       .builder()
@@ -1086,6 +1118,80 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     assertEqualsInAnyOrder(expected, actual)
 
     session.stop()
+  }
+
+  @Test
+  def testJdbcQueryHints(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config(
+        "spark.sql.catalog.ob.jdbc.pushdown-query-hints",
+        "READ_CONSISTENCY(STRONG) query_timeout(10000000)")
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+    queryAndVerifyTableData(session, "products", expected)
+    session.stop()
+
+    // empty test case
+    val session1 = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.pushdown-query-hints", "")
+      .getOrCreate()
+
+    session1.sql("use ob;")
+    insertTestData(session1, "products")
+    queryAndVerifyTableData(session1, "products", expected)
+    session1.stop()
+  }
+
+  @Test
+  def testJdbcWriteHints(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.pushdown-write-hints", "MONITOR PARALLEL(2)")
+      .getOrCreate()
+
+    session.sql("use ob;")
+    insertTestData(session, "products")
+    queryAndVerifyTableData(session, "products", expected)
+    session.stop()
+
+    // empty test case
+    val session1 = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.pushdown-write-hints", "")
+      .getOrCreate()
+
+    session1.sql("use ob;")
+    insertTestData(session1, "products")
+    queryAndVerifyTableData(session1, "products", expected)
+    session1.stop()
   }
 
   private def queryAndVerifyTableData(

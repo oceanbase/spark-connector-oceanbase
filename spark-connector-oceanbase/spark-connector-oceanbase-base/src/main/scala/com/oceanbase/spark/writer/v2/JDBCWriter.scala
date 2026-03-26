@@ -96,6 +96,7 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
       }
     } catch {
       case ex: SQLException =>
+        logError(s"Failed to execute batch with sql: $sql", ex)
         throw new RuntimeException(s"Failed to execute batch with sql: $sql", ex)
     } finally {
       if (!config.getJdbcEnableAutoCommit && !committed) {
@@ -125,7 +126,7 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
     if (upsertColInfos.nonEmpty) {
       dialect.getUpsertIntoStatement(tableName, schema, upsertColInfos, config)
     } else {
-      dialect.getInsertIntoStatement(tableName, schema)
+      dialect.getInsertIntoStatement(tableName, schema, config)
     }
   }
 
