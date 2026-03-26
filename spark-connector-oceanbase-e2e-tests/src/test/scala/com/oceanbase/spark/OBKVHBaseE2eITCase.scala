@@ -52,26 +52,28 @@ class OBKVHBaseE2eITCase extends SparkContainerTestEnvironment {
   )
   def testInsertValues(): Unit = {
     val sqlLines: util.List[String] = new util.ArrayList[String]
-    sqlLines.add(s"""
-                    |CREATE TEMPORARY VIEW test_sink (
-                    |  rowkey STRING,
-                    |  family1 STRUCT<address: STRING, phone: STRING, personalName: STRING, personalPhone: DOUBLE>
-                    |)
-                    |USING `obkv-hbase`
-                    |OPTIONS(
-                    |  "url" = "${getSysParameter("obconfig_url")}",
-                    |  "sys.username"= "$getSysUsername",
-                    |  "sys.password" = "$getSysPassword",
-                    |  "schema-name"="$getSchemaName",
-                    |  "table-name"="htable",
-                    |  "username"="$getUsername#$getClusterName",
-                    |  "password"="$getPassword"
-                    |);
-                    |""".stripMargin)
-    sqlLines.add("""
-                   |INSERT INTO test_sink VALUES
-                   |('16891', named_struct('address', '40 Ellis St.', 'phone', '674-555-0110', 'personalName', 'John Jackson', 'personalPhone', 121.11));
-                   |""".stripMargin)
+    sqlLines.add(
+      s"""
+         |CREATE TEMPORARY VIEW test_sink (
+         |  rowkey STRING,
+         |  family1 STRUCT<address: STRING, phone: STRING, personalName: STRING, personalPhone: DOUBLE>
+         |)
+         |USING `obkv-hbase`
+         |OPTIONS(
+         |  "url" = "${getSysParameter("obconfig_url")}",
+         |  "sys.username"= "$getSysUsername",
+         |  "sys.password" = "$getSysPassword",
+         |  "schema-name"="$getSchemaName",
+         |  "table-name"="htable",
+         |  "username"="$getUsername#$getClusterName",
+         |  "password"="$getPassword"
+         |);
+         |""".stripMargin)
+    sqlLines.add(
+      """
+        |INSERT INTO test_sink VALUES
+        |('16891', named_struct('address', '40 Ellis St.', 'phone', '674-555-0110', 'personalName', 'John Jackson', 'personalPhone', 121.11));
+        |""".stripMargin)
     submitSQLJob(sqlLines, getResource(SINK_CONNECTOR_NAME))
 
     import scala.collection.JavaConverters._
@@ -191,4 +193,4 @@ object OBKVHBaseE2eITCase extends SparkContainerTestEnvironment {
       .foreach(_.stop())
   }
 
-  }
+}
