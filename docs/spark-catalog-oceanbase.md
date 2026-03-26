@@ -408,7 +408,7 @@ Precautions for direct-load:
                 <td>No</td>
                 <td style="word-wrap: break-word;"></td>
                 <td>String</td>
-                <td>Specifies hints to be pushed down to OceanBase INSERT statements. These hints will be added to the final SQL sent to OceanBase for execution. Supports multiple hints (separated by spaces), e.g., 'append parallel(16)'.</td>
+                <td>Specifies hints to be pushed down to OceanBase INSERT statements. These hints will be added to the final SQL sent to OceanBase for execution. Supports multiple hints (separated by spaces), e.g., 'enable_parallel_dml parallel(8)'.</td>
             </tr>
             <tr>
                 <td>spark.sql.catalog.your_catalog_name.jdbc.partition-compute-parallelism</td>
