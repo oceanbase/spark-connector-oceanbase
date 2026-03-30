@@ -141,7 +141,7 @@ CREATE TABLE `htable$family2`
 
 The connector uses Spark's STRUCT types to define the schema mapping between Spark and HBase:
 
-- The **first field** must be the rowkey column (typically a STRING type)
+- The **first field** must be the rowkey column
 - **Subsequent fields** represent column families, each defined as a STRUCT type
 - **Fields inside STRUCT** represent columns within that column family (the field name is the column qualifier)
 

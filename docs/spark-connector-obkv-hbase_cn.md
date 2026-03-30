@@ -140,7 +140,7 @@ CREATE TABLE `htable$family2`
 
 连接器使用 Spark 的 STRUCT 类型来定义 Spark 和 HBase 之间的 schema 映射：
 
-- **第一个字段**必须是 rowkey 列（通常是 STRING 类型）
+- **第一个字段**必须是 rowkey 列
 - **后续字段**代表列族（column family），每个字段定义为 STRUCT 类型
 - **STRUCT 内部的字段**代表该列族内的列（字段名即为列限定符 qualifier）
 
