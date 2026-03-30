@@ -111,18 +111,30 @@ insert into orders values
 (5, now(), 'dot', 111.25, 12, true);
 ```
 
-- Connect to OceanBase
+- Connect to OceanBase and create HBase tables. In OceanBase HBase mode, each column family is a separate physical table with the naming convention `table_name$family_name`:
 
 ```sql
 use test;
-CREATE TABLE `htable1$family1`
+
+-- Create table for family1 column family
+CREATE TABLE `htable$family1`
 (
   `K` varbinary(1024)    NOT NULL,
   `Q` varbinary(256)     NOT NULL,
   `T` bigint(20)         NOT NULL,
   `V` varbinary(1048576) NOT NULL,
   PRIMARY KEY (`K`, `Q`, `T`)
-)
+);
+
+-- Create table for family2 column family (if you need multiple column families)
+CREATE TABLE `htable$family2`
+(
+  `K` varbinary(1024)    NOT NULL,
+  `Q` varbinary(256)     NOT NULL,
+  `T` bigint(20)         NOT NULL,
+  `V` varbinary(1048576) NOT NULL,
+  PRIMARY KEY (`K`, `Q`, `T`)
+);
 ```
 
 ### Schema Definition
@@ -169,7 +181,7 @@ OPTIONS(
   "sys.username"= "root",
   "sys.password" = "password",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
   "password"="password"
 );
@@ -202,7 +214,7 @@ sourceDf
   .option("username", "root@sys#myob")
   .option("password", "password")
   .option("schema-name", "test")
-  .option("table-name", "htable1")
+  .option("table-name", "htable")
   .save()
 ```
 
@@ -227,7 +239,7 @@ OPTIONS(
   "odp-ip"= "localhost",
   "odp-port" = "2885",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
   "password"="password"
 );
@@ -260,13 +272,13 @@ sourceDf
   .option("username", "root@sys#myob")
   .option("password", "password")
   .option("schema-name", "test")
-  .option("table-name", "htable1")
+  .option("table-name", "htable")
   .save()
 ```
 
 ### Multiple Column Families
 
-You can write to multiple column families by defining multiple STRUCT fields:
+You can write to multiple column families by defining multiple STRUCT fields. Note that you need to create corresponding tables in OceanBase first (e.g., `htable$family1` and `htable$family2`):
 
 ```sql
 CREATE TEMPORARY VIEW test_obkv (
@@ -280,7 +292,7 @@ OPTIONS(
   "odp-ip"= "localhost",
   "odp-port" = "2885",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
   "password"="password"
 );
@@ -317,7 +329,7 @@ SELECT
      <td>Yes</td>
      <td></td>
      <td>String</td>
-     <td>The table name of HBase, note that the table name in OceanBase is <code>hbase_table_name$family_name</code>.</td>
+     <td>The HBase table name (without <code>$family</code> suffix). OceanBase HBase tables are named as <code>table_name$family_name</code>, but you only need to specify the base table name here. The connector automatically routes data to the correct family table based on the STRUCT field names in your schema.</td>
    </tr>
    <tr>
      <td>username</td>

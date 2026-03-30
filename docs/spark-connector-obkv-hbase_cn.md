@@ -110,18 +110,30 @@ insert into orders values
 (5, now(), 'dot', 111.25, 12, true);
 ```
 
-- 连接到 OceanBase
+- 连接到 OceanBase 并创建 HBase 表。在 OceanBase HBase 模式下，每个列族是一个独立的物理表，命名格式为 `表名$列族名`：
 
 ```sql
 use test;
-CREATE TABLE `htable1$family1`
+
+-- 创建 family1 列族对应的表
+CREATE TABLE `htable$family1`
 (
   `K` varbinary(1024)    NOT NULL,
   `Q` varbinary(256)     NOT NULL,
   `T` bigint(20)         NOT NULL,
   `V` varbinary(1048576) NOT NULL,
   PRIMARY KEY (`K`, `Q`, `T`)
-)
+);
+
+-- 创建 family2 列族对应的表（如果需要多列族）
+CREATE TABLE `htable$family2`
+(
+  `K` varbinary(1024)    NOT NULL,
+  `Q` varbinary(256)     NOT NULL,
+  `T` bigint(20)         NOT NULL,
+  `V` varbinary(1048576) NOT NULL,
+  PRIMARY KEY (`K`, `Q`, `T`)
+);
 ```
 
 ### Schema 定义
@@ -168,7 +180,7 @@ OPTIONS(
   "sys.username"= "root",
   "sys.password" = "password",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
   "password"="password"
 );
@@ -201,7 +213,7 @@ sourceDf
   .option("username", "root@sys#myob")
   .option("password", "password")
   .option("schema-name", "test")
-  .option("table-name", "htable1")
+  .option("table-name", "htable")
   .save()
 ```
 
@@ -226,7 +238,7 @@ OPTIONS(
   "odp-ip"= "localhost",
   "odp-port" = "2885",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
   "password"="password"
 );
@@ -259,13 +271,13 @@ sourceDf
   .option("username", "root@sys#myob")
   .option("password", "password")
   .option("schema-name", "test")
-  .option("table-name", "htable1")
+  .option("table-name", "htable")
   .save()
 ```
 
 ### 多列族支持
 
-您可以通过定义多个 STRUCT 字段来写入多个列族：
+您可以通过定义多个 STRUCT 字段来写入多个列族。注意需要先在 OceanBase 中创建对应的表（如 `htable$family1` 和 `htable$family2`）：
 
 ```sql
 CREATE TEMPORARY VIEW test_obkv (
@@ -279,7 +291,7 @@ OPTIONS(
   "odp-ip"= "localhost",
   "odp-port" = "2885",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
   "password"="password"
 );
@@ -316,7 +328,7 @@ SELECT
       <td>是</td>
       <td></td>
       <td>String</td>
-      <td>HBase 表名，注意在 OceanBase 中表名的结构是 <code>hbase_table_name$family_name</code>。</td>
+      <td>HBase 表名（不带 <code>$family</code> 后缀）。OceanBase HBase 表的命名格式为 <code>表名$列族名</code>，但此处只需指定基础表名。连接器会根据 schema 中的 STRUCT 字段名自动将数据路由到正确的列族表。</td>
     </tr>
     <tr>
       <td>username</td>
