@@ -287,8 +287,8 @@ OPTIONS(
 INSERT INTO test_obkv
 SELECT
   'rowkey_value' as rowkey,
-  STRUCT('value1', 123) as family1,
-  STRUCT(456.78, true) as family2;
+  named_struct('col1', 'value1', 'col2', 123) as family1,
+  named_struct('col3', 456.78, 'col4', true) as family2;
 ```
 
 ## 配置项
