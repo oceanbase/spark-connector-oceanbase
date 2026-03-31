@@ -25,6 +25,7 @@ import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Disabl
 import org.junit.jupiter.api.condition.{DisabledOnOs, OS}
 
 import java.sql.ResultSet
+import java.sql.Timestamp
 import java.util
 
 class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
@@ -199,6 +200,110 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testMultipleDataTypes(): Unit = {
+    val session = SparkSession.builder.master("local[*]").getOrCreate
+
+    import org.apache.spark.sql.types._
+
+    // Test various data types: INT, LONG, FLOAT, BOOLEAN, TIMESTAMP
+    val schema = StructType(
+      Seq(
+        StructField("rowkey", StringType, nullable = false),
+        StructField(
+          "family1",
+          StructType(
+            Seq(
+              StructField("intCol", IntegerType),
+              StructField("longCol", LongType),
+              StructField("floatCol", FloatType),
+              StructField("boolCol", BooleanType)
+            ))
+        )
+      ))
+
+    val data = Seq(
+      Row("row1", Row(123, 9876543210L, 3.14f, true)),
+      Row("row2", Row(-456, -1234567890L, -2.71f, false))
+    )
+    val df = session.createDataFrame(session.sparkContext.parallelize(data), schema)
+
+    df.write
+      .format("obkv-hbase")
+      .option("odp-mode", true)
+      .option("odp-ip", OceanBaseMySQLTestBase.ODP.getHost)
+      .option("odp-port", OceanBaseMySQLTestBase.ODP.getRpcPort)
+      .option("username", s"$getUsername#$getClusterName")
+      .option("password", getPassword)
+      .option("table-name", "htable")
+      .option("schema-name", getSchemaName)
+      .save()
+    session.stop()
+
+    import scala.collection.JavaConverters._
+    val expected = List(
+      "row1,intCol,123",
+      "row1,longCol,9876543210",
+      "row1,floatCol,3.14",
+      "row1,boolCol,true",
+      "row2,intCol,-456",
+      "row2,longCol,-1234567890",
+      "row2,floatCol,-2.71",
+      "row2,boolCol,false"
+    ).asJava
+
+    val actual = queryHTable("htable$family1", multiTypeRowConverter)
+    assertEqualsInAnyOrder(expected, actual)
+  }
+
+  @Test
+  def testNullValueHandling(): Unit = {
+    val session = SparkSession.builder.master("local[*]").getOrCreate
+
+    import org.apache.spark.sql.types._
+
+    // Test null value handling
+    val schema = StructType(
+      Seq(
+        StructField("rowkey", StringType, nullable = false),
+        StructField(
+          "family1",
+          StructType(
+            Seq(
+              StructField("col1", StringType),
+              StructField("col2", StringType),
+              StructField("col3", StringType)
+            ))
+        )
+      ))
+
+    // Row with some null values
+    val data = Seq(
+      Row("row1", Row("value1", null, "value3")),
+      Row("row2", Row(null, "value2", null))
+    )
+    val df = session.createDataFrame(session.sparkContext.parallelize(data), schema)
+
+    df.write
+      .format("obkv-hbase")
+      .option("odp-mode", true)
+      .option("odp-ip", OceanBaseMySQLTestBase.ODP.getHost)
+      .option("odp-port", OceanBaseMySQLTestBase.ODP.getRpcPort)
+      .option("username", s"$getUsername#$getClusterName")
+      .option("password", getPassword)
+      .option("table-name", "htable")
+      .option("schema-name", getSchemaName)
+      .save()
+    session.stop()
+
+    import scala.collection.JavaConverters._
+    // Null values should not be written to HBase
+    val expected = List("row1,col1,value1", "row1,col3,value3", "row2,col2,value2").asJava
+
+    val actual = queryHTable("htable$family1", rowConverter)
+    assertEqualsInAnyOrder(expected, actual)
+  }
+
+  @Test
   @DisabledOnOs(
     value = Array[OS](OS.MAC),
     disabledReason = "Currently it can only be successfully run on the GitHub CI environment")
@@ -280,11 +385,33 @@ class OBKVHBaseConnectorITCase extends OceanBaseMySQLTestBase {
       val bytes = rs.getBytes("V")
       var v: String = null
       q match {
-        case "address" | "phone" | "personalName" =>
+        case "address" | "phone" | "personalName" | "col1" | "col2" | "col3" =>
           v = Bytes.toString(bytes)
 
         case "personalPhone" =>
           v = String.valueOf(Bytes.toDouble(bytes))
+        case _ =>
+          throw new RuntimeException("Unknown qualifier: " + q)
+      }
+      s"$k,$q,$v"
+    }
+  }
+
+  def multiTypeRowConverter: OceanBaseTestBase.RowConverter = new OceanBaseTestBase.RowConverter {
+    override def convert(rs: ResultSet, columnCount: Int): String = {
+      val k = Bytes.toString(rs.getBytes("K"))
+      val q = Bytes.toString(rs.getBytes("Q"))
+      val bytes = rs.getBytes("V")
+      var v: String = null
+      q match {
+        case "intCol" =>
+          v = String.valueOf(Bytes.toInt(bytes))
+        case "longCol" =>
+          v = String.valueOf(Bytes.toLong(bytes))
+        case "floatCol" =>
+          v = String.valueOf(Bytes.toFloat(bytes))
+        case "boolCol" =>
+          v = String.valueOf(Bytes.toBoolean(bytes))
         case _ =>
           throw new RuntimeException("Unknown qualifier: " + q)
       }

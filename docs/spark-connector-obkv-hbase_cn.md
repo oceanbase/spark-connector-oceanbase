@@ -4,6 +4,8 @@
 
 本项目是一个 OBKV HBase 的 Spark Connector，可以在 Spark 中通过 [obkv-hbase-client-java](https://github.com/oceanbase/obkv-hbase-client-java) 将数据写入到 OceanBase。
 
+> **注意**：当前版本仅支持**写入操作**，不支持从 HBase 读取数据。
+
 ## 版本兼容
 
 <div class="highlight">

@@ -4,6 +4,8 @@ English | [简体中文](spark-connector-obkv-hbase_cn.md)
 
 This is the spark connector for OBKV HBase mode, which can be used to write data to OceanBase via [obkv-hbase-client-java](https://github.com/oceanbase/obkv-hbase-client-java).
 
+> **Note**: The current version only supports **write operations**. Reading data from HBase is not supported.
+
 ## Version compatibility
 
 <div class="highlight">
