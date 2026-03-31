@@ -4,6 +4,8 @@
 
 本项目是一个 OBKV HBase 的 Spark Connector，可以在 Spark 中通过 [obkv-hbase-client-java](https://github.com/oceanbase/obkv-hbase-client-java) 将数据写入到 OceanBase。
 
+> **注意**：当前版本仅支持**写入操作**，不支持从 HBase 读取数据。
+
 ## 版本兼容
 
 <div class="highlight">
@@ -86,7 +88,7 @@ mvn clean package -Dscala.version=2.11.12 -Dscala.binary.version=2.11 -DskipTest
 
 以从Hive同步数据到OceanBase为例
 
-#### 准备工作
+### 准备工作
 
 创建对应的Hive表和OceanBase表，为数据同步做准备
 
@@ -110,126 +112,160 @@ insert into orders values
 (5, now(), 'dot', 111.25, 12, true);
 ```
 
-- 连接到 OceanBase
+- 连接到 OceanBase 并创建 HBase 表。在 OceanBase HBase 模式下，每个列族是一个独立的物理表，命名格式为 `表名$列族名`：
 
 ```sql
 use test;
-CREATE TABLE `htable1$family1`
+
+-- 创建 family1 列族对应的表
+CREATE TABLE `htable$family1`
 (
   `K` varbinary(1024)    NOT NULL,
   `Q` varbinary(256)     NOT NULL,
   `T` bigint(20)         NOT NULL,
   `V` varbinary(1048576) NOT NULL,
   PRIMARY KEY (`K`, `Q`, `T`)
-)
+);
+
+-- 创建 family2 列族对应的表（如果需要多列族）
+CREATE TABLE `htable$family2`
+(
+  `K` varbinary(1024)    NOT NULL,
+  `Q` varbinary(256)     NOT NULL,
+  `T` bigint(20)         NOT NULL,
+  `V` varbinary(1048576) NOT NULL,
+  PRIMARY KEY (`K`, `Q`, `T`)
+);
 ```
 
-### Config Url 模式
+### Schema 定义
+
+连接器使用 Spark 的 STRUCT 类型来定义 Spark 和 HBase 之间的 schema 映射：
+
+- **第一个字段**必须是 rowkey 列
+- **后续字段**代表列族（column family），每个字段定义为 STRUCT 类型
+- **STRUCT 内部的字段**代表该列族内的列（字段名即为列限定符 qualifier）
+
+单列族 schema 示例：
+
+```
+rowkey STRING,
+family1 STRUCT<col1: STRING, col2: INT>
+```
+
+多列族 schema 示例：
+
+```
+rowkey STRING,
+family1 STRUCT<col1: STRING, col2: INT>,
+family2 STRUCT<col3: DOUBLE, col4: BOOLEAN>
+```
+
+### 直连模式
 
 #### Spark-SQL
 
 ```sql
-CREATE TEMPORARY VIEW test_obkv
+CREATE TEMPORARY VIEW test_obkv (
+  rowkey STRING,
+  family1 STRUCT<
+    order_date: TIMESTAMP,
+    customer_name: STRING,
+    price: DOUBLE,
+    product_id: INT,
+    order_status: BOOLEAN
+  >
+)
 USING `obkv-hbase`
 OPTIONS(
   "url" = "http://localhost:8080/services?Action=ObRootServiceInfo&ObRegion=myob",
   "sys.username"= "root",
   "sys.password" = "password",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
-  "password"="password",
-  "schema"="{
-    'order_id': {'cf': 'rowkey','col': 'order_id','type': 'int'},
-    'order_date': {'cf': 'family1','col': 'order_date','type': 'timestamp'},
-    'customer_name': {'cf': 'family1','col': 'customer_name','type': 'string'},
-    'price': {'cf': 'family1','col': 'price','type': 'double'},
-    'product_id': {'cf': 'family1','col': 'product_id','type': 'int'},
-    'order_status': {'cf': 'family1','col': 'order_status','type': 'boolean'}
-}"
+  "password"="password"
 );
 
-insert into table test_obkv
-select * from test.orders;
+INSERT INTO test_obkv
+SELECT
+  CAST(order_id AS STRING) as rowkey,
+  STRUCT(order_date, customer_name, price, product_id, order_status) as family1
+FROM test.orders;
 ```
 
-#### DataFrame
+#### DataFrame API
 
 ```scala
-val df = spark.sql("select * from test.orders")
+import org.apache.spark.sql.functions._
 
-val schema: String =
-  """
-    |{
-    |    "order_id": {"cf": "rowkey","col": "order_id","type": "int"},
-    |    "order_date": {"cf": "family1","col": "order_date","type": "timestamp"},
-    |    "customer_name": {"cf": "family1","col": "customer_name","type": "string"},
-    |    "price": {"cf": "family1","col": "price","type": "double"},
-    |    "product_id": {"cf": "family1","col": "product_id","type": "int"},
-    |    "order_status": {"cf": "family1","col": "order_status","type": "boolean"}
-    |}
-    |""".stripMargin
+val sourceDf = spark.sql("select * from test.orders")
 
-df.write
+// 转换为 STRUCT schema 并写入
+sourceDf
+  .select(
+    col("order_id").cast("string").as("rowkey"),
+    struct("order_date", "customer_name", "price", "product_id", "order_status").as("family1")
+  )
+  .write
   .format("obkv-hbase")
   .option("url", "http://localhost:8080/services?Action=ObRootServiceInfo&ObRegion=myob")
-  .option("sys-username", "root")
-  .option("sys-password", "password")
+  .option("sys.username", "root")
+  .option("sys.password", "password")
   .option("username", "root@sys#myob")
   .option("password", "password")
-  .option("table-name", "htable1")
   .option("schema-name", "test")
-  .option("schema", schema)
+  .option("table-name", "htable")
   .save()
 ```
 
-### ODP模式
+### ODP 模式
 
 #### Spark-SQL
 
 ```sql
-CREATE TEMPORARY VIEW test_obkv
+CREATE TEMPORARY VIEW test_obkv (
+  rowkey STRING,
+  family1 STRUCT<
+    order_date: TIMESTAMP,
+    customer_name: STRING,
+    price: DOUBLE,
+    product_id: INT,
+    order_status: BOOLEAN
+  >
+)
 USING `obkv-hbase`
 OPTIONS(
   "odp-mode" = true,
-  "odp-ip"= "root",
-  "odp-port" = "password",
+  "odp-ip"= "localhost",
+  "odp-port" = "2885",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
-  "password"="password",
-  "schema"="{
-    'order_id': {'cf': 'rowkey','col': 'order_id','type': 'int'},
-    'order_date': {'cf': 'family1','col': 'order_date','type': 'timestamp'},
-    'customer_name': {'cf': 'family1','col': 'customer_name','type': 'string'},
-    'price': {'cf': 'family1','col': 'price','type': 'double'},
-    'product_id': {'cf': 'family1','col': 'product_id','type': 'int'},
-    'order_status': {'cf': 'family1','col': 'order_status','type': 'boolean'}
-}"
+  "password"="password"
 );
 
-insert into table test_obkv
-select * from test.orders;
+INSERT INTO test_obkv
+SELECT
+  CAST(order_id AS STRING) as rowkey,
+  STRUCT(order_date, customer_name, price, product_id, order_status) as family1
+FROM test.orders;
 ```
 
-#### DataFrame
+#### DataFrame API
 
 ```scala
-val df = spark.sql("select * from test.orders")
+import org.apache.spark.sql.functions._
 
-val schema: String =
-  """
-    |{
-    |    "order_id": {"cf": "rowkey","col": "order_id","type": "int"},
-    |    "order_date": {"cf": "family1","col": "order_date","type": "timestamp"},
-    |    "customer_name": {"cf": "family1","col": "customer_name","type": "string"},
-    |    "price": {"cf": "family1","col": "price","type": "double"},
-    |    "product_id": {"cf": "family1","col": "product_id","type": "int"},
-    |    "order_status": {"cf": "family1","col": "order_status","type": "boolean"}
-    |}
-    |""".stripMargin
+val sourceDf = spark.sql("select * from test.orders")
 
-df.write
+// 转换为 STRUCT schema 并写入
+sourceDf
+  .select(
+    col("order_id").cast("string").as("rowkey"),
+    struct("order_date", "customer_name", "price", "product_id", "order_status").as("family1")
+  )
+  .write
   .format("obkv-hbase")
   .option("odp-mode", true)
   .option("odp-ip", "localhost")
@@ -237,9 +273,36 @@ df.write
   .option("username", "root@sys#myob")
   .option("password", "password")
   .option("schema-name", "test")
-  .option("table-name", "htable1")
-  .option("schema", schema)
+  .option("table-name", "htable")
   .save()
+```
+
+### 多列族支持
+
+您可以通过定义多个 STRUCT 字段来写入多个列族。注意需要先在 OceanBase 中创建对应的表（如 `htable$family1` 和 `htable$family2`）：
+
+```sql
+CREATE TEMPORARY VIEW test_obkv (
+  rowkey STRING,
+  family1 STRUCT<col1: STRING, col2: INT>,
+  family2 STRUCT<col3: DOUBLE, col4: BOOLEAN>
+)
+USING `obkv-hbase`
+OPTIONS(
+  "odp-mode" = true,
+  "odp-ip"= "localhost",
+  "odp-port" = "2885",
+  "schema-name"="test",
+  "table-name"="htable",
+  "username"="root@sys#myob",
+  "password"="password"
+);
+
+INSERT INTO test_obkv
+SELECT
+  'rowkey_value' as rowkey,
+  named_struct('col1', 'value1', 'col2', 123) as family1,
+  named_struct('col3', 456.78, 'col4', true) as family2;
 ```
 
 ## 配置项
@@ -267,7 +330,7 @@ df.write
       <td>是</td>
       <td></td>
       <td>String</td>
-      <td>HBase 表名，注意在 OceanBase 中表名的结构是 <code>hbase_table_name$family_name</code>。</td>
+      <td>HBase 表名（不带 <code>$family</code> 后缀）。OceanBase HBase 表的命名格式为 <code>表名$列族名</code>，但此处只需指定基础表名。连接器会根据 schema 中的 STRUCT 字段名自动将数据路由到正确的列族表。</td>
     </tr>
     <tr>
       <td>username</td>
@@ -283,18 +346,6 @@ df.write
       <td>String</td>
       <td>非 sys 租户的密码。</td>
     </tr>
-   <tr>
-     <td>schema</td>
-     <td>Yes</td>
-     <td></td>
-     <td>String</td>
-     <td>自定义的JSON格式Schema，支持JSON单引号和双引号模式，使用Spark-SQL时，单引号模式无需对双引号进行转义，更为方便。
-     <ul>
-      <li>rowkey：对于rowkey列，该列的列族名必须为"rowkey"。比如：<code>"order_id": {"cf": "rowkey","col": "order_id","type": "int"}</code></li>
-      <li>数据类型：这里统一使用Spark-SQL数据类型，参考：<a href="https://spark.apache.org/docs/latest/sql-ref-datatypes.html">https://spark.apache.org/docs/latest/sql-ref-datatypes.html</a></li>
-    </ul>
-    </td>
-   </tr>
     <tr>
       <td>odp-mode</td>
       <td>否</td>

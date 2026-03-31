@@ -4,6 +4,8 @@ English | [简体中文](spark-connector-obkv-hbase_cn.md)
 
 This is the spark connector for OBKV HBase mode, which can be used to write data to OceanBase via [obkv-hbase-client-java](https://github.com/oceanbase/obkv-hbase-client-java).
 
+> **Note**: The current version only supports **write operations**. Reading data from HBase is not supported.
+
 ## Version compatibility
 
 <div class="highlight">
@@ -111,76 +113,110 @@ insert into orders values
 (5, now(), 'dot', 111.25, 12, true);
 ```
 
-- Connect to OceanBase
+- Connect to OceanBase and create HBase tables. In OceanBase HBase mode, each column family is a separate physical table with the naming convention `table_name$family_name`:
 
 ```sql
 use test;
-CREATE TABLE `htable1$family1`
+
+-- Create table for family1 column family
+CREATE TABLE `htable$family1`
 (
   `K` varbinary(1024)    NOT NULL,
   `Q` varbinary(256)     NOT NULL,
   `T` bigint(20)         NOT NULL,
   `V` varbinary(1048576) NOT NULL,
   PRIMARY KEY (`K`, `Q`, `T`)
-)
+);
+
+-- Create table for family2 column family (if you need multiple column families)
+CREATE TABLE `htable$family2`
+(
+  `K` varbinary(1024)    NOT NULL,
+  `Q` varbinary(256)     NOT NULL,
+  `T` bigint(20)         NOT NULL,
+  `V` varbinary(1048576) NOT NULL,
+  PRIMARY KEY (`K`, `Q`, `T`)
+);
 ```
 
-### Config Url Mode
+### Schema Definition
+
+The connector uses Spark's STRUCT types to define the schema mapping between Spark and HBase:
+
+- The **first field** must be the rowkey column
+- **Subsequent fields** represent column families, each defined as a STRUCT type
+- **Fields inside STRUCT** represent columns within that column family (the field name is the column qualifier)
+
+Example schema with single column family:
+
+```
+rowkey STRING,
+family1 STRUCT<col1: STRING, col2: INT>
+```
+
+Example schema with multiple column families:
+
+```
+rowkey STRING,
+family1 STRUCT<col1: STRING, col2: INT>,
+family2 STRUCT<col3: DOUBLE, col4: BOOLEAN>
+```
+
+### Direct Mode
 
 #### Spark-SQL
 
 ```sql
-CREATE TEMPORARY VIEW test_obkv
+CREATE TEMPORARY VIEW test_obkv (
+  rowkey STRING,
+  family1 STRUCT<
+    order_date: TIMESTAMP,
+    customer_name: STRING,
+    price: DOUBLE,
+    product_id: INT,
+    order_status: BOOLEAN
+  >
+)
 USING `obkv-hbase`
 OPTIONS(
   "url" = "http://localhost:8080/services?Action=ObRootServiceInfo&ObRegion=myob",
   "sys.username"= "root",
   "sys.password" = "password",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
-  "password"="password",
-  "schema"="{
-    'order_id': {'cf': 'rowkey','col': 'order_id','type': 'int'},
-    'order_date': {'cf': 'family1','col': 'order_date','type': 'timestamp'},
-    'customer_name': {'cf': 'family1','col': 'customer_name','type': 'string'},
-    'price': {'cf': 'family1','col': 'price','type': 'double'},
-    'product_id': {'cf': 'family1','col': 'product_id','type': 'int'},
-    'order_status': {'cf': 'family1','col': 'order_status','type': 'boolean'}
-}"
+  "password"="password"
 );
 
-insert into table test_obkv
-select * from test.orders;
+INSERT INTO test_obkv
+SELECT
+  CAST(order_id AS STRING) as rowkey,
+  STRUCT(order_date, customer_name, price, product_id, order_status) as family1
+FROM test.orders;
 ```
 
-#### DataFrame
+#### DataFrame API
 
 ```scala
-val df = spark.sql("select * from test.orders")
+import org.apache.spark.sql.functions._
 
-val schema: String =
-  """
-    |{
-    |    "order_id": {"cf": "rowkey","col": "order_id","type": "int"},
-    |    "order_date": {"cf": "family1","col": "order_date","type": "timestamp"},
-    |    "customer_name": {"cf": "family1","col": "customer_name","type": "string"},
-    |    "price": {"cf": "family1","col": "price","type": "double"},
-    |    "product_id": {"cf": "family1","col": "product_id","type": "int"},
-    |    "order_status": {"cf": "family1","col": "order_status","type": "boolean"}
-    |}
-    |""".stripMargin
+val sourceDf = spark.sql("select * from test.orders")
 
-df.write
+// Transform to STRUCT schema and write
+sourceDf
+  .select(
+    col("order_id").cast("string").as("rowkey"),
+    struct("order_date", "customer_name", "price", "product_id", "order_status").as("family1")
+  )
+  .write
   .format("obkv-hbase")
   .option("url", "http://localhost:8080/services?Action=ObRootServiceInfo&ObRegion=myob")
-  .option("sys-username", "root")
-  .option("sys-password", "password")
+  .option("sys.username", "root")
+  .option("sys.password", "password")
   .option("username", "root@sys#myob")
   .option("password", "password")
   .option("schema-name", "test")
-  .option("table-name", "htable1")
-  .option("schema", schema)
+  .option("table-name", "htable")
   .save()
 ```
 
@@ -189,48 +225,48 @@ df.write
 #### Spark-SQL
 
 ```sql
-CREATE TEMPORARY VIEW test_obkv
+CREATE TEMPORARY VIEW test_obkv (
+  rowkey STRING,
+  family1 STRUCT<
+    order_date: TIMESTAMP,
+    customer_name: STRING,
+    price: DOUBLE,
+    product_id: INT,
+    order_status: BOOLEAN
+  >
+)
 USING `obkv-hbase`
 OPTIONS(
   "odp-mode" = true,
   "odp-ip"= "localhost",
   "odp-port" = "2885",
   "schema-name"="test",
-  "table-name"="htable1",
+  "table-name"="htable",
   "username"="root@sys#myob",
-  "password"="password",
-  "schema"="{
-    'order_id': {'cf': 'rowkey','col': 'order_id','type': 'int'},
-    'order_date': {'cf': 'family1','col': 'order_date','type': 'timestamp'},
-    'customer_name': {'cf': 'family1','col': 'customer_name','type': 'string'},
-    'price': {'cf': 'family1','col': 'price','type': 'double'},
-    'product_id': {'cf': 'family1','col': 'product_id','type': 'int'},
-    'order_status': {'cf': 'family1','col': 'order_status','type': 'boolean'}
-}"
+  "password"="password"
 );
 
-insert into table test_obkv
-select * from test.orders;
+INSERT INTO test_obkv
+SELECT
+  CAST(order_id AS STRING) as rowkey,
+  STRUCT(order_date, customer_name, price, product_id, order_status) as family1
+FROM test.orders;
 ```
 
-#### DataFrame
+#### DataFrame API
 
 ```scala
-val df = spark.sql("select * from test.orders")
+import org.apache.spark.sql.functions._
 
-val schema: String =
-  """
-    |{
-    |    "order_id": {"cf": "rowkey","col": "order_id","type": "int"},
-    |    "order_date": {"cf": "family1","col": "order_date","type": "timestamp"},
-    |    "customer_name": {"cf": "family1","col": "customer_name","type": "string"},
-    |    "price": {"cf": "family1","col": "price","type": "double"},
-    |    "product_id": {"cf": "family1","col": "product_id","type": "int"},
-    |    "order_status": {"cf": "family1","col": "order_status","type": "boolean"}
-    |}
-    |""".stripMargin
+val sourceDf = spark.sql("select * from test.orders")
 
-df.write
+// Transform to STRUCT schema and write
+sourceDf
+  .select(
+    col("order_id").cast("string").as("rowkey"),
+    struct("order_date", "customer_name", "price", "product_id", "order_status").as("family1")
+  )
+  .write
   .format("obkv-hbase")
   .option("odp-mode", true)
   .option("odp-ip", "localhost")
@@ -238,9 +274,36 @@ df.write
   .option("username", "root@sys#myob")
   .option("password", "password")
   .option("schema-name", "test")
-  .option("table-name", "htable1")
-  .option("schema", schema)
+  .option("table-name", "htable")
   .save()
+```
+
+### Multiple Column Families
+
+You can write to multiple column families by defining multiple STRUCT fields. Note that you need to create corresponding tables in OceanBase first (e.g., `htable$family1` and `htable$family2`):
+
+```sql
+CREATE TEMPORARY VIEW test_obkv (
+  rowkey STRING,
+  family1 STRUCT<col1: STRING, col2: INT>,
+  family2 STRUCT<col3: DOUBLE, col4: BOOLEAN>
+)
+USING `obkv-hbase`
+OPTIONS(
+  "odp-mode" = true,
+  "odp-ip"= "localhost",
+  "odp-port" = "2885",
+  "schema-name"="test",
+  "table-name"="htable",
+  "username"="root@sys#myob",
+  "password"="password"
+);
+
+INSERT INTO test_obkv
+SELECT
+  'rowkey_value' as rowkey,
+  named_struct('col1', 'value1', 'col2', 123) as family1,
+  named_struct('col3', 456.78, 'col4', true) as family2;
 ```
 
 ## Configuration
@@ -268,7 +331,7 @@ df.write
      <td>Yes</td>
      <td></td>
      <td>String</td>
-     <td>The table name of HBase, note that the table name in OceanBase is <code>hbase_table_name$family_name</code>.</td>
+     <td>The HBase table name (without <code>$family</code> suffix). OceanBase HBase tables are named as <code>table_name$family_name</code>, but you only need to specify the base table name here. The connector automatically routes data to the correct family table based on the STRUCT field names in your schema.</td>
    </tr>
    <tr>
      <td>username</td>
@@ -283,18 +346,6 @@ df.write
      <td></td>
      <td>String</td>
      <td>The password of non-sys tenant user.</td>
-   </tr>
-   <tr>
-     <td>schema</td>
-     <td>Yes</td>
-     <td></td>
-     <td>String</td>
-     <td>The custom JSON format schema supports JSON single quote and double quote modes. When using Spark-SQL, the single quote mode does not need to escape double quotes, which is more convenient.
-     <ul>
-      <li>rowkey: For the rowkey column, the column family name of the column must be "rowkey". For example: <code>"order_id": {"cf": "rowkey","col": "order_id","type": "int"}</code></li>
-      <li>Data type: Spark-SQL data types are used uniformly here, refer to: <a href="https://spark.apache.org/docs/latest/sql-ref-datatypes.html">https://spark.apache.org/docs/latest/sql-ref-datatypes.html</a></li>
-    </ul>
-    </td>
    </tr>
    <tr>
      <td>odp-mode</td>
