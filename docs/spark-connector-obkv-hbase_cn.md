@@ -161,7 +161,7 @@ family1 STRUCT<col1: STRING, col2: INT>,
 family2 STRUCT<col3: DOUBLE, col4: BOOLEAN>
 ```
 
-### Config Url 模式
+### 直连模式
 
 #### Spark-SQL
 
