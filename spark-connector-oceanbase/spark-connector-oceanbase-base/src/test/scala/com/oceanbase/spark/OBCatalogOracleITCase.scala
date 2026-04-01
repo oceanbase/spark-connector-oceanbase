@@ -53,7 +53,8 @@ class OBCatalogOracleITCase extends OceanBaseOracleTestBase {
       "PRODUCTS_FULL_PRI_KEY",
       "PRODUCTS_NO_INT_PRI_KEY",
       "PRODUCTS_UNIQUE_KEY",
-      "PRODUCTS_FULL_UNIQUE_KEY"
+      "PRODUCTS_FULL_UNIQUE_KEY",
+      "PRODUCTS_LARGE_NUM_PK"
     )
   }
 
@@ -513,6 +514,50 @@ class OBCatalogOracleITCase extends OceanBaseOracleTestBase {
       "select NAME, min(ID), max(WEIGHT) from PRODUCTS group by NAME order by NAME desc limit 3",
       expect1)
 
+    session.stop()
+  }
+
+  @Test
+  def testReadLargeNumberPrimaryKey(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .config("spark.sql.catalog.ob.jdbc.max-records-per-partition", 3)
+      .getOrCreate()
+
+    session.sql("use ob;")
+    session.sql(s"""
+                   |INSERT INTO $getSchemaName.PRODUCTS_LARGE_NUM_PK VALUES
+                   |(100000000000000000001, 'item_a', 'description_a', 1.00),
+                   |(100000000000000000002, 'item_b', 'description_b', 2.00),
+                   |(100000000000000000003, 'item_c', 'description_c', 3.00),
+                   |(100000000000000000004, 'item_d', 'description_d', 4.00),
+                   |(100000000000000000005, 'item_e', 'description_e', 5.00),
+                   |(100000000000000000006, 'item_f', 'description_f', 6.00),
+                   |(100000000000000000007, 'item_g', 'description_g', 7.00),
+                   |(100000000000000000008, 'item_h', 'description_h', 8.00),
+                   |(100000000000000000009, 'item_i', 'description_i', 9.00);
+                   |""".stripMargin)
+
+    import scala.collection.JavaConverters._
+    val expectedData: util.List[String] = Seq(
+      "100000000000000000001,item_a,description_a,1.00",
+      "100000000000000000002,item_b,description_b,2.00",
+      "100000000000000000003,item_c,description_c,3.00",
+      "100000000000000000004,item_d,description_d,4.00",
+      "100000000000000000005,item_e,description_e,5.00",
+      "100000000000000000006,item_f,description_f,6.00",
+      "100000000000000000007,item_g,description_g,7.00",
+      "100000000000000000008,item_h,description_h,8.00",
+      "100000000000000000009,item_i,description_i,9.00"
+    ).toList.asJava
+
+    queryAndVerifyTableData(session, "PRODUCTS_LARGE_NUM_PK", expectedData)
     session.stop()
   }
 
