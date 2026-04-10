@@ -60,4 +60,12 @@ CREATE TABLE products_full_unique_key (
     CONSTRAINT uk_products_full_unique UNIQUE (id, name, description, weight)
 );
 
+CREATE TABLE products_large_num_pk (
+    cust_id NUMBER(24,0) NOT NULL,
+    name VARCHAR2(255),
+    description VARCHAR2(1000),
+    weight NUMBER(10,2),
+    CONSTRAINT pk_products_large_num PRIMARY KEY (cust_id)
+);
+
 
