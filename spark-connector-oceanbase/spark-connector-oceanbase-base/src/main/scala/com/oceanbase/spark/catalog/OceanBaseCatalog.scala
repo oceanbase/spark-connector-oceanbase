@@ -72,7 +72,7 @@ class OceanBaseCatalog
       conn =>
         val schemaPattern = if (namespace.length == 1) namespace.head else null
         val rs = conn.getMetaData
-          .getTables(schemaPattern, "%", "%", Array("TABLE"));
+          .getTables(schemaPattern, schemaPattern, "%", Array("TABLE"));
         new Iterator[Identifier] {
           def hasNext: Boolean = rs.next()
           def next(): Identifier = Identifier.of(namespace, rs.getString("TABLE_NAME"))
