@@ -19,7 +19,7 @@ package com.oceanbase.spark.writer.v2
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.directload.{DirectLoader, DirectLoadUtils}
 import com.oceanbase.spark.utils.RetryUtils
-import com.oceanbase.spark.writer.v2.DirectLoadWriteV2.convertFieldToJava
+import com.oceanbase.spark.writer.v2.DirectLoadWriterV2.convertFieldToJava
 
 import com.alipay.oceanbase.rpc.direct_load.ObDirectLoadBucket
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj
@@ -33,7 +33,7 @@ import scala.collection.JavaConverters.asJavaIterableConverter
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 
-class DirectLoadWriteV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
+class DirectLoadWriterV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
   extends DataWriter[InternalRow]
   with Logging {
 
@@ -92,7 +92,7 @@ class DirectLoadWriteV2(schema: StructType, oceanBaseConfig: OceanBaseConfig)
   }
 }
 
-object DirectLoadWriteV2 {
+object DirectLoadWriterV2 {
 
   private def convertFieldToJava(row: InternalRow, index: Int, dataType: DataType): AnyRef = {
     if (row.isNullAt(index)) return null

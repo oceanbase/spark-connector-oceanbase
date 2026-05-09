@@ -90,6 +90,6 @@ class DirectLoadDataWriterFactory(schema: StructType, config: OceanBaseConfig)
   extends DataWriterFactory {
 
   override def createWriter(partitionId: Int, taskId: Long): DataWriter[InternalRow] = {
-    new DirectLoadWriteV2(schema, config)
+    new DirectLoadWriterV2(schema, config)
   }
 }
