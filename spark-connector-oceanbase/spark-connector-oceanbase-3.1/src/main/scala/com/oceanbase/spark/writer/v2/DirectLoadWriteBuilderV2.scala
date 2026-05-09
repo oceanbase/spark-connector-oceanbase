@@ -65,6 +65,6 @@ class DirectLoadDataWriterFactory(
       partitionId: Int,
       taskId: Long
   ): DataWriter[InternalRow] = {
-    new DirectLoadWriteV2(schema, oceanBaseConfig)
+    new DirectLoadWriterV2(schema, oceanBaseConfig)
   }
 }
