@@ -18,8 +18,9 @@ package com.oceanbase.spark
 import com.oceanbase.spark.OceanBaseMySQLConnectorITCase.expected
 import com.oceanbase.spark.OceanBaseTestBase.assertEqualsInAnyOrder
 
-import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.junit.jupiter.api.{AfterAll, AfterEach, BeforeAll, BeforeEach, Test}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
+import org.junit.jupiter.api.{AfterAll, AfterEach, Assertions, BeforeAll, BeforeEach, Test}
 
 import java.util
 
@@ -244,8 +245,10 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
       "109,spare tire"
     )
     import scala.collection.JavaConverters._
-    val actual = session
-      .sql("select * from test_read_query")
+    val dataFrame = session.sql("select * from test_read_query")
+    assertDataSourceV2Table(dataFrame, "OceanBaseLegacyTable")
+
+    val actual = dataFrame
       .collect()
       .map(
         _.toString().drop(1).dropRight(1)
@@ -344,6 +347,159 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
       .option("schema-name", getSchemaName)
       .load()
 
+    assertDataSourceV2Table(dataFrame, "OceanBaseTable")
+
+    import scala.collection.JavaConverters._
+    val actual = dataFrame
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
+      .asJava
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+  }
+
+  @Test
+  def testDataFrameReadMatchesCatalogV2ReaderBehavior(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", "com.oceanbase.spark.catalog.OceanBaseCatalog")
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "$getJdbcUrl",
+                   |  "rpc-port" = "$getRpcPort",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="products",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+    insertToProducts(session)
+
+    session.read
+      .format("oceanbase")
+      .option("url", getJdbcUrlWithoutDB)
+      .option("username", getUsername)
+      .option("password", getPassword)
+      .option("table-name", "products")
+      .option("schema-name", getSchemaName)
+      .load()
+      .createOrReplaceTempView("df_products")
+
+    session.sql("use ob;")
+
+    assertCatalogAndDataFrameQuery(
+      session,
+      "select id, name from %s where id >= 104 and id < 108",
+      Seq("OBJdbcBatchScan", "requiredColumns: [`id`, `name`]", "PushedFilters: ["))
+
+    assertCatalogAndDataFrameQuery(
+      session,
+      "select id, name from %s limit 3",
+      Seq("OBJdbcBatchScan", "requiredColumns: [`id`, `name`]", "PushedLimit: 3"))
+
+    assertCatalogAndDataFrameQuery(
+      session,
+      "select * from %s order by id desc nulls first limit 3",
+      Seq("OBJdbcBatchScan", "PushedLimit: 3", "PushedTopN: ["))
+
+    assertCatalogAndDataFrameQuery(
+      session,
+      "select name, min(id), max(weight) from %s group by name",
+      Seq(
+        "OBJdbcBatchScan",
+        "PushedAggregates: [MIN(`id`), MAX(`weight`)]",
+        "PushedGroupBy: [`name`]")
+    )
+
+    session.stop()
+  }
+
+  @Test
+  def testDataFrameV2ReadHonorsLegacyBatchReaderOption(): Unit = {
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "$getJdbcUrl",
+                   |  "rpc-port" = "$getRpcPort",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="products",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+    insertToProducts(session)
+
+    val dataFrame = session.read
+      .format("oceanbase")
+      .option("url", getJdbcUrlWithoutDB)
+      .option("username", getUsername)
+      .option("password", getPassword)
+      .option("table-name", "products")
+      .option("schema-name", getSchemaName)
+      .option("enable_legacy_batch_reader", "true")
+      .load()
+      .where("id >= 104 and id < 108")
+      .select("id", "name")
+
+    assertDataSourceV2Table(dataFrame, "OceanBaseTable")
+    assertPlanContains(dataFrame, Seq("OBJDBCLimitScan", "prunedSchema:", "PushedFilters: ["))
+
+    import scala.collection.JavaConverters._
+    val expected: util.List[String] =
+      util.Arrays.asList("104,hammer", "105,hammer", "106,hammer", "107,rocks")
+    val actual = collectAsStrings(dataFrame).asJava
+    assertEqualsInAnyOrder(expected, actual)
+
+    session.stop()
+  }
+
+  @Test
+  def testDataFrameReadWithV2ReaderDisabled(): Unit = {
+    val session = SparkSession.builder().master("local[*]").getOrCreate()
+
+    session.sql(s"""
+                   |CREATE TEMPORARY VIEW test_sink
+                   |USING oceanbase
+                   |OPTIONS(
+                   |  "url"= "$getJdbcUrl",
+                   |  "rpc-port" = "$getRpcPort",
+                   |  "schema-name"="$getSchemaName",
+                   |  "table-name"="products",
+                   |  "username"="$getUsername",
+                   |  "password"="$getPassword"
+                   |);
+                   |""".stripMargin)
+
+    insertToProducts(session)
+
+    val dataFrame = session.read
+      .format("oceanbase")
+      .option("url", getJdbcUrlWithoutDB)
+      .option("username", getUsername)
+      .option("password", getPassword)
+      .option("table-name", "products")
+      .option("schema-name", getSchemaName)
+      .option("enable_v2_reader", "false")
+      .load()
+
+    assertDataSourceV2Table(dataFrame, "OceanBaseLegacyTable")
+
     import scala.collection.JavaConverters._
     val actual = dataFrame
       .collect()
@@ -377,6 +533,51 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
     waitingAndAssertTableCount(tableName, expected.size)
     val actual: util.List[String] = queryTable(tableName)
     assertEqualsInAnyOrder(expected, actual)
+  }
+
+  private def assertCatalogAndDataFrameQuery(
+      session: SparkSession,
+      queryTemplate: String,
+      expectedPlanParts: Seq[String]): Unit = {
+    import scala.collection.JavaConverters._
+    val catalogDataFrame = session.sql(queryTemplate.format("products"))
+    val dataFrameApiDataFrame = session.sql(queryTemplate.format("df_products"))
+
+    assertDataSourceV2Table(catalogDataFrame, "OceanBaseTable")
+    assertDataSourceV2Table(dataFrameApiDataFrame, "OceanBaseTable")
+    assertPlanContains(catalogDataFrame, expectedPlanParts)
+    assertPlanContains(dataFrameApiDataFrame, expectedPlanParts)
+    assertEqualsInAnyOrder(
+      collectAsStrings(catalogDataFrame).asJava,
+      collectAsStrings(dataFrameApiDataFrame).asJava)
+  }
+
+  private def assertDataSourceV2Table(dataFrame: DataFrame, tableClassName: String): Unit = {
+    val tableNames = dataFrame.queryExecution.optimizedPlan
+      .collect { case relation: DataSourceV2Relation => relation.table.getClass.getName }
+
+    Assertions.assertTrue(
+      tableNames.exists(_.contains(tableClassName)),
+      s"Expected DataSource V2 table $tableClassName, actual tables: ${tableNames.mkString(", ")}")
+  }
+
+  private def assertPlanContains(dataFrame: DataFrame, expectedParts: Seq[String]): Unit = {
+    val plan = dataFrame.queryExecution.executedPlan.toString()
+    expectedParts.foreach {
+      expectedPart =>
+        Assertions.assertTrue(
+          plan.contains(expectedPart),
+          s"Expected plan to contain '$expectedPart', actual plan:\n$plan")
+    }
+  }
+
+  private def collectAsStrings(dataFrame: DataFrame): List[String] = {
+    dataFrame
+      .collect()
+      .map(
+        _.toString().drop(1).dropRight(1)
+      )
+      .toList
   }
 
   def getJdbcUrlWithoutDB: String =
