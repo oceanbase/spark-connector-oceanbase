@@ -20,8 +20,9 @@
 ## Compatibility Behavior
 
 - `query` option keeps the old V1 JDBC read behavior because arbitrary subqueries cannot be represented as a Catalog table.
-- `enable_v2_reader=false` forces the V1 JDBC read behavior.
-- The fallback is surfaced through a V2 wrapper table:
+- No new `enable_v2_reader` option is introduced.
+- `enable_legacy_batch_reader=true` uses the existing Catalog-compatible legacy batch reader path through `OceanBaseTable -> JDBCLimitScanBuilder`, matching SQL/Catalog read behavior.
+- The `query` fallback is surfaced through a V2 wrapper table:
   - `OceanBaseLegacyTable`
   - `OceanBaseLegacyScanBuilder`
   - `OceanBaseLegacyScan`
@@ -34,7 +35,7 @@
 
 - `testDataFrameRead` now verifies that default DataFrame API reads use `OceanBaseTable`.
 - `testSqlReadWithQuery` now verifies that `query` reads use `OceanBaseLegacyTable`.
-- Added `testDataFrameReadWithV2ReaderDisabled` to verify that `enable_v2_reader=false` uses `OceanBaseLegacyTable` and preserves result compatibility.
+- Added `testSqlReadHonorsLegacyBatchReaderOption` to verify that SQL temp-view reads honor `enable_legacy_batch_reader=true` while resolving through `OceanBaseTable`.
 - Added `testDataFrameReadMatchesCatalogV2ReaderBehavior` to compare Catalog reads and DataFrame API reads in the same Spark session for:
   - filter pushdown
   - column pruning
@@ -113,13 +114,36 @@ Local Docker is unavailable, so the branch should be pushed to GitHub and the re
 - Pushed branch: `wary/spark-connector-oceanbase:df_v2`
 - Fork PR: <https://github.com/wary/spark-connector-oceanbase/pull/1>
 - Upstream PR: <https://github.com/oceanbase/spark-connector-oceanbase/pull/111>
-- Upstream CI run: <https://github.com/oceanbase/spark-connector-oceanbase/actions/runs/28181760003>
+- Fork CI run: <https://github.com/wary/spark-connector-oceanbase/actions/runs/28181840768>
+- Upstream CI run: <https://github.com/oceanbase/spark-connector-oceanbase/actions/runs/28181836762>
 
-The upstream PR triggered the CI workflow, but GitHub completed the run with `action_required` before starting any jobs. The run contains no job logs yet. The PR currently reports:
+The upstream PR triggered the CI workflow, but GitHub completed the run with `action_required` before starting any jobs. The run contains no job logs yet. The upstream PR currently reports:
 
 ```text
 license/cla: pending
 CI: action_required
 ```
 
-This means the Docker/Testcontainers-backed e2e matrix has not executed yet. A repository maintainer needs to approve the fork PR workflow run, and the CLA check needs to be completed, before CI can provide actionable test logs.
+The fork PR workflow did run the full matrix. Results from run `28181840768`:
+
+```text
+spark-connector-obkv-hbase / Test: passed
+e2e-tests-scala-2_11 (2.4.6) / Test: passed
+e2e-tests (v3.1.3) / Test: passed
+e2e-tests (v3.2.4) / Test: passed
+e2e-tests (3.3.3) / Test: passed
+e2e-tests (3.4.4) / Test: passed
+e2e-tests (3.5.5) / Test: passed
+e2e-tests-scala-2_13 (3.5.5) / Test: passed
+spark-connector-oceanbase / Test: failed
+```
+
+The failing base test job did not expose a DataFrame reader implementation error. It failed because the new test helper inspected `optimizedPlan`, where Spark 3.5 had already optimized away the `DataSourceV2Relation`, so the helper reported an empty table list. That assertion failure left the Spark session open, causing the later `TempTableAlreadyExists` cascade.
+
+Local follow-up fix:
+
+- `assertDataSourceV2Table` now inspects the analyzed logical plan.
+- `afterEach` now stops and clears the active/default Spark session to avoid temp-view leakage after failures.
+- Removed the temporary `enable_v2_reader` option and switched the compatibility tests to `enable_legacy_batch_reader`.
+
+These follow-up fixes still need to be pushed and rerun in GitHub Actions.

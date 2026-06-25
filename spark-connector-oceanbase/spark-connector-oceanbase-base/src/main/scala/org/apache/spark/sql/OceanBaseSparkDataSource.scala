@@ -21,7 +21,7 @@ import com.oceanbase.spark.utils.{OBJdbcUtils, OceanBaseSourceUtils}
 import com.oceanbase.spark.utils.OBJdbcUtils.{getCompatibleMode, getDbTable}
 import com.oceanbase.spark.writer.DirectLoadWriter
 
-import OceanBaseSparkDataSource.{buildJDBCOptions, isV1Read, writeDataViaDirectLoad, ENABLE_V2_READER, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import OceanBaseSparkDataSource.{buildJDBCOptions, isQueryRead, writeDataViaDirectLoad, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql
 import org.apache.spark.sql.connector.catalog.{SupportsRead, Table => ConnectorTable, TableCapability, TableProvider}
@@ -42,7 +42,7 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider with TableProvider {
   override def shortName(): String = SHORT_NAME
 
   override def inferSchema(options: CaseInsensitiveStringMap): StructType = {
-    if (isV1Read(options)) {
+    if (isQueryRead(options)) {
       OceanBaseSparkDataSource.resolveV1Schema(options)
     } else {
       OceanBaseSourceUtils.resolveTable(options).schema
@@ -54,7 +54,7 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider with TableProvider {
       partitioning: Array[Transform],
       properties: JMap[String, String]): ConnectorTable = {
     val options = new CaseInsensitiveStringMap(properties)
-    if (isV1Read(options)) {
+    if (isQueryRead(options)) {
       OceanBaseLegacyTable(schema, properties.asScala.toMap)
     } else {
       val resolved = OceanBaseSourceUtils.resolveTable(options)
@@ -94,15 +94,13 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider with TableProvider {
 
 object OceanBaseSparkDataSource {
   val SHORT_NAME: String = "oceanbase"
-  val ENABLE_V2_READER = "enable_v2_reader"
   val JDBC_URL = "url"
   val JDBC_USER = "user"
   val JDBC_TXN_ISOLATION_LEVEL = "isolationLevel"
   val OCEANBASE_DEFAULT_ISOLATION_LEVEL = "READ_COMMITTED"
 
-  def isV1Read(options: CaseInsensitiveStringMap): Boolean = {
-    !options.getBoolean(ENABLE_V2_READER, true) || options.containsKey(
-      JDBCOptions.JDBC_QUERY_STRING)
+  def isQueryRead(options: CaseInsensitiveStringMap): Boolean = {
+    options.containsKey(JDBCOptions.JDBC_QUERY_STRING)
   }
 
   def resolveV1Schema(options: CaseInsensitiveStringMap): StructType = {

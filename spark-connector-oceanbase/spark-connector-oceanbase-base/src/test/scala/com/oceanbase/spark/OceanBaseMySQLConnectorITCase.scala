@@ -33,6 +33,9 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
   @AfterEach
   def afterEach(): Unit = {
+    SparkSession.getActiveSession.foreach(_.stop())
+    SparkSession.clearActiveSession()
+    SparkSession.clearDefaultSession()
     dropTables(
       "products",
       "products_no_pri_key",
@@ -470,7 +473,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
-  def testDataFrameReadWithV2ReaderDisabled(): Unit = {
+  def testSqlReadHonorsLegacyBatchReaderOption(): Unit = {
     val session = SparkSession.builder().master("local[*]").getOrCreate()
 
     session.sql(s"""
@@ -481,6 +484,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
                    |  "rpc-port" = "$getRpcPort",
                    |  "schema-name"="$getSchemaName",
                    |  "table-name"="products",
+                   |  "enable_legacy_batch_reader"="true",
                    |  "username"="$getUsername",
                    |  "password"="$getPassword"
                    |);
@@ -488,26 +492,16 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
 
     insertToProducts(session)
 
-    val dataFrame = session.read
-      .format("oceanbase")
-      .option("url", getJdbcUrlWithoutDB)
-      .option("username", getUsername)
-      .option("password", getPassword)
-      .option("table-name", "products")
-      .option("schema-name", getSchemaName)
-      .option("enable_v2_reader", "false")
-      .load()
+    val dataFrame = session
+      .sql("select id, name from test_sink where id >= 104 and id < 108")
 
-    assertDataSourceV2Table(dataFrame, "OceanBaseLegacyTable")
+    assertDataSourceV2Table(dataFrame, "OceanBaseTable")
+    assertPlanContains(dataFrame, Seq("OBJDBCLimitScan", "prunedSchema:", "PushedFilters: ["))
 
     import scala.collection.JavaConverters._
-    val actual = dataFrame
-      .collect()
-      .map(
-        _.toString().drop(1).dropRight(1)
-      )
-      .toList
-      .asJava
+    val expected: util.List[String] =
+      util.Arrays.asList("104,hammer", "105,hammer", "106,hammer", "107,rocks")
+    val actual = collectAsStrings(dataFrame).asJava
     assertEqualsInAnyOrder(expected, actual)
 
     session.stop()
@@ -553,7 +547,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
   }
 
   private def assertDataSourceV2Table(dataFrame: DataFrame, tableClassName: String): Unit = {
-    val tableNames = dataFrame.queryExecution.optimizedPlan
+    val tableNames = dataFrame.queryExecution.analyzed
       .collect { case relation: DataSourceV2Relation => relation.table.getClass.getName }
 
     Assertions.assertTrue(
