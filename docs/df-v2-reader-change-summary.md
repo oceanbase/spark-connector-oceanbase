@@ -108,4 +108,18 @@ This means the Docker/Testcontainers-backed e2e assertions still need to be reru
 
 Local Docker is unavailable, so the branch should be pushed to GitHub and the repository workflow should run the Docker/Testcontainers-backed checks there. The relevant branch is `df_v2`.
 
-The GitHub Actions result should be recorded here after the remote run finishes.
+## GitHub Actions Status
+
+- Pushed branch: `wary/spark-connector-oceanbase:df_v2`
+- Fork PR: <https://github.com/wary/spark-connector-oceanbase/pull/1>
+- Upstream PR: <https://github.com/oceanbase/spark-connector-oceanbase/pull/111>
+- Upstream CI run: <https://github.com/oceanbase/spark-connector-oceanbase/actions/runs/28181760003>
+
+The upstream PR triggered the CI workflow, but GitHub completed the run with `action_required` before starting any jobs. The run contains no job logs yet. The PR currently reports:
+
+```text
+license/cla: pending
+CI: action_required
+```
+
+This means the Docker/Testcontainers-backed e2e matrix has not executed yet. A repository maintainer needs to approve the fork PR workflow run, and the CLA check needs to be completed, before CI can provide actionable test logs.
