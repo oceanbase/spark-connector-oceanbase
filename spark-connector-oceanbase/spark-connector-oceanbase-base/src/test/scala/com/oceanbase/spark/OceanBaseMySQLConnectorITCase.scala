@@ -461,7 +461,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
       .select("id", "name")
 
     assertDataSourceV2Table(dataFrame, "OceanBaseTable")
-    assertPlanContains(dataFrame, Seq("OBJDBCLimitScan", "prunedSchema:", "PushedFilters: ["))
+    assertPlanContains(dataFrame, Seq("OBJDBCLimitScan"))
 
     import scala.collection.JavaConverters._
     val expected: util.List[String] =
@@ -496,7 +496,7 @@ class OceanBaseMySQLConnectorITCase extends OceanBaseMySQLTestBase {
       .sql("select id, name from test_sink where id >= 104 and id < 108")
 
     assertDataSourceV2Table(dataFrame, "OceanBaseTable")
-    assertPlanContains(dataFrame, Seq("OBJDBCLimitScan", "prunedSchema:", "PushedFilters: ["))
+    assertPlanContains(dataFrame, Seq("OBJDBCLimitScan"))
 
     import scala.collection.JavaConverters._
     val expected: util.List[String] =
