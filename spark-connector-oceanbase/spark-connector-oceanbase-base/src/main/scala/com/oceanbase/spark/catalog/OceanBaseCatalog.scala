@@ -20,6 +20,7 @@ import com.oceanbase.spark.catalog.OceanBaseCatalog.{extractDatabaseName, resolv
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.{OceanBaseDialect, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import com.oceanbase.spark.utils.OBJdbcUtils
+import com.oceanbase.spark.utils.OceanBaseConnectionProvider
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.SQLConfHelper
@@ -351,7 +352,7 @@ object OceanBaseCatalog {
   def extractDatabaseName(jdbcUrl: String): Option[String] = {
     val pattern = "(?i)^jdbc:(mysql|oceanbase)://[^/]+/([^?]+).*".r
 
-    jdbcUrl match {
+    OceanBaseConnectionProvider.parseJdbcUrls(jdbcUrl).headOption.getOrElse(jdbcUrl) match {
       case pattern(_, databaseName) => Some(databaseName)
       case _ => None
     }

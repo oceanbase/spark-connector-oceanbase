@@ -31,7 +31,7 @@ import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
-import java.sql.{PreparedStatement, ResultSet}
+import java.sql.{Connection, PreparedStatement, ResultSet}
 import java.util.Objects
 import java.util.concurrent.TimeUnit
 
@@ -47,10 +47,16 @@ class OBJdbcReader(
 
   private val getters: Array[OBValueGetter] = makeGetters(schema)
   private val mutableRow = new SpecificInternalRow(schema.fields.map(x => x.dataType))
-  private lazy val conn = OBJdbcUtils.getConnection(config)
-  private lazy val stmt: PreparedStatement =
-    conn.prepareStatement(buildQuerySql(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
-  private lazy val rs: ResultSet = {
+  private var conn: Connection = _
+  private var stmt: PreparedStatement = _
+  private var rs: ResultSet = _
+
+  private def openResultSet(): Unit = {
+    conn = OBJdbcUtils.getConnection(config)
+    stmt = conn.prepareStatement(
+      buildQuerySql(),
+      ResultSet.TYPE_FORWARD_ONLY,
+      ResultSet.CONCUR_READ_ONLY)
     partition match {
       case part: OBMySQLPartition =>
         part.unevenlyWhereValue.zipWithIndex.foreach {
@@ -60,18 +66,26 @@ class OBJdbcReader(
     }
     stmt.setFetchSize(config.getJdbcFetchSize)
     stmt.setQueryTimeout(config.getJdbcQueryTimeout)
-    stmt.executeQuery()
+    rs = stmt.executeQuery()
+  }
+
+  private def currentResultSet: ResultSet = {
+    if (Objects.isNull(rs)) {
+      openResultSet()
+    }
+    rs
   }
 
   private var currentRecord: InternalRow = _
 
   override def next(): Boolean = {
-    val hasNext = rs.next()
+    val resultSet = currentResultSet
+    val hasNext = resultSet.next()
     if (hasNext) currentRecord = {
       var i = 0
       while (i < getters.length) {
-        getters(i)(rs, mutableRow, i)
-        if (rs.wasNull) mutableRow.setNullAt(i)
+        getters(i)(resultSet, mutableRow, i)
+        if (resultSet.wasNull) mutableRow.setNullAt(i)
         i = i + 1
       }
       mutableRow
@@ -82,14 +96,29 @@ class OBJdbcReader(
   override def get(): InternalRow = currentRecord
 
   override def close(): Unit = {
+    closeCurrentResources()
+  }
+
+  private def closeCurrentResources(): Unit = {
     if (Objects.nonNull(rs)) {
-      rs.close()
+      closeQuietly(rs.close())
+      rs = null
     }
     if (Objects.nonNull(stmt)) {
-      stmt.close()
+      closeQuietly(stmt.close())
+      stmt = null
     }
     if (Objects.nonNull(conn)) {
-      conn.close()
+      closeQuietly(conn.close())
+      conn = null
+    }
+  }
+
+  private def closeQuietly(close: => Unit): Unit = {
+    try {
+      close
+    } catch {
+      case exception: Exception => logWarning("Failed to close JDBC resource.", exception)
     }
   }
 
