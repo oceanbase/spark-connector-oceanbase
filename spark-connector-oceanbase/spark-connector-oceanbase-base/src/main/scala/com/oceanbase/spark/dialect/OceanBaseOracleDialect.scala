@@ -37,7 +37,7 @@ import scala.util.control.NonFatal
 
 class OceanBaseOracleDialect extends OceanBaseDialect {
   override def quoteIdentifier(colName: String): String = {
-    s""""$colName""""
+    s""""${colName.replace("\"", "\"\"")}""""
   }
 
   override def unQuoteIdentifier(colName: String): String = {
