@@ -71,8 +71,17 @@ object OBMySQLPartition extends Logging {
             val partColConfig = String.format(
               OceanBaseConfig.SPECIFY_PK_TABLE_PARTITION_COLUMN.getKey,
               dialect.unQuoteIdentifier(config.getDbTable))
-            configPartitionColumn = Optional.ofNullable(
-              configPartitionColumn.orElse(ConfigUtils.findFromRuntimeConf(partColConfig)))
+            // Quote the column name from runtime conf, keeping it consistent with the other
+            // partition-column sources (getJdbcReaderPartitionColumn and getPriKeyInfo already
+            // return quoted names). Otherwise a reserved-word column (e.g. `usage`) would break
+            // the generated partition/stats SQL.
+            val runtimeConfPartitionColumn = ConfigUtils.findFromRuntimeConf(partColConfig)
+            val quotedRuntimeConfPartitionColumn =
+              if (runtimeConfPartitionColumn != null)
+                dialect.quoteIdentifier(runtimeConfPartitionColumn)
+              else null
+            configPartitionColumn =
+              Optional.ofNullable(configPartitionColumn.orElse(quotedRuntimeConfPartitionColumn))
             if (config.getDisableIntPkTableUseWherePartition) {
               limitOffsetPartitionWay(connection, config, obPartInfos)
             } else if (null == finalIntPriKey) {
