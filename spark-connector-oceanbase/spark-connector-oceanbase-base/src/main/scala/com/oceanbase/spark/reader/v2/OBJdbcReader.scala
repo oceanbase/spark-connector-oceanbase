@@ -126,8 +126,8 @@ class OBJdbcReader(
                 case _ => quoted
               }
           }
-          if (projected.isEmpty) "1" else projected.mkString(",")
-        case _ => if (columns.isEmpty) "1" else columns.mkString(",")
+          if (projected.isEmpty) "1" else projected.mkString(", ")
+        case _ => if (columns.isEmpty) "1" else columns.mkString(", ")
       }
     }
 
@@ -216,10 +216,13 @@ class OBJdbcReader(
       case _ => ""
     }
 
-    s"""
-       |SELECT $hint $columnStr FROM ${config.getDbTable} $partitionClause
-       |$whereClause $getGroupByClause $getOrderByClause $finalLimitClause
-       |""".stripMargin
+    val sql =
+      s"""
+         |SELECT $hint $columnStr FROM ${config.getDbTable} $partitionClause
+         |$whereClause $getGroupByClause $getOrderByClause $finalLimitClause
+         |""".stripMargin
+    logDebug(s"OceanBase JDBC read SQL: $sql")
+    sql
   }
 
   /**

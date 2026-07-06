@@ -95,7 +95,7 @@ class OBJdbcReader(
 
   private def buildQuerySql(): String = {
     val columns = schema.map(col => dialect.quoteIdentifier(col.name)).toArray
-    val columnStr: String = if (columns.isEmpty) "1" else columns.mkString(",")
+    val columnStr: String = if (columns.isEmpty) "1" else columns.mkString(", ")
 
     val filterWhereClause: String =
       pushedFilter
