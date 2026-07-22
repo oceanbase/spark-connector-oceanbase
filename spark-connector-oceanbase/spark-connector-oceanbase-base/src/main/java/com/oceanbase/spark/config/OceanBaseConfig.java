@@ -235,6 +235,30 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(1024);
 
+    public static final ConfigEntry<Integer> JDBC_CONNECTION_MAX_RETRIES =
+            new ConfigBuilder("jdbc.connection.max-retries")
+                    .doc(
+                            "Maximum number of attempts when opening a JDBC connection, including the initial attempt.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .intConf()
+                    .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(3);
+
+    public static final ConfigEntry<Duration> JDBC_CONNECTION_RETRY_INTERVAL =
+            new ConfigBuilder("jdbc.connection.retry-interval")
+                    .doc("Initial retry interval when opening a JDBC connection.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .durationConf()
+                    .createWithDefault(Duration.ofSeconds(1));
+
+    public static final ConfigEntry<Duration> JDBC_CONNECTION_FAILED_URL_COOLDOWN =
+            new ConfigBuilder("jdbc.connection.failed-url-cooldown")
+                    .doc(
+                            "Cooldown before a JDBC URL that failed to connect is treated as healthy again.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .durationConf()
+                    .createWithDefault(Duration.ofSeconds(60));
+
     public static final ConfigEntry<Boolean> JDBC_ENABLE_AUTOCOMMIT =
             new ConfigBuilder("jdbc.enable-autocommit")
                     .doc("Declare whether to enable autocommit when writing data using JDBC.")
@@ -540,6 +564,18 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcBatchSize() {
         return get(JDBC_BATCH_SIZE);
+    }
+
+    public Integer getJdbcConnectionMaxRetries() {
+        return get(JDBC_CONNECTION_MAX_RETRIES);
+    }
+
+    public long getJdbcConnectionRetryIntervalMillis() {
+        return get(JDBC_CONNECTION_RETRY_INTERVAL).toMillis();
+    }
+
+    public long getJdbcConnectionFailedUrlCooldownMillis() {
+        return get(JDBC_CONNECTION_FAILED_URL_COOLDOWN).toMillis();
     }
 
     public Boolean getJdbcEnableAutoCommit() {

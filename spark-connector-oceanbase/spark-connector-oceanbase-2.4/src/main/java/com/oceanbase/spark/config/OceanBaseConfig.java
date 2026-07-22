@@ -17,6 +17,7 @@
 package com.oceanbase.spark.config;
 
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.Map;
 
 
@@ -178,6 +179,37 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .create();
 
+    public static final ConfigEntry<Integer> JDBC_CONNECTION_MAX_RETRIES =
+            new ConfigBuilder("jdbc.connection.max-retries")
+                    .doc(
+                            "Maximum number of attempts when opening a JDBC connection, including the initial attempt.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .intConf()
+                    .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(3);
+
+    public static final ConfigEntry<Duration> JDBC_CONNECTION_RETRY_INTERVAL =
+            new ConfigBuilder("jdbc.connection.retry-interval")
+                    .doc("Initial retry interval when opening a JDBC connection.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .durationConf()
+                    .createWithDefault(Duration.ofSeconds(1));
+
+    public static final ConfigEntry<Duration> JDBC_CONNECTION_FAILED_URL_COOLDOWN =
+            new ConfigBuilder("jdbc.connection.failed-url-cooldown")
+                    .doc(
+                            "Cooldown before a JDBC URL that failed to connect is treated as healthy again.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .durationConf()
+                    .createWithDefault(Duration.ofSeconds(60));
+
+    public static final ConfigEntry<String> DRIVER =
+            new ConfigBuilder("driver")
+                    .doc("The class name of the JDBC driver to use to connect to this URL.")
+                    .version(ConfigConstants.VERSION_1_1_0)
+                    .stringConf()
+                    .create();
+
     public static final ConfigEntry<Boolean> DIRECT_LOAD_TASK_USE_REPARTITION =
             new ConfigBuilder("direct-load.task-use-repartition")
                     .doc(
@@ -273,5 +305,21 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public boolean getDirectLoadUseRepartition() {
         return get(DIRECT_LOAD_TASK_USE_REPARTITION);
+    }
+
+    public Integer getJdbcConnectionMaxRetries() {
+        return get(JDBC_CONNECTION_MAX_RETRIES);
+    }
+
+    public long getJdbcConnectionRetryIntervalMillis() {
+        return get(JDBC_CONNECTION_RETRY_INTERVAL).toMillis();
+    }
+
+    public long getJdbcConnectionFailedUrlCooldownMillis() {
+        return get(JDBC_CONNECTION_FAILED_URL_COOLDOWN).toMillis();
+    }
+
+    public String getDriver() {
+        return get(DRIVER);
     }
 }
