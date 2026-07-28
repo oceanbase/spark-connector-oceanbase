@@ -162,7 +162,7 @@ abstract class OceanBaseDialect extends Logging with Serializable {
    * is a reserved keyword, or in case it contains characters that require quotes (e.g. space).
    */
   def quoteIdentifier(colName: String): String = {
-    s"""`$colName`"""
+    s"`${colName.replace("`", "``")}`"
   }
 
   def unQuoteIdentifier(colName: String): String = {
