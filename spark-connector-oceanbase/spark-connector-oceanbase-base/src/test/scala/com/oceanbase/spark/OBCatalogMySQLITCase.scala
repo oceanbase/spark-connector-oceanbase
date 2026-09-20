@@ -40,6 +40,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "products_no_pri_key",
       "products_full_pri_key",
       "products_no_int_pri_key",
+      "products_reserved_word_pri_key",
       "products_unique_key",
       "products_full_unique_key",
       "products_pri_and_unique_key",
@@ -563,6 +564,38 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
     session.sql("use ob;")
     insertTestData(session, "products_no_int_pri_key")
     queryAndVerifyTableData(session, "products_no_int_pri_key", expected)
+
+    session.stop()
+  }
+
+  /**
+   * Regression test: when the read partition column is specified via a bare Spark runtime conf
+   * (i.e. not as a `spark.sql.catalog.<name>.*` option, so it is resolved through
+   * `ConfigUtils.findFromRuntimeConf` rather than `getJdbcReaderPartitionColumn`) and the column
+   * name is a reserved word (e.g. `usage`), the generated partition/stats SQL must still quote it.
+   */
+  @Test
+  def testUnevenlyReadWithReservedWordPartitionColumn(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.jdbc.max-records-per-partition", "2")
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    // Set the partition column as a bare runtime conf (no catalog prefix) so it is only picked up
+    // by ConfigUtils.findFromRuntimeConf, exercising the branch that previously left the reserved
+    // word unquoted.
+    session.conf
+      .set(s"jdbc.$getSchemaName.products_reserved_word_pri_key.partition-column", "usage")
+
+    session.sql("use ob;")
+    insertTestData(session, "products_reserved_word_pri_key")
+    queryAndVerifyTableData(session, "products_reserved_word_pri_key", expected)
 
     session.stop()
   }
