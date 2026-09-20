@@ -202,7 +202,7 @@ class OceanBaseMySQLDialect extends OceanBaseDialect {
             val columnKey = rs.getString(3)
             if (null != columnKey && columnKey.equals("PRI")) {
               arrayBuffer += PriKeyColumnInfo(
-                quoteIdentifier(rs.getString(1)),
+                rs.getString(1),
                 rs.getString(2),
                 columnKey,
                 rs.getString(4),

@@ -24,14 +24,45 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.spark.annotation.Since
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.CatalystTypeConverters
-import org.apache.spark.sql.catalyst.util.{DateFormatter, DateTimeUtils, TimestampFormatter}
+import org.apache.spark.sql.catalyst.util.{
+  DateFormatter,
+  DateTimeUtils,
+  TimestampFormatter
+}
 import org.apache.spark.sql.connector.catalog.TableChange
-import org.apache.spark.sql.connector.catalog.TableChange.{AddColumn, DeleteColumn, RenameColumn, UpdateColumnNullability, UpdateColumnType}
-import org.apache.spark.sql.connector.expressions.{Expression, Literal, NamedReference, Transform}
+import org.apache.spark.sql.connector.catalog.TableChange.{
+  AddColumn,
+  DeleteColumn,
+  RenameColumn,
+  UpdateColumnNullability,
+  UpdateColumnType
+}
+import org.apache.spark.sql.connector.expressions.{
+  Expression,
+  Literal,
+  NamedReference,
+  Transform
+}
 import org.apache.spark.sql.connector.util.V2ExpressionSQLBuilder
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegerType, LongType, MetadataBuilder, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types.{
+  BinaryType,
+  BooleanType,
+  ByteType,
+  DataType,
+  DateType,
+  DecimalType,
+  DoubleType,
+  FloatType,
+  IntegerType,
+  LongType,
+  MetadataBuilder,
+  ShortType,
+  StringType,
+  StructType,
+  TimestampType
+}
 
 import java.sql.{Connection, Date, Timestamp}
 import java.time.{Instant, LocalDate}
@@ -47,7 +78,8 @@ abstract class OceanBaseDialect extends Logging with Serializable {
   /** Returns true if the table already exists in the JDBC database. */
   def tableExists(conn: Connection, config: OceanBaseConfig): Boolean = {
     Try {
-      val statement = conn.prepareStatement(getTableExistsQuery(config.getDbTable))
+      val statement =
+        conn.prepareStatement(getTableExistsQuery(config.getDbTable))
       try {
         statement.setQueryTimeout(config.getJdbcQueryTimeout)
         statement.executeQuery()
@@ -58,7 +90,11 @@ abstract class OceanBaseDialect extends Logging with Serializable {
   }
 
   /** Drops a table from the JDBC database. */
-  def dropTable(conn: Connection, table: String, config: OceanBaseConfig): Unit = {
+  def dropTable(
+      conn: Connection,
+      table: String,
+      config: OceanBaseConfig
+  ): Unit = {
     executeStatement(conn, config, s"DROP TABLE $table")
   }
 
@@ -79,14 +115,16 @@ abstract class OceanBaseDialect extends Logging with Serializable {
       schema: StructType,
       partitions: Array[Transform],
       config: OceanBaseConfig,
-      properties: java.util.Map[String, String]): Unit
+      properties: java.util.Map[String, String]
+  ): Unit
 
   /** Rename a table from the JDBC database. */
   def renameTable(
       conn: Connection,
       oldTable: String,
       newTable: String,
-      config: OceanBaseConfig): Unit = {
+      config: OceanBaseConfig
+  ): Unit = {
     executeStatement(conn, config, getRenameTableSql(oldTable, newTable))
   }
 
@@ -95,19 +133,27 @@ abstract class OceanBaseDialect extends Logging with Serializable {
       conn: Connection,
       tableName: String,
       changes: Seq[TableChange],
-      config: OceanBaseConfig): Unit = {
+      config: OceanBaseConfig
+  ): Unit = {
     val metaData = conn.getMetaData
     if (changes.length == 1) {
       executeStatement(
         conn,
         config,
-        alterTable(tableName, changes, metaData.getDatabaseMajorVersion)(0))
+        alterTable(tableName, changes, metaData.getDatabaseMajorVersion)(0)
+      )
     } else {
       conn.setAutoCommit(false)
       val statement = conn.createStatement
       try {
         statement.setQueryTimeout(config.getJdbcQueryTimeout)
-        for (sql <- alterTable(tableName, changes, metaData.getDatabaseMajorVersion)) {
+        for (
+          sql <- alterTable(
+            tableName,
+            changes,
+            metaData.getDatabaseMajorVersion
+          )
+        ) {
           statement.executeUpdate(sql)
         }
         conn.commit()
@@ -130,7 +176,10 @@ abstract class OceanBaseDialect extends Logging with Serializable {
     s"ALTER TABLE $oldTable RENAME TO $newTable"
   }
 
-  def getTruncateQuery(table: String, cascade: Option[Boolean] = Some(false)): String = {
+  def getTruncateQuery(
+      table: String,
+      cascade: Option[Boolean] = Some(false)
+  ): String = {
     s"TRUNCATE TABLE $table"
   }
 
@@ -148,19 +197,36 @@ abstract class OceanBaseDialect extends Logging with Serializable {
   def getJDBCType(dt: DataType): Option[JdbcType] = None
 
   /** Creates a schema. */
-  def createSchema(conn: Connection, config: OceanBaseConfig, schema: String, comment: String): Unit
+  def createSchema(
+      conn: Connection,
+      config: OceanBaseConfig,
+      schema: String,
+      comment: String
+  ): Unit
 
-  def schemaExists(conn: Connection, config: OceanBaseConfig, schema: String): Boolean
+  def schemaExists(
+      conn: Connection,
+      config: OceanBaseConfig,
+      schema: String
+  ): Boolean
 
-  def listSchemas(conn: Connection, config: OceanBaseConfig): Array[Array[String]]
+  def listSchemas(
+      conn: Connection,
+      config: OceanBaseConfig
+  ): Array[Array[String]]
 
   /** Drops a schema from the JDBC database. */
-  def dropSchema(conn: Connection, config: OceanBaseConfig, schema: String, cascade: Boolean): Unit
+  def dropSchema(
+      conn: Connection,
+      config: OceanBaseConfig,
+      schema: String,
+      cascade: Boolean
+  ): Unit
 
-  /**
-   * Quotes the identifier. This is used to put quotes around the identifier in case the column name
-   * is a reserved keyword, or in case it contains characters that require quotes (e.g. space).
-   */
+  /** Quotes the identifier. This is used to put quotes around the identifier in
+    * case the column name is a reserved keyword, or in case it contains
+    * characters that require quotes (e.g. space).
+    */
   def quoteIdentifier(colName: String): String = {
     s"`${colName.replace("`", "``")}`"
   }
@@ -173,31 +239,38 @@ abstract class OceanBaseDialect extends Logging with Serializable {
       connection: Connection,
       schemaName: String,
       tableName: String,
-      config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo]
+      config: OceanBaseConfig
+  ): ArrayBuffer[PriKeyColumnInfo]
 
   def getUniqueKeyInfo(
       connection: Connection,
       schemaName: String,
       tableName: String,
-      config: OceanBaseConfig): ArrayBuffer[PriKeyColumnInfo]
+      config: OceanBaseConfig
+  ): ArrayBuffer[PriKeyColumnInfo]
 
-  def getInsertIntoStatement(tableName: String, schema: StructType, config: OceanBaseConfig): String
+  def getInsertIntoStatement(
+      tableName: String,
+      schema: StructType,
+      config: OceanBaseConfig
+  ): String
 
   def getUpsertIntoStatement(
       tableName: String,
       schema: StructType,
       priKeyColumnInfo: ArrayBuffer[PriKeyColumnInfo],
-      config: OceanBaseConfig): String
+      config: OceanBaseConfig
+  ): String
 
-  /**
-   * The SQL query that should be used to discover the schema of a table. It only needs to ensure
-   * that the result set has the same schema as the table, such as by calling "SELECT * ...".
-   * Dialects can override this method to return a query that works best in a particular database.
-   * @param table
-   *   The name of the table.
-   * @return
-   *   The SQL query to use for discovering the schema.
-   */
+  /** The SQL query that should be used to discover the schema of a table. It
+    * only needs to ensure that the result set has the same schema as the table,
+    * such as by calling "SELECT * ...". Dialects can override this method to
+    * return a query that works best in a particular database.
+    * @param table
+    *   The name of the table.
+    * @return
+    *   The SQL query to use for discovering the schema.
+    */
   def getSchemaQuery(table: String): String = {
     s"SELECT * FROM $table WHERE 1=0"
   }
@@ -211,44 +284,66 @@ abstract class OceanBaseDialect extends Logging with Serializable {
   protected class JDBCSQLBuilder extends V2ExpressionSQLBuilder {
     override def visitLiteral(literal: Literal[_]): String = {
       Option(literal.value())
-        .map(
-          v => compileValue(CatalystTypeConverters.convertToScala(v, literal.dataType())).toString)
+        .map(v =>
+          compileValue(
+            CatalystTypeConverters.convertToScala(v, literal.dataType())
+          ).toString
+        )
         .getOrElse(super.visitLiteral(literal))
     }
 
     override def visitNamedReference(namedRef: NamedReference): String = {
       if (namedRef.fieldNames().length > 1) {
-        throw OceanBaseCatalogException("Filter push down: " + namedRef.toString)
+        throw OceanBaseCatalogException(
+          "Filter push down: " + namedRef.toString
+        )
       }
       quoteIdentifier(namedRef.fieldNames.head)
     }
 
-    override def visitCast(l: String, dataType: DataType): String = {
+    /** Spark 4.0 changed visitCast to 3 parameters. */
+    override def visitCast(
+        l: String,
+        dataType: DataType,
+        elementType: DataType
+    ): String = {
       val databaseTypeDefinition =
-        getJDBCType(dataType).map(_.databaseTypeDefinition).getOrElse(dataType.typeName)
+        getJDBCType(dataType)
+          .map(_.databaseTypeDefinition)
+          .getOrElse(dataType.typeName)
       s"CAST($l AS $databaseTypeDefinition)"
     }
 
-    override def visitSQLFunction(funcName: String, inputs: Array[String]): String = {
+    override def visitSQLFunction(
+        funcName: String,
+        inputs: Array[String]
+    ): String = {
       if (isSupportedFunction(funcName)) {
         s"""${dialectFunctionName(funcName)}(${inputs.mkString(", ")})"""
       } else {
         // The framework will catch the error and give up the push-down.
         // Please see `JdbcDialect.compileExpression(expr: Expression)` for more details.
         throw new UnsupportedOperationException(
-          s"${this.getClass.getSimpleName} does not support function: $funcName")
+          s"${this.getClass.getSimpleName} does not support function: $funcName"
+        )
       }
     }
 
     override def visitAggregateFunction(
         funcName: String,
         isDistinct: Boolean,
-        inputs: Array[String]): String = {
+        inputs: Array[String]
+    ): String = {
       if (isSupportedFunction(funcName)) {
-        super.visitAggregateFunction(dialectFunctionName(funcName), isDistinct, inputs)
+        super.visitAggregateFunction(
+          dialectFunctionName(funcName),
+          isDistinct,
+          inputs
+        )
       } else {
         throw new UnsupportedOperationException(
-          s"${this.getClass.getSimpleName} does not support aggregate function: $funcName");
+          s"${this.getClass.getSimpleName} does not support aggregate function: $funcName"
+        );
       }
     }
 
@@ -259,7 +354,8 @@ abstract class OceanBaseDialect extends Logging with Serializable {
         super.visitOverlay(inputs)
       } else {
         throw new UnsupportedOperationException(
-          s"${this.getClass.getSimpleName} does not support function: OVERLAY")
+          s"${this.getClass.getSimpleName} does not support function: OVERLAY"
+        )
       }
     }
 
@@ -268,27 +364,26 @@ abstract class OceanBaseDialect extends Logging with Serializable {
         super.visitTrim(direction, inputs)
       } else {
         throw new UnsupportedOperationException(
-          s"${this.getClass.getSimpleName} does not support function: TRIM")
+          s"${this.getClass.getSimpleName} does not support function: TRIM"
+        )
       }
     }
   }
 
-  /**
-   * Returns whether the database supports function.
-   * @param funcName
-   *   Upper-cased function name
-   * @return
-   *   True if the database supports function.
-   */
+  /** Returns whether the database supports function.
+    * @param funcName
+    *   Upper-cased function name
+    * @return
+    *   True if the database supports function.
+    */
   def isSupportedFunction(funcName: String): Boolean = false
 
-  /**
-   * Converts V2 expression to String representing a SQL expression.
-   * @param expr
-   *   The V2 expression to be converted.
-   * @return
-   *   Converted value.
-   */
+  /** Converts V2 expression to String representing a SQL expression.
+    * @param expr
+    *   The V2 expression to be converted.
+    * @return
+    *   Converted value.
+    */
   def compileExpression(expr: Expression): Option[String] = {
     val jdbcSQLBuilder = new JDBCSQLBuilder()
     try {
@@ -300,97 +395,103 @@ abstract class OceanBaseDialect extends Logging with Serializable {
     }
   }
 
-  /**
-   * Get the custom datatype mapping for the given jdbc meta information.
-   * @param sqlType
-   *   The sql type (see java.sql.Types)
-   * @param typeName
-   *   The sql type name (e.g. "BIGINT UNSIGNED")
-   * @param size
-   *   The size of the type.
-   * @param md
-   *   Result metadata associated with this type.
-   * @return
-   *   The actual DataType (subclasses of [[org.apache.spark.sql.types.DataType]]) or null if the
-   *   default type mapping should be used.
-   */
+  /** Get the custom datatype mapping for the given jdbc meta information.
+    * @param sqlType
+    *   The sql type (see java.sql.Types)
+    * @param typeName
+    *   The sql type name (e.g. "BIGINT UNSIGNED")
+    * @param size
+    *   The size of the type.
+    * @param md
+    *   Result metadata associated with this type.
+    * @return
+    *   The actual DataType (subclasses of
+    *   [[org.apache.spark.sql.types.DataType]]) or null if the default type
+    *   mapping should be used.
+    */
   def getCatalystType(
       sqlType: Int,
       typeName: String,
       size: Int,
-      md: MetadataBuilder): Option[DataType] = None
+      md: MetadataBuilder
+  ): Option[DataType] = None
 
-  /**
-   * Retrieve standard jdbc types.
-   *
-   * @param dt
-   *   The datatype (e.g. [[org.apache.spark.sql.types.StringType]])
-   * @return
-   *   The default JdbcType for this DataType
-   */
+  /** Retrieve standard jdbc types.
+    *
+    * @param dt
+    *   The datatype (e.g. [[org.apache.spark.sql.types.StringType]])
+    * @return
+    *   The default JdbcType for this DataType
+    */
   def getCommonJDBCType(dt: DataType): Option[JdbcType] = {
     dt match {
       case IntegerType => Option(JdbcType("INTEGER", java.sql.Types.INTEGER))
-      case LongType => Option(JdbcType("BIGINT", java.sql.Types.BIGINT))
-      case DoubleType => Option(JdbcType("DOUBLE PRECISION", java.sql.Types.DOUBLE))
-      case FloatType => Option(JdbcType("REAL", java.sql.Types.FLOAT))
-      case ShortType => Option(JdbcType("INTEGER", java.sql.Types.SMALLINT))
-      case ByteType => Option(JdbcType("BYTE", java.sql.Types.TINYINT))
+      case LongType    => Option(JdbcType("BIGINT", java.sql.Types.BIGINT))
+      case DoubleType =>
+        Option(JdbcType("DOUBLE PRECISION", java.sql.Types.DOUBLE))
+      case FloatType   => Option(JdbcType("REAL", java.sql.Types.FLOAT))
+      case ShortType   => Option(JdbcType("INTEGER", java.sql.Types.SMALLINT))
+      case ByteType    => Option(JdbcType("BYTE", java.sql.Types.TINYINT))
       case BooleanType => Option(JdbcType("BIT(1)", java.sql.Types.BIT))
-      case StringType => Option(JdbcType("TEXT", java.sql.Types.CLOB))
-      case BinaryType => Option(JdbcType("BLOB", java.sql.Types.BLOB))
-      case TimestampType => Option(JdbcType("TIMESTAMP", java.sql.Types.TIMESTAMP))
+      case StringType  => Option(JdbcType("TEXT", java.sql.Types.CLOB))
+      case BinaryType  => Option(JdbcType("BLOB", java.sql.Types.BLOB))
+      case TimestampType =>
+        Option(JdbcType("TIMESTAMP", java.sql.Types.TIMESTAMP))
       case DateType => Option(JdbcType("DATE", java.sql.Types.DATE))
       case t: DecimalType =>
-        Option(JdbcType(s"DECIMAL(${t.precision},${t.scale})", java.sql.Types.DECIMAL))
+        Option(
+          JdbcType(
+            s"DECIMAL(${t.precision},${t.scale})",
+            java.sql.Types.DECIMAL
+          )
+        )
       case _ => None
     }
   }
 
-  /**
-   * Escape special characters in SQL string literals.
-   * @param value
-   *   The string to be escaped.
-   * @return
-   *   Escaped string.
-   */
+  /** Escape special characters in SQL string literals.
+    * @param value
+    *   The string to be escaped.
+    * @return
+    *   Escaped string.
+    */
   def escapeSql(value: String): String =
     if (value == null) null else StringUtils.replace(value, "'", "''")
 
-  /**
-   * Converts value to SQL expression.
-   * @param value
-   *   The value to be converted.
-   * @return
-   *   Converted value.
-   */
+  /** Converts value to SQL expression.
+    * @param value
+    *   The value to be converted.
+    * @return
+    *   Converted value.
+    */
   def compileValue(value: Any): Any = value match {
-    case stringValue: String => s"'${escapeSql(stringValue)}'"
+    case stringValue: String       => s"'${escapeSql(stringValue)}'"
     case timestampValue: Timestamp => "'" + timestampValue + "'"
     case timestampValue: Instant =>
       val timestampFormatter = TimestampFormatter.getFractionFormatter(
-        DateTimeUtils.getZoneId(SQLConf.get.sessionLocalTimeZone))
+        DateTimeUtils.getZoneId(SQLConf.get.sessionLocalTimeZone)
+      )
       s"'${timestampFormatter.format(timestampValue)}'"
-    case dateValue: Date => "'" + dateValue + "'"
-    case dateValue: LocalDate => s"'${DateFormatter().format(dateValue)}'"
+    case dateValue: Date        => "'" + dateValue + "'"
+    case dateValue: LocalDate   => s"'${DateFormatter().format(dateValue)}'"
     case arrayValue: Array[Any] => arrayValue.map(compileValue).mkString(", ")
-    case _ => value
+    case _                      => value
   }
 
-  /**
-   * Alter an existing table.
-   *
-   * @param tableName
-   *   The name of the table to be altered.
-   * @param changes
-   *   Changes to apply to the table.
-   * @return
-   *   The SQL statements to use for altering the table.
-   */
+  /** Alter an existing table.
+    *
+    * @param tableName
+    *   The name of the table to be altered.
+    * @param changes
+    *   Changes to apply to the table.
+    * @return
+    *   The SQL statements to use for altering the table.
+    */
   def alterTable(
       tableName: String,
       changes: Seq[TableChange],
-      dbMajorVersion: Int): Array[String] = {
+      dbMajorVersion: Int
+  ): Array[String] = {
     val updateClause = mutable.ArrayBuilder.make[String]
     for (change <- changes) {
       change match {
@@ -400,70 +501,95 @@ abstract class OceanBaseDialect extends Logging with Serializable {
           updateClause += getAddColumnQuery(tableName, name(0), dataType)
         case rename: RenameColumn if rename.fieldNames.length == 1 =>
           val name = rename.fieldNames
-          updateClause += getRenameColumnQuery(tableName, name(0), rename.newName, dbMajorVersion)
+          updateClause += getRenameColumnQuery(
+            tableName,
+            name(0),
+            rename.newName,
+            dbMajorVersion
+          )
         case delete: DeleteColumn if delete.fieldNames.length == 1 =>
           val name = delete.fieldNames
           updateClause += getDeleteColumnQuery(tableName, name(0))
-        case updateColumnType: UpdateColumnType if updateColumnType.fieldNames.length == 1 =>
+        case updateColumnType: UpdateColumnType
+            if updateColumnType.fieldNames.length == 1 =>
           val name = updateColumnType.fieldNames
-          val dataType = getJdbcType(updateColumnType.newDataType()).databaseTypeDefinition
+          val dataType = getJdbcType(
+            updateColumnType.newDataType()
+          ).databaseTypeDefinition
           updateClause += getUpdateColumnTypeQuery(tableName, name(0), dataType)
-        case updateNull: UpdateColumnNullability if updateNull.fieldNames.length == 1 =>
+        case updateNull: UpdateColumnNullability
+            if updateNull.fieldNames.length == 1 =>
           val name = updateNull.fieldNames
-          updateClause += getUpdateColumnNullabilityQuery(tableName, name(0), updateNull.nullable())
+          updateClause += getUpdateColumnNullabilityQuery(
+            tableName,
+            name(0),
+            updateNull.nullable()
+          )
         case _ =>
           throw new RuntimeException(
-            s"unsupportedTableChangeInJDBCCatalogError: ${change.toString}")
+            s"unsupportedTableChangeInJDBCCatalogError: ${change.toString}"
+          )
       }
     }
     updateClause.result()
   }
 
-  def getAddColumnQuery(tableName: String, columnName: String, dataType: String): String =
+  def getAddColumnQuery(
+      tableName: String,
+      columnName: String,
+      dataType: String
+  ): String =
     s"ALTER TABLE $tableName ADD COLUMN ${quoteIdentifier(columnName)} $dataType"
 
   def getRenameColumnQuery(
       tableName: String,
       columnName: String,
       newName: String,
-      dbMajorVersion: Int): String =
+      dbMajorVersion: Int
+  ): String =
     s"ALTER TABLE $tableName RENAME COLUMN ${quoteIdentifier(columnName)} TO" +
       s" ${quoteIdentifier(newName)}"
 
   def getDeleteColumnQuery(tableName: String, columnName: String): String =
     s"ALTER TABLE $tableName DROP COLUMN ${quoteIdentifier(columnName)}"
 
-  def getUpdateColumnTypeQuery(tableName: String, columnName: String, newDataType: String): String =
+  def getUpdateColumnTypeQuery(
+      tableName: String,
+      columnName: String,
+      newDataType: String
+  ): String =
     s"ALTER TABLE $tableName ALTER COLUMN ${quoteIdentifier(columnName)} $newDataType"
 
   def getUpdateColumnNullabilityQuery(
       tableName: String,
       columnName: String,
-      isNullable: Boolean): String = {
+      isNullable: Boolean
+  ): String = {
     val nullable = if (isNullable) "NULL" else "NOT NULL"
     s"ALTER TABLE $tableName ALTER COLUMN ${quoteIdentifier(columnName)} SET $nullable"
   }
 
-  /**
-   * Get actual column type names from database system catalogs. Returns COLUMN_TYPE which includes
-   * full type definition like "ARRAY(INT)", "VECTOR(3)"
-   *
-   * @param connection
-   *   The database connection
-   * @param tableName
-   *   The table name
-   * @param schemaName
-   *   The schema/database name
-   * @param config
-   *   The OceanBase configuration
-   * @return
-   *   Map of column name (uppercase) to column type
-   */
+  /** Get actual column type names from database system catalogs. Returns
+    * COLUMN_TYPE which includes full type definition like "ARRAY(INT)",
+    * "VECTOR(3)"
+    *
+    * @param connection
+    *   The database connection
+    * @param tableName
+    *   The table name
+    * @param schemaName
+    *   The schema/database name
+    * @param config
+    *   The OceanBase configuration
+    * @return
+    *   Map of column name (uppercase) to column type
+    */
   def getActualColumnTypes(
       connection: Connection,
       tableName: String,
       schemaName: String,
-      config: OceanBaseConfig): Map[String, String]
+      config: OceanBaseConfig
+  ): Map[String, String]
 }
 
 case class PriKeyColumnInfo(
@@ -471,6 +597,7 @@ case class PriKeyColumnInfo(
     columnType: String,
     columnKey: String,
     dataType: String,
-    extra: String)
+    extra: String
+)
 
 case class JdbcType(databaseTypeDefinition: String, jdbcNullType: Int)

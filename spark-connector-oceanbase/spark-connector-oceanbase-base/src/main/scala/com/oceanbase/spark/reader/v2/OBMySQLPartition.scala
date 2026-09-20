@@ -84,7 +84,8 @@ object OBMySQLPartition extends Logging {
                 connection,
                 config,
                 EMPTY_STRING,
-                finalIntPriKey.columnName)
+                finalIntPriKey.columnName,
+                dialect)
               val priKeyDepth = info.max - info.min
               // Check the uniformity of the integer primary key value distribution. TODO：Refine logic of Check the uniformity
               if ((priKeyDepth >= info.count * 2) || (priKeyDepth * 2 <= info.count)) {
@@ -97,12 +98,18 @@ object OBMySQLPartition extends Logging {
                 whereEvenlySizedPartitionWay(
                   connection,
                   config,
+                  dialect,
                   obPartInfos,
                   finalIntPriKey.columnName)
               }
             }
           } else { // non-primary key table
-            whereEvenlySizedPartitionWay(connection, config, obPartInfos, HIDDEN_PK_INCREMENT)
+            whereEvenlySizedPartitionWay(
+              connection,
+              config,
+              dialect,
+              obPartInfos,
+              HIDDEN_PK_INCREMENT)
           }
         }
     }
@@ -124,14 +131,15 @@ object OBMySQLPartition extends Logging {
   private def whereEvenlySizedPartitionWay(
       connection: Connection,
       config: OceanBaseConfig,
+      dialect: OceanBaseDialect,
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String) = {
     if (obPartInfos.length == 1 && Objects.isNull(obPartInfos(0).partName)) {
       // For non-partition table
-      computeWherePartInfoForNonPartTable(connection, config, priKeyColumnName)
+      computeWherePartInfoForNonPartTable(connection, config, dialect, priKeyColumnName)
     } else {
       // For partition table
-      computeWherePartInfoForPartTable(connection, config, obPartInfos, priKeyColumnName)
+      computeWherePartInfoForPartTable(connection, config, dialect, obPartInfos, priKeyColumnName)
     }
   }
 
@@ -291,6 +299,7 @@ object OBMySQLPartition extends Logging {
   private def computeWherePartInfoForPartTable(
       connection: Connection,
       config: OceanBaseConfig,
+      dialect: OceanBaseDialect,
       obPartInfos: Array[OBPartInfo],
       priKeyColumnName: String): Array[InputPartition] = {
     val arr = new ArrayBuffer[OBMySQLPartition]()
@@ -301,9 +310,9 @@ object OBMySQLPartition extends Logging {
           case _ => PARTITION_QUERY_FORMAT.format(obPartInfo.subPartName)
         }
         val keyTableInfo =
-          obtainIntPriKeyTableInfo(connection, config, partitionName, priKeyColumnName)
+          obtainIntPriKeyTableInfo(connection, config, partitionName, priKeyColumnName, dialect)
         val partitions =
-          computeWhereSparkPart(keyTableInfo, partitionName, priKeyColumnName, config)
+          computeWhereSparkPart(keyTableInfo, partitionName, priKeyColumnName, config, dialect)
         arr ++= partitions
       })
     arr.zipWithIndex.map {
@@ -333,7 +342,8 @@ object OBMySQLPartition extends Logging {
       keyTableInfo: IntPriKeyTableInfo,
       partitionClause: String,
       priKeyColumnName: String,
-      config: OceanBaseConfig): Array[OBMySQLPartition] = {
+      config: OceanBaseConfig,
+      dialect: OceanBaseDialect): Array[OBMySQLPartition] = {
     // Return empty array if table has no rows
     if (keyTableInfo.count <= 0) {
       return Array.empty[OBMySQLPartition]
@@ -352,13 +362,14 @@ object OBMySQLPartition extends Logging {
     var useHiddenPKColumn = false
     if (priKeyColumnName.equals(HIDDEN_PK_INCREMENT))
       useHiddenPKColumn = true
+    val quotedPriKey = dialect.quoteIdentifier(priKeyColumnName)
     (0 until numPartitions).map {
       i =>
         val lower = keyTableInfo.min + i * step
         val upper =
           if (i == numPartitions - 1) keyTableInfo.max + 1
           else lower + step // Ensure upper bound includes max value for last partition
-        val whereClause = s"($priKeyColumnName >= $lower AND $priKeyColumnName < $upper)"
+        val whereClause = s"($quotedPriKey >= $lower AND $quotedPriKey < $upper)"
         OBMySQLPartition(
           partitionClause = partitionClause,
           limitOffsetClause = EMPTY_STRING,
@@ -371,11 +382,12 @@ object OBMySQLPartition extends Logging {
   private def computeWherePartInfoForNonPartTable(
       connection: Connection,
       config: OceanBaseConfig,
+      dialect: OceanBaseDialect,
       priKeyColumnName: String): Array[InputPartition] = {
     val priKeyColumnInfo =
-      obtainIntPriKeyTableInfo(connection, config, EMPTY_STRING, priKeyColumnName)
+      obtainIntPriKeyTableInfo(connection, config, EMPTY_STRING, priKeyColumnName, dialect)
     if (priKeyColumnInfo.count <= 0) Array.empty
-    computeWhereSparkPart(priKeyColumnInfo, EMPTY_STRING, priKeyColumnName, config)
+    computeWhereSparkPart(priKeyColumnInfo, EMPTY_STRING, priKeyColumnName, config, dialect)
       .asInstanceOf[Array[InputPartition]]
   }
 
@@ -383,7 +395,8 @@ object OBMySQLPartition extends Logging {
       connection: Connection,
       config: OceanBaseConfig,
       partName: String,
-      priKeyColumnName: String) = {
+      priKeyColumnName: String,
+      dialect: OceanBaseDialect) = {
     val statement = connection.createStatement()
     val tableName = config.getDbTable
     val useHiddenPKColHint =
@@ -392,11 +405,12 @@ object OBMySQLPartition extends Logging {
       else EMPTY_STRING
     val hint =
       s"/*+ PARALLEL(${config.getJdbcStatsParallelHintDegree}) $useHiddenPKColHint ${queryTimeoutHint(config)} */"
+    val quotedPriKey = dialect.quoteIdentifier(priKeyColumnName)
 
     val sql =
       s"""
               SELECT $hint
-                count(1) AS cnt, min($priKeyColumnName), max($priKeyColumnName)
+                count(1) AS cnt, min($quotedPriKey), max($quotedPriKey)
               FROM $tableName $partName
              """
     try {
