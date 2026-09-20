@@ -52,24 +52,28 @@ class OBKVHBaseE2eITCase extends SparkContainerTestEnvironment {
   )
   def testInsertValues(): Unit = {
     val sqlLines: util.List[String] = new util.ArrayList[String]
-    sqlLines.add(s"""
-                    |CREATE TEMPORARY VIEW test_sink
-                    |USING `obkv-hbase`
-                    |OPTIONS(
-                    |  "url" = "${getSysParameter("obconfig_url")}",
-                    |  "sys.username"= "$getSysUsername",
-                    |  "sys.password" = "$getSysPassword",
-                    |  "schema-name"="$getSchemaName",
-                    |  "table-name"="htable",
-                    |  "username"="$getUsername#$getClusterName",
-                    |  "password"="$getPassword",
-                    |  "schema"="${OBKVHBaseE2eITCase.schemaWithSingleQuotes}"
-                    |);
-                    |""".stripMargin)
-    sqlLines.add("""
-                   |INSERT INTO test_sink VALUES
-                   |('16891', '40 Ellis St.', '674-555-0110', 'John Jackson', 121.11);
-                   |""".stripMargin)
+    sqlLines.add(
+      s"""
+         |CREATE TEMPORARY VIEW test_sink (
+         |  rowkey STRING,
+         |  family1 STRUCT<address: STRING, phone: STRING, personalName: STRING, personalPhone: DOUBLE>
+         |)
+         |USING `obkv-hbase`
+         |OPTIONS(
+         |  "url" = "${getSysParameter("obconfig_url")}",
+         |  "sys.username"= "$getSysUsername",
+         |  "sys.password" = "$getSysPassword",
+         |  "schema-name"="$getSchemaName",
+         |  "table-name"="htable",
+         |  "username"="$getUsername#$getClusterName",
+         |  "password"="$getPassword"
+         |);
+         |""".stripMargin)
+    sqlLines.add(
+      """
+        |INSERT INTO test_sink VALUES
+        |('16891', named_struct('address', '40 Ellis St.', 'phone', '674-555-0110', 'personalName', 'John Jackson', 'personalPhone', 121.11));
+        |""".stripMargin)
     submitSQLJob(sqlLines, getResource(SINK_CONNECTOR_NAME))
 
     import scala.collection.JavaConverters._
@@ -95,38 +99,31 @@ class OBKVHBaseE2eITCase extends SparkContainerTestEnvironment {
     val sqlLines: util.List[String] = new util.ArrayList[String]
     sqlLines.add(
       s"""
-         |  val schema: String =
-         |    \"\"\"
-         |      |{
-         |      |    "rowkey": {"cf": "rowkey","col": "rowkey","type": "string"},
-         |      |    "address": {"cf": "family1","col": "officeAddress","type": "string"},
-         |      |    "phone": {"cf": "family1","col": "officePhone","type": "string"},
-         |      |    "personalName": {"cf": "family1","col": "personalName","type": "string"},
-         |      |    "personalPhone": {"cf": "family1","col": "personalPhone","type": "double"}
-         |      |}
-         |      |\"\"\".stripMargin
-         |    case class ContactRecord(
-         |                              rowkey: String,
-         |                              officeAddress: String,
-         |                              officePhone: String,
-         |                              personalName: String,
-         |                              personalPhone: Double
-         |                            )
-         |    val newContact =
-         |      ContactRecord("16891", "40 Ellis St.", "674-555-0110", "John Jackson", 121.11)
-         |    val newData = Seq(newContact)
-         |    val df = spark.createDataFrame(newData).toDF()
-         |    df.write
-         |      .format("obkv-hbase")
-         |      .option("url", "${getSysParameter("obconfig_url")}")
-         |      .option("sys.username", "$getSysUsername")
-         |      .option("sys.password", "$getSysPassword")
-         |      .option("username", "$getUsername#$getClusterName")
-         |      .option("password", "$getPassword")
-         |      .option("table-name", "htable")
-         |      .option("schema-name", "$getSchemaName")
-         |      .option("schema", schema)
-         |      .save()
+         |  import org.apache.spark.sql.types._
+         |  val schema = StructType(Seq(
+         |    StructField("rowkey", StringType),
+         |    StructField("family1", StructType(Seq(
+         |      StructField("address", StringType),
+         |      StructField("phone", StringType),
+         |      StructField("personalName", StringType),
+         |      StructField("personalPhone", DoubleType)
+         |    )))
+         |  ))
+         |  case class Family1(address: String, phone: String, personalName: String, personalPhone: Double)
+         |  case class ContactRecord(rowkey: String, family1: Family1)
+         |  val newContact = ContactRecord("16891", Family1("40 Ellis St.", "674-555-0110", "John Jackson", 121.11))
+         |  val newData = Seq(newContact)
+         |  val df = spark.createDataFrame(newData)
+         |  df.write
+         |    .format("obkv-hbase")
+         |    .option("url", "${getSysParameter("obconfig_url")}")
+         |    .option("sys.username", "$getSysUsername")
+         |    .option("sys.password", "$getSysPassword")
+         |    .option("username", "$getUsername#$getClusterName")
+         |    .option("password", "$getPassword")
+         |    .option("table-name", "htable")
+         |    .option("schema-name", "$getSchemaName")
+         |    .save()
          |""".stripMargin)
 
     submitSparkShellJob(sqlLines, getResource(SINK_CONNECTOR_NAME))
@@ -196,14 +193,4 @@ object OBKVHBaseE2eITCase extends SparkContainerTestEnvironment {
       .foreach(_.stop())
   }
 
-  val schemaWithSingleQuotes: String =
-    """
-      |{
-      |    'rowkey': {'cf': 'rowkey','col': 'rowkey','type': 'string'},
-      |    'address': {'cf': 'family1','col': 'address','type': 'string'},
-      |    'phone': {'cf': 'family1','col': 'phone','type': 'string'},
-      |    'personalName': {'cf': 'family1','col': 'personalName','type': 'string'},
-      |    'personalPhone': {'cf': 'family1','col': 'personalPhone','type': 'double'}
-      |}
-      |""".stripMargin
 }

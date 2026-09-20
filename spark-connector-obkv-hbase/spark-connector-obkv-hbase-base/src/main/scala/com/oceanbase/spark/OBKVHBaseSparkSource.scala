@@ -23,6 +23,7 @@ import org.apache.spark.sql.types._
 class OBKVHBaseSparkSource
   extends DataSourceRegister
   with RelationProvider
+  with SchemaRelationProvider
   with CreatableRelationProvider {
 
   override def shortName(): String = "obkv-hbase"
@@ -30,7 +31,16 @@ class OBKVHBaseSparkSource
   override def createRelation(
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
-    HBaseRelation(parameters, None)(sqlContext)
+    throw new UnsupportedOperationException(
+      "OBKV-HBase connector requires a user-specified schema. " +
+        "Please use CREATE TEMPORARY VIEW with schema definition.")
+  }
+
+  override def createRelation(
+      sqlContext: SQLContext,
+      parameters: Map[String, String],
+      schema: StructType): BaseRelation = {
+    HBaseRelation(parameters, Some(schema))(sqlContext)
   }
 
   override def createRelation(

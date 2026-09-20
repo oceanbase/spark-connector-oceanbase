@@ -20,7 +20,7 @@ import com.oceanbase.spark.directload.{DirectLoader, DirectLoadUtils}
 
 import com.alipay.oceanbase.rpc.direct_load.ObDirectLoadBucket
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj
-import org.apache.commons.lang.StringUtils
+import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.{DataFrame, Row}
 
 import java.util.Objects

@@ -23,6 +23,7 @@ import com.oceanbase.spark.utils.OBJdbcUtils
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.connector.read.InputPartition
 
+import java.math.RoundingMode
 import java.sql.Connection
 import java.util.Objects
 
@@ -226,7 +227,10 @@ object OBOraclePartition extends Logging {
     }.toArray
   }
 
-  private case class IntPriKeyTableInfo(count: Long, min: Long, max: Long)
+  private case class IntPriKeyTableInfo(
+      count: Long,
+      min: java.math.BigDecimal,
+      max: java.math.BigDecimal)
 
   private def obtainIntPriKeyTableInfo(
       connection: Connection,
@@ -251,8 +255,15 @@ object OBOraclePartition extends Logging {
         .format(normalizePkNameForSql(priKeyColumnName), normalizePkNameForSql(priKeyColumnName))
     try {
       val rs = statement.executeQuery(sql)
-      if (rs.next()) IntPriKeyTableInfo(rs.getLong(1), rs.getLong(2), rs.getLong(3))
-      else throw new RuntimeException(s"Failed to obtain count of $tableName.")
+      if (rs.next()) {
+        val minBd = Option(rs.getBigDecimal(2))
+          .map(_.setScale(0, RoundingMode.FLOOR))
+          .getOrElse(java.math.BigDecimal.ZERO)
+        val maxBd = Option(rs.getBigDecimal(3))
+          .map(_.setScale(0, RoundingMode.CEILING))
+          .getOrElse(java.math.BigDecimal.ZERO)
+        IntPriKeyTableInfo(rs.getLong(1), minBd, maxBd)
+      } else throw new RuntimeException(s"Failed to obtain count of $tableName.")
     } finally {
       statement.close()
     }
@@ -269,15 +280,24 @@ object OBOraclePartition extends Logging {
       config.getJdbcMaxRecordsPrePartition.orElse(calPartitionSize(keyTableInfo.count))
     val numPartitions =
       Math.ceil(keyTableInfo.count.toDouble / desiredRowsPerPartition).toInt.max(1)
-    val idRange = keyTableInfo.max - keyTableInfo.min
-    val step = (idRange + numPartitions - 1) / numPartitions
+    val numPartBd = java.math.BigDecimal.valueOf(numPartitions.toLong)
+    val idRange = keyTableInfo.max.subtract(keyTableInfo.min)
+    val step = idRange
+      .add(numPartBd)
+      .subtract(java.math.BigDecimal.ONE)
+      .divide(numPartBd, 0, RoundingMode.FLOOR)
     val useHidden = priKeyColumnName.replace("\"", "") == HIDDEN_PK_INCREMENT
 
     (0 until numPartitions).map {
       i =>
-        val lower = keyTableInfo.min + i * step
-        val upper = if (i == numPartitions - 1) keyTableInfo.max + 1 else lower + step
-        val whereClause = s"($priKeyColumnName >= $lower AND $priKeyColumnName < $upper)"
+        val iBd = java.math.BigDecimal.valueOf(i.toLong)
+        val lower = keyTableInfo.min.add(step.multiply(iBd))
+        val upper =
+          if (i == numPartitions - 1) keyTableInfo.max.add(java.math.BigDecimal.ONE)
+          else lower.add(step)
+        val lowerStr = lower.toPlainString
+        val upperStr = upper.toPlainString
+        val whereClause = s"($priKeyColumnName >= $lowerStr AND $priKeyColumnName < $upperStr)"
         OBOraclePartition(
           partitionClause = partitionClause,
           limitOffsetClause = EMPTY_STRING,

@@ -57,3 +57,6 @@ build/
 LocalTest.scala
 set-test-env.sh
 *.db
+
+### Claude Code ###
+claude.md

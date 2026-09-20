@@ -96,6 +96,7 @@ class JDBCWriter(schema: StructType, config: OceanBaseConfig, dialect: OceanBase
       }
     } catch {
       case ex: SQLException =>
+        logError(s"Failed to execute batch with sql: $sql", ex)
         throw new RuntimeException(s"Failed to execute batch with sql: $sql", ex)
     } finally {
       if (!config.getJdbcEnableAutoCommit && !committed) {
