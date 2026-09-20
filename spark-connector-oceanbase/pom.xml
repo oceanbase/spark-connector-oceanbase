@@ -50,4 +50,17 @@ under the License.
             <version>2.0.0</version>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- Spark 4.0 requires Java 17+, only include the module when the build JDK supports it -->
+        <profile>
+            <id>spark-4.0</id>
+            <activation>
+                <jdk>[17,)</jdk>
+            </activation>
+            <modules>
+                <module>spark-connector-oceanbase-4.0</module>
+            </modules>
+        </profile>
+    </profiles>
 </project>

@@ -1154,6 +1154,60 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
   }
 
   @Test
+  def testStringArrayTypesWriteAndRead(): Unit = {
+    val session = SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.sql.catalog.ob", OB_CATALOG_CLASS)
+      .config("spark.sql.catalog.ob.url", getJdbcUrl)
+      .config("spark.sql.catalog.ob.username", getUsername)
+      .config("spark.sql.catalog.ob.password", getPassword)
+      .config("spark.sql.catalog.ob.schema-name", getSchemaName)
+      .getOrCreate()
+
+    val conn = getJdbcConnection()
+    val stmt = conn.createStatement()
+    try {
+      stmt.execute("DROP TABLE IF EXISTS products_string_arrays")
+      stmt.execute(s"""
+                      |CREATE TABLE $getSchemaName.products_string_arrays
+                      |(
+                      |  id INTEGER NOT NULL PRIMARY KEY,
+                      |  interests ARRAY(VARCHAR(255))
+                      |)
+                      |""".stripMargin)
+
+      session.sql("use ob;")
+      session.sql(s"""
+                     |INSERT INTO $getSchemaName.products_string_arrays VALUES
+                     |(1, array('阅读', '摄影')),
+                     |(2, array('a\"b', 'x,y')),
+                     |(3, array(null, '换行\\n值'))
+                     |""".stripMargin)
+
+      import scala.collection.JavaConverters._
+      val actual = session
+        .sql(s"SELECT * FROM $getSchemaName.products_string_arrays ORDER BY id")
+        .collect()
+        .map(_.toString().drop(1).dropRight(1))
+        .toList
+        .asJava
+
+      val expected: util.List[String] = util.Arrays.asList(
+        "1,WrappedArray(阅读, 摄影)",
+        "2,WrappedArray(a\"b, x,y)",
+        "3,WrappedArray(null, 换行\\n值)"
+      )
+      assertEqualsInAnyOrder(expected, actual)
+    } finally {
+      session.stop()
+      stmt.execute("DROP TABLE IF EXISTS products_string_arrays")
+      stmt.close()
+      conn.close()
+    }
+  }
+
+  @Test
   def testJdbcQueryHints(): Unit = {
     val session = SparkSession
       .builder()
