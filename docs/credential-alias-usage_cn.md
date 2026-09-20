@@ -16,6 +16,7 @@
 - ✅ **向下兼容**: 支持明文密码，现有配置无需修改
 - ✅ **多环境支持**: 不同环境可使用不同的 credential provider
 - ✅ **标准化**: 遵循 Hadoop 生态系统的安全最佳实践
+- ✅ **集群模式支持**: Credential alias 在 Driver 端解析后再随连接配置发送到 Executor
 
 ## 支持的配置项
 
@@ -99,6 +100,9 @@ val spark = SparkSession.builder()
 spark.sql("USE ob")
 spark.sql("SELECT * FROM users").show()
 ```
+
+Credential Provider 必须在 Driver 初始化 OceanBase Catalog 或 Data Source 时可访问。Connector
+会在 Driver 端解析 alias，Executor 不需要直接访问本地 JCEKS 文件。
 
 ## 高级配置
 
@@ -207,4 +211,3 @@ IOException: Permission denied
 - 确保 Spark 进程有读取权限
 - 使用 `chmod 600` 设置正确权限
 - 检查目录权限：`ls -ld /path/to/`
-

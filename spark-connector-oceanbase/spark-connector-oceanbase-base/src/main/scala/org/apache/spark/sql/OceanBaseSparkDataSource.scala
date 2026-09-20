@@ -36,7 +36,10 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
     val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
-    val jdbcOptions = buildJDBCOptions(parameters, oceanBaseConfig)._1
+    oceanBaseConfig.resolvePasswordAlias()
+    val resolvedParameters =
+      parameters + (OceanBaseConfig.PASSWORD.getKey -> oceanBaseConfig.getPassword)
+    val jdbcOptions = buildJDBCOptions(resolvedParameters, oceanBaseConfig)._1
     val resolver = sqlContext.conf.resolver
     val timeZoneId = sqlContext.conf.sessionLocalTimeZone
     val schema = JDBCRelation.getSchema(resolver, jdbcOptions)
@@ -50,13 +53,16 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider {
       parameters: Map[String, String],
       dataFrame: DataFrame): BaseRelation = {
     val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
+    oceanBaseConfig.resolvePasswordAlias()
+    val resolvedParameters =
+      parameters + (OceanBaseConfig.PASSWORD.getKey -> oceanBaseConfig.getPassword)
     val enableDirectLoadWrite = oceanBaseConfig.getDirectLoadEnable
     if (!enableDirectLoadWrite) {
-      val param = buildJDBCOptions(parameters, oceanBaseConfig)._2
+      val param = buildJDBCOptions(resolvedParameters, oceanBaseConfig)._2
       super.createRelation(sqlContext, mode, param, dataFrame)
     } else {
       writeDataViaDirectLoad(mode, dataFrame, oceanBaseConfig)
-      createRelation(sqlContext, parameters)
+      createRelation(sqlContext, resolvedParameters)
     }
   }
 

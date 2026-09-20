@@ -27,6 +27,7 @@ import java.util.Optional;
 
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 
 public class OceanBaseConfig extends Config implements Serializable {
     public static final String EMPTY_STRING = "";
@@ -456,6 +457,38 @@ public class OceanBaseConfig extends Config implements Serializable {
             }
         }
         return password;
+    }
+
+    /**
+     * Resolves a Hadoop credential alias and replaces it with the resolved password.
+     *
+     * <p>This method must be called on the Spark driver before this configuration is serialized to
+     * executors. Executors do not have an active {@code SparkSession}, so resolving an alias lazily
+     * while an executor opens a JDBC connection would fail.
+     */
+    public void resolvePasswordAlias() {
+        String password = get(PASSWORD);
+        if (StringUtils.isNotBlank(password) && password.startsWith("alias:")) {
+            set(PASSWORD, getPassword());
+        }
+    }
+
+    /** Resolves a Hadoop credential alias with the supplied Hadoop configuration. */
+    public void resolvePasswordAlias(Configuration hadoopConf) {
+        String password = get(PASSWORD);
+        if (StringUtils.isNotBlank(password) && password.startsWith("alias:")) {
+            try {
+                set(
+                        PASSWORD,
+                        ConfigUtils.getCredentialFromAlias(password.substring(6), hadoopConf));
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        String.format(
+                                "Failed to get password from hadoop credential alias: %s",
+                                password),
+                        e);
+            }
+        }
     }
 
     public String getSchemaName() {

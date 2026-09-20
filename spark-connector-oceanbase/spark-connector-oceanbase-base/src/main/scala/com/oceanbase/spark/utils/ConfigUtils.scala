@@ -15,6 +15,7 @@
  */
 
 package com.oceanbase.spark.utils
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.security.alias.CredentialProviderFactory
 import org.apache.spark.sql.SparkSession
 
@@ -36,11 +37,14 @@ object ConfigUtils {
   }
 
   def getCredentialFromAlias(alias: String): String = {
+    getCredentialFromAlias(alias, SparkSession.active.sparkContext.hadoopConfiguration)
+  }
+
+  def getCredentialFromAlias(alias: String, hadoopConf: Configuration): String = {
     if (credentialCache.contains(alias)) {
       return credentialCache(alias)
     }
-    val providers =
-      CredentialProviderFactory.getProviders(SparkSession.active.sparkContext.hadoopConfiguration)
+    val providers = CredentialProviderFactory.getProviders(hadoopConf)
     if (providers == null || providers.isEmpty) {
       throw new RuntimeException("No credential provider is configured or loaded.")
     }

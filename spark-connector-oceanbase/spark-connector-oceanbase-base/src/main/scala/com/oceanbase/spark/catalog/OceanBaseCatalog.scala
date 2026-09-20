@@ -54,6 +54,9 @@ class OceanBaseCatalog
     assert(catalogName.isEmpty, "The OceanBase catalog is already initialed")
     catalogName = Some(name)
     config = new OceanBaseConfig(options)
+    // Resolve credential aliases on the driver. The resolved config is copied into table scans and
+    // writes, whose JDBC connections are opened on executors without an active SparkSession.
+    config.resolvePasswordAlias()
 
     // Register dialect for mysql and oracle modes.
     OBJdbcUtils.getCompatibleMode(this.config).map(_.toLowerCase) match {
