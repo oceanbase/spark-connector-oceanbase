@@ -162,7 +162,7 @@ object OBJdbcUtils {
     val elements = (0 until array.numElements()).map {
       i =>
         if (array.isNullAt(i)) {
-          "NULL"
+          "null"
         } else {
           elementType match {
             case IntegerType => array.getInt(i).toString
@@ -172,7 +172,7 @@ object OBJdbcUtils {
             case FloatType => array.getFloat(i).toString
             case DoubleType => array.getDouble(i).toString
             case BooleanType => array.getBoolean(i).toString
-            case StringType => s"'${array.getUTF8String(i).toString}'"
+            case StringType => toJsonStringLiteral(array.getUTF8String(i).toString)
             case ArrayType(innerElementType, _) =>
               // Recursively convert nested array
               val innerArray = array.getArray(i)
@@ -182,6 +182,25 @@ object OBJdbcUtils {
         }
     }
     "[" + elements.mkString(", ") + "]"
+  }
+
+  /**
+   * Escape a Spark string element as a JSON string literal before sending ARRAY(VARCHAR) values to
+   * OceanBase. OceanBase parses string arrays from their textual representation, so quotes and
+   * control characters must be escaped instead of being concatenated verbatim.
+   */
+  private def toJsonStringLiteral(value: String): String = {
+    "\"" + value.flatMap {
+      case '"' => "\\\""
+      case '\\' => "\\\\"
+      case '\b' => "\\b"
+      case '\f' => "\\f"
+      case '\n' => "\\n"
+      case '\r' => "\\r"
+      case '\t' => "\\t"
+      case c if c < ' ' => f"\\u${c.toInt}%04x"
+      case c => c.toString
+    } + "\""
   }
 
   /** Convert MapData to OceanBase MAP string format. For example: {1:10, 2:20} for MAP(INT, INT) */

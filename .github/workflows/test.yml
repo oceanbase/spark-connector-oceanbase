@@ -9,6 +9,10 @@ on:
       maven_opts:
         required: false
         type: string
+      java_version:
+        required: false
+        type: string
+        default: '8'
 
 jobs:
   test:
@@ -31,7 +35,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: '${{ inputs.java_version }}'
           distribution: 'zulu'
           cache: 'maven'
 
