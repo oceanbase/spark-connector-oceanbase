@@ -179,6 +179,25 @@ case class OBJdbcBatchScan(
   override def filter(filters: Array[Filter]): Unit = {
     runtimeFilters = filters
   }
+
+  override def description(): String = {
+    val (aggString, groupByString) = if (pushedGroupBys.nonEmpty) {
+      val groupByColumnsLength = pushedGroupBys.get.length
+      (
+        seqToString(requiredColumns.drop(groupByColumnsLength)),
+        seqToString(requiredColumns.take(groupByColumnsLength)))
+    } else {
+      ("[]", "[]")
+    }
+    super.description() + ", requiredColumns: " + seqToString(requiredColumns) +
+      ", PushedFilters: " + seqToString(pushedFilter) +
+      ", PushedLimit: " + pushDownLimit +
+      ", PushedTopN: " + seqToString(pushDownTopNSortOrders) +
+      ", PushedAggregates: " + aggString +
+      ", PushedGroupBy: " + groupByString
+  }
+
+  private def seqToString(seq: Seq[Any]): String = seq.mkString("[", ", ", "]")
 }
 
 class OBJdbcBatch(
