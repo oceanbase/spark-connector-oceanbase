@@ -48,6 +48,16 @@ CREATE TABLE products_no_int_pri_key
   primary key(id, name)
 );
 
+-- Table for testing a reserved-word column (`usage`) used as the read partition column.
+CREATE TABLE products_reserved_word_pri_key
+(
+  id          VARCHAR(255) NOT NULL ,
+  `usage`     VARCHAR(255) NOT NULL,
+  description VARCHAR(512),
+  weight      DECIMAL(20, 10),
+  primary key(id, `usage`)
+);
+
 CREATE TABLE products_unique_key
 (
   id          INTEGER ,

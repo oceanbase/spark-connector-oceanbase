@@ -20,6 +20,7 @@ import com.oceanbase.spark.catalog.OceanBaseCatalog.{extractDatabaseName, resolv
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.dialect.{OceanBaseDialect, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import com.oceanbase.spark.utils.OBJdbcUtils
+import com.oceanbase.spark.utils.OceanBaseConnectionProvider
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.SQLConfHelper
@@ -54,6 +55,9 @@ class OceanBaseCatalog
     assert(catalogName.isEmpty, "The OceanBase catalog is already initialed")
     catalogName = Some(name)
     config = new OceanBaseConfig(options)
+    // Resolve credential aliases on the driver. The resolved config is copied into table scans and
+    // writes, whose JDBC connections are opened on executors without an active SparkSession.
+    config.resolvePasswordAlias()
 
     // Register dialect for mysql and oracle modes.
     OBJdbcUtils.getCompatibleMode(this.config).map(_.toLowerCase) match {
@@ -351,7 +355,7 @@ object OceanBaseCatalog {
   def extractDatabaseName(jdbcUrl: String): Option[String] = {
     val pattern = "(?i)^jdbc:(mysql|oceanbase)://[^/]+/([^?]+).*".r
 
-    jdbcUrl match {
+    OceanBaseConnectionProvider.parseJdbcUrls(jdbcUrl).headOption.getOrElse(jdbcUrl) match {
       case pattern(_, databaseName) => Some(databaseName)
       case _ => None
     }

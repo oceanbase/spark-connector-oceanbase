@@ -27,6 +27,7 @@ import java.util.Optional;
 
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 
 public class OceanBaseConfig extends Config implements Serializable {
     public static final String EMPTY_STRING = "";
@@ -234,6 +235,30 @@ public class OceanBaseConfig extends Config implements Serializable {
                     .intConf()
                     .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
                     .createWithDefault(1024);
+
+    public static final ConfigEntry<Integer> JDBC_CONNECTION_MAX_RETRIES =
+            new ConfigBuilder("jdbc.connection.max-retries")
+                    .doc(
+                            "Maximum number of attempts when opening a JDBC connection, including the initial attempt.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .intConf()
+                    .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+                    .createWithDefault(3);
+
+    public static final ConfigEntry<Duration> JDBC_CONNECTION_RETRY_INTERVAL =
+            new ConfigBuilder("jdbc.connection.retry-interval")
+                    .doc("Initial retry interval when opening a JDBC connection.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .durationConf()
+                    .createWithDefault(Duration.ofSeconds(1));
+
+    public static final ConfigEntry<Duration> JDBC_CONNECTION_FAILED_URL_COOLDOWN =
+            new ConfigBuilder("jdbc.connection.failed-url-cooldown")
+                    .doc(
+                            "Cooldown before a JDBC URL that failed to connect is treated as healthy again.")
+                    .version(ConfigConstants.VERSION_1_4_0)
+                    .durationConf()
+                    .createWithDefault(Duration.ofSeconds(60));
 
     public static final ConfigEntry<Boolean> JDBC_ENABLE_AUTOCOMMIT =
             new ConfigBuilder("jdbc.enable-autocommit")
@@ -458,6 +483,38 @@ public class OceanBaseConfig extends Config implements Serializable {
         return password;
     }
 
+    /**
+     * Resolves a Hadoop credential alias and replaces it with the resolved password.
+     *
+     * <p>This method must be called on the Spark driver before this configuration is serialized to
+     * executors. Executors do not have an active {@code SparkSession}, so resolving an alias lazily
+     * while an executor opens a JDBC connection would fail.
+     */
+    public void resolvePasswordAlias() {
+        String password = get(PASSWORD);
+        if (StringUtils.isNotBlank(password) && password.startsWith("alias:")) {
+            set(PASSWORD, getPassword());
+        }
+    }
+
+    /** Resolves a Hadoop credential alias with the supplied Hadoop configuration. */
+    public void resolvePasswordAlias(Configuration hadoopConf) {
+        String password = get(PASSWORD);
+        if (StringUtils.isNotBlank(password) && password.startsWith("alias:")) {
+            try {
+                set(
+                        PASSWORD,
+                        ConfigUtils.getCredentialFromAlias(password.substring(6), hadoopConf));
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        String.format(
+                                "Failed to get password from hadoop credential alias: %s",
+                                password),
+                        e);
+            }
+        }
+    }
+
     public String getSchemaName() {
         return get(SCHEMA_NAME);
     }
@@ -540,6 +597,18 @@ public class OceanBaseConfig extends Config implements Serializable {
 
     public Integer getJdbcBatchSize() {
         return get(JDBC_BATCH_SIZE);
+    }
+
+    public Integer getJdbcConnectionMaxRetries() {
+        return get(JDBC_CONNECTION_MAX_RETRIES);
+    }
+
+    public long getJdbcConnectionRetryIntervalMillis() {
+        return get(JDBC_CONNECTION_RETRY_INTERVAL).toMillis();
+    }
+
+    public long getJdbcConnectionFailedUrlCooldownMillis() {
+        return get(JDBC_CONNECTION_FAILED_URL_COOLDOWN).toMillis();
     }
 
     public Boolean getJdbcEnableAutoCommit() {

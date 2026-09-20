@@ -151,6 +151,31 @@ class OceanBaseCatalogE2eITCase extends SparkContainerTestEnvironment {
     matches = "^2\\.4\\.[0-9]$",
     disabledReason = "Catalog is only supported starting from Spark3."
   )
+  def testReadWithMultipleJdbcUrls(): Unit = {
+    val sqlLines: util.List[String] = new util.ArrayList[String]
+    sqlLines.add(
+      s"""
+         |set spark.sql.catalog.ob=com.oceanbase.spark.catalog.OceanBaseCatalog;
+         |set spark.sql.catalog.ob.url=$getUnavailableJdbcUrlInContainer,$getJdbcUrlInContainer;
+         |set spark.sql.catalog.ob.username=$getUsername;
+         |set spark.sql.catalog.ob.password=$getPassword;
+         |set `spark.sql.catalog.ob.schema-name`=$getSchemaName;
+         |set `spark.sql.catalog.ob.jdbc.connection.max-retries`=1;
+         |set `spark.sql.catalog.ob.jdbc.connection.retry-interval`=PT0S;
+         |set `spark.sql.catalog.ob.jdbc.connection.failed-url-cooldown`=PT1S;
+         |set spark.sql.defaultCatalog=ob;
+         |""".stripMargin)
+    sqlLines.add(s"select id, name from $getSchemaName.products where id = 101;")
+
+    submitSQLJob(sqlLines, getResource(SINK_CONNECTOR_NAME), getResource(MYSQL_CONNECTOR_JAVA))
+  }
+
+  @Test
+  @DisabledIfSystemProperty(
+    named = "spark_version",
+    matches = "^2\\.4\\.[0-9]$",
+    disabledReason = "Catalog is only supported starting from Spark3."
+  )
   def testCatalogOp(): Unit = {
     val sqlLines: util.List[String] = new util.ArrayList[String]
     sqlLines.add(s"""
@@ -175,6 +200,9 @@ class OceanBaseCatalogE2eITCase extends SparkContainerTestEnvironment {
       }
     })
   }
+
+  private def getUnavailableJdbcUrlInContainer: String =
+    s"jdbc:mysql://127.0.0.1:1/$getSchemaName?useUnicode=true&characterEncoding=UTF-8&useSSL=false"
 }
 
 object OceanBaseCatalogE2eITCase extends SparkContainerTestEnvironment {
