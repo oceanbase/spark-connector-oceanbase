@@ -38,7 +38,10 @@ class OceanBaseSparkDataSource extends JdbcRelationProvider with SchemaRelationP
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
     val oceanBaseConfig = new OceanBaseConfig(parameters.asJava)
-    val jdbcOptions = buildJDBCOptions(parameters, oceanBaseConfig)._1
+    oceanBaseConfig.resolvePasswordAlias()
+    val resolvedParameters =
+      parameters + (OceanBaseConfig.PASSWORD.getKey -> oceanBaseConfig.getPassword)
+    val jdbcOptions = buildJDBCOptions(resolvedParameters, oceanBaseConfig)._1
     val resolver = sqlContext.conf.resolver
     val timeZoneId = sqlContext.conf.sessionLocalTimeZone
     val schema = JDBCRelation.getSchema(resolver, jdbcOptions)

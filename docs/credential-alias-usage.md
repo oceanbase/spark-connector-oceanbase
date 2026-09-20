@@ -16,6 +16,7 @@ To improve configuration security, OceanBase Spark Connector now supports using 
 - ✅ **Backward Compatible**: Supports plain text passwords, existing configurations require no modification
 - ✅ **Multi-Environment Support**: Different environments can use different credential providers
 - ✅ **Standardized**: Follows Hadoop ecosystem security best practices
+- ✅ **Cluster mode support**: Resolves credential aliases on the driver before sending connection configuration to executors
 
 ## Supported Configuration Items
 
@@ -97,6 +98,10 @@ val spark = SparkSession.builder()
 spark.sql("USE ob")
 spark.sql("SELECT * FROM users").show()
 ```
+
+The Credential Provider must be accessible when the driver initializes the OceanBase Catalog or
+Data Source. The connector resolves the alias on the driver, so executors do not need direct access
+to a local JCEKS file.
 
 ## Advanced Configuration
 
