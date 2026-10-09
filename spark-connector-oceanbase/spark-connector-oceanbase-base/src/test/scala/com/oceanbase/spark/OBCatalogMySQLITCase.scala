@@ -1182,11 +1182,13 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
                       |""".stripMargin)
 
       session.sql("use ob;")
+      // The s-interpolator consumes one escape layer. Four backslashes are required here so
+      // Spark receives a literal `\n` and the test exercises backslash preservation.
       session.sql(s"""
                      |INSERT INTO $getSchemaName.products_string_arrays VALUES
                      |(1, array('阅读', '摄影')),
                      |(2, array('a\"b', 'x,y')),
-                     |(3, array(null, '换行\\n值'))
+                     |(3, array(null, '换行\\\\n值'))
                      |""".stripMargin)
 
       import scala.collection.JavaConverters._
