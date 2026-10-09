@@ -57,17 +57,7 @@ case class OceanBaseTable(
 
   override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
     if (config.getObkvEnabled) {
-      // In Catalog mode, retrieve primary key info via JDBC
-      // Note: getPriKeyInfo returns quoted column names (e.g. `id`),
-      // but OBKV operations need unquoted names to match Spark schema fields.
-      val primaryKeys = OBJdbcUtils.withConnection(config) {
-        conn =>
-          dialect
-            .getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
-            .map(pk => dialect.unQuoteIdentifier(pk.columnName))
-            .toArray
-      }
-      OBKVScanBuilder(schema, config, primaryKeys)
+      OBKVScanBuilder(schema, config, resolvePrimaryKeys())
     } else {
       val mergedOptions = new JDBCOptions(
         config.getProperties.asScala.toMap ++ options.asCaseSensitiveMap().asScala)
@@ -84,18 +74,26 @@ case class OceanBaseTable(
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     if (config.getObkvEnabled) {
-      val primaryKeys = OBJdbcUtils.withConnection(config) {
-        conn =>
-          dialect
-            .getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
-            .map(pk => dialect.unQuoteIdentifier(pk.columnName))
-            .toArray
-      }
-      new OBKVWriteBuilder(schema, config, primaryKeys)
+      new OBKVWriteBuilder(schema, config, resolvePrimaryKeys())
     } else if (config.getDirectLoadEnable) {
       DirectLoadWriteBuilderV2(schema, config)
     } else {
       new JDBCWriteBuilder(schema, config, dialect)
+    }
+  }
+
+  /**
+   * Resolves the table's primary key columns via JDBC for OBKV operations. Note: getPriKeyInfo
+   * returns quoted column names (e.g. `id`), but OBKV operations need unquoted names to match Spark
+   * schema fields.
+   */
+  private def resolvePrimaryKeys(): Array[String] = {
+    OBJdbcUtils.withConnection(config) {
+      conn =>
+        dialect
+          .getPriKeyInfo(conn, config.getSchemaName, config.getTableName, config)
+          .map(pk => dialect.unQuoteIdentifier(pk.columnName))
+          .toArray
     }
   }
 

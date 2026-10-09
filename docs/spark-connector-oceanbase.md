@@ -4,10 +4,10 @@ English | [简体中文](spark-connector-oceanbase_cn.md)
 
 Spark OceanBase Connector can support reading data stored in OceanBase through Spark, and also supports writing data to OceanBase through Spark.
 
-|           | Read |      Write       |
-|-----------|------|------------------|
-| DataFrame | JDBC | JDBC、Direct Load |
-| SQL       | JDBC | JDBC、Direct Load |
+|           |   Read    |         Write         |
+|-----------|-----------|-----------------------|
+| DataFrame | JDBC、OBKV | JDBC、Direct Load、OBKV |
+| SQL       | JDBC、OBKV | JDBC、Direct Load、OBKV |
 
 ## Version compatibility
 
@@ -34,6 +34,30 @@ Spark OceanBase Connector can support reading data stored in OceanBase through S
                 </td>
                 <td>8</td>
                 <td>2.12</td>
+            </tr>
+            <tr>
+                <td>1.5</td>
+                <td style="word-wrap: break-word;">2.4, 3.1 ~ 3.5</td>
+                <td>
+                  <ul>
+                    <li>JDBC/OBKV: 3.x, 4.x</li>
+                    <li>Direct Load: 4.2.x or later versions</li>
+                  </ul>
+                </td>
+                <td>8</td>
+                <td>2.12</td>
+            </tr>
+            <tr>
+                <td>1.5</td>
+                <td style="word-wrap: break-word;">4.0</td>
+                <td>
+                  <ul>
+                    <li>JDBC/OBKV: 3.x, 4.x</li>
+                    <li>Direct Load: 4.2.x or later versions</li>
+                  </ul>
+                </td>
+                <td>17</td>
+                <td>2.13</td>
             </tr>
         </tbody>
     </table>
@@ -126,6 +150,27 @@ val oceanBaseSparkDF = spark.read.format("OceanBase")
 
 oceanBaseSparkDF.show(5)
 ```
+
+#### Use OBKV
+
+Reading through OBKV requires the table to have a primary key, and supports server-side predicate pushdown.
+
+```scala
+val oceanBaseSparkDF = spark.read.format("oceanbase")
+  .option("url", "jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false")
+  .option("username", "root@test")
+  .option("password", "123456")
+  .option("schema-name", "test")
+  .option("table-name", "orders")
+  .option("obkv.enabled", "true")
+  .option("obkv.param-url", "http://localhost:8080/services?Action=ObRootServiceInfo&ObCluster=obcluster")
+  .option("obkv.full-user-name", "root@test#obcluster")
+  .load()
+
+oceanBaseSparkDF.show(5)
+```
+
+- Note: If you declare the schema manually through `.schema(...)`, you also need to set `obkv.primary-key` to the comma-separated primary key column names.
 
 ### Write
 
@@ -251,6 +296,57 @@ df.write
   .option("direct-load.rpc-port", "2882")
   .save()
 ```
+
+#### Based on OBKV
+
+Writing through OBKV uses OceanBase's TableAPI and supports insert, insertOrUpdate, replace and put semantics through `obkv.dup-action`.
+
+##### Spark-SQL
+
+```sql
+CREATE TEMPORARY VIEW test_obkv
+USING oceanbase
+OPTIONS(
+  "url"="jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false",
+  "schema-name"="test",
+  "table-name"="orders",
+  "username"="root@test",
+  "password"="123456",
+  "obkv.enabled"="true",
+  "obkv.param-url"="http://localhost:8080/services?Action=ObRootServiceInfo&ObCluster=obcluster",
+  "obkv.full-user-name"="root@test#obcluster",
+  "obkv.primary-key"="order_id"
+);
+
+insert into table test_obkv
+select * from test.orders;
+
+insert overwrite table test_obkv
+select * from test.orders;
+```
+
+##### DataFrame
+
+```scala
+val df = spark.sql("select * from test.orders")
+
+import org.apache.spark.sql.SaveMode
+df.write
+  .format("oceanbase")
+  .mode(saveMode = SaveMode.Append)
+  .option("url", "jdbc:mysql://localhost:2881/test?useUnicode=true&characterEncoding=UTF-8&useSSL=false")
+  .option("username", "root@test")
+  .option("password", "123456")
+  .option("table-name", "orders")
+  .option("schema-name", "test")
+  .option("obkv.enabled", "true")
+  .option("obkv.param-url", "http://localhost:8080/services?Action=ObRootServiceInfo&ObCluster=obcluster")
+  .option("obkv.full-user-name", "root@test#obcluster")
+  .option("obkv.primary-key", "order_id")
+  .save()
+```
+
+- Note: OBKV write currently supports the following column types: INT, BIGINT, DOUBLE, VARCHAR, CHAR, TIMESTAMP, DATETIME. TINYINT, SMALLINT and FLOAT are read-only. DECIMAL, DATE, TEXT and VARBINARY are not supported.
 
 ## Configuration
 
@@ -402,6 +498,119 @@ df.write
     </table>
 </div>
 
+### OBKV configuration
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 10%">Option</th>
+                <th class="text-left" style="width: 10%">Default</th>
+                <th class="text-left" style="width: 15%">Type</th>
+                <th class="text-left" style="width: 50%">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>obkv.enabled</td>
+                <td>false</td>
+                <td>Boolean</td>
+                <td>Enable OBKV read/write mode.</td>
+            </tr>
+            <tr>
+                <td>obkv.param-url</td>
+                <td></td>
+                <td>String</td>
+                <td>The OceanBase config server URL for direct connection mode (required when obkv.odp-mode is false).</td>
+            </tr>
+            <tr>
+                <td>obkv.full-user-name</td>
+                <td></td>
+                <td>String</td>
+                <td>The full user name for OBKV connection, format: user@tenant#cluster.</td>
+            </tr>
+            <tr>
+                <td>obkv.password</td>
+                <td></td>
+                <td>String</td>
+                <td>The password for OBKV connection. If not set, reuses the global password.</td>
+            </tr>
+            <tr>
+                <td>obkv.sys-user-name</td>
+                <td></td>
+                <td>String</td>
+                <td>The system tenant user name for OBKV (optional).</td>
+            </tr>
+            <tr>
+                <td>obkv.sys-password</td>
+                <td></td>
+                <td>String</td>
+                <td>The system tenant password for OBKV (optional).</td>
+            </tr>
+            <tr>
+                <td>obkv.odp-mode</td>
+                <td>false</td>
+                <td>Boolean</td>
+                <td>Whether to use ODP proxy for OBKV connection.</td>
+            </tr>
+            <tr>
+                <td>obkv.odp-addr</td>
+                <td></td>
+                <td>String</td>
+                <td>The ODP address for OBKV proxy mode.</td>
+            </tr>
+            <tr>
+                <td>obkv.odp-port</td>
+                <td>2882</td>
+                <td>Integer</td>
+                <td>The ODP port for OBKV proxy mode.</td>
+            </tr>
+            <tr>
+                <td>obkv.batch-size</td>
+                <td>1024</td>
+                <td>Integer</td>
+                <td>The batch size for OBKV read/write operations.</td>
+            </tr>
+            <tr>
+                <td>obkv.rpc-connect-timeout</td>
+                <td>5000</td>
+                <td>Integer</td>
+                <td>The RPC connect timeout in milliseconds for OBKV connections.</td>
+            </tr>
+            <tr>
+                <td>obkv.rpc-execute-timeout</td>
+                <td>10000</td>
+                <td>Integer</td>
+                <td>The RPC execute timeout in milliseconds for OBKV operations.</td>
+            </tr>
+            <tr>
+                <td>obkv.operation-timeout</td>
+                <td>10000</td>
+                <td>Integer</td>
+                <td>The operation timeout in milliseconds for OBKV client.</td>
+            </tr>
+            <tr>
+                <td>obkv.dup-action</td>
+                <td>INSERT_OR_UPDATE</td>
+                <td>String</td>
+                <td>The action when there is a duplicate record during OBKV write. Can be <code>INSERT_OR_UPDATE</code>, <code>INSERT</code>, <code>REPLACE</code> or <code>PUT</code>.</td>
+            </tr>
+            <tr>
+                <td>obkv.read-consistency</td>
+                <td>STRONG</td>
+                <td>String</td>
+                <td>The read consistency level for OBKV queries. Can be <code>STRONG</code> or <code>WEAK</code>.</td>
+            </tr>
+            <tr>
+                <td>obkv.primary-key</td>
+                <td></td>
+                <td>String</td>
+                <td>The primary key column names for OBKV, comma-separated. Required in non-Catalog mode.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
 ### JDBC configuration
 
 - This Connector is implemented based on [JDBC To Other Databases](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html).
@@ -409,4 +618,38 @@ df.write
 - Support OceanBase MySQL and Oracle modes:
   - For MySQL mode, you need to add the `MySQL Connector/J` driver to Spark's CLASSPATH
   - For Oracle mode, you need to add the `OceanBase Connector/J` driver to Spark's CLASSPATH
+- The `url` option accepts multiple comma-separated JDBC URLs, in which case connection failures automatically fail over to the remaining URLs.
+
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 10%">Option</th>
+                <th class="text-left" style="width: 10%">Default</th>
+                <th class="text-left" style="width: 15%">Type</th>
+                <th class="text-left" style="width: 50%">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>jdbc.connection.max-retries</td>
+                <td>3</td>
+                <td>Integer</td>
+                <td>Maximum number of attempts when opening a JDBC connection, including the initial attempt.</td>
+            </tr>
+            <tr>
+                <td>jdbc.connection.retry-interval</td>
+                <td>1s</td>
+                <td>Duration</td>
+                <td>Initial retry interval when opening a JDBC connection.</td>
+            </tr>
+            <tr>
+                <td>jdbc.connection.failed-url-cooldown</td>
+                <td>60s</td>
+                <td>Duration</td>
+                <td>Cooldown before a JDBC URL that failed to connect is treated as healthy again.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 

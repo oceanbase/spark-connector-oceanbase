@@ -17,7 +17,8 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    # Keep the runner stable instead of following the upcoming ubuntu-latest migration.
+    runs-on: ubuntu-24.04
     steps:
       - name: Free disk space on Ubuntu runner
         uses: kfir4444/free-disk-space@main
@@ -30,10 +31,10 @@ jobs:
           swap-storage: true
 
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '${{ inputs.java_version }}'
           distribution: 'zulu'

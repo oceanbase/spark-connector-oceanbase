@@ -23,9 +23,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.sources.{BaseRelation, Filter, InsertableRelation, PrunedFilteredScan}
-import org.apache.spark.sql.types.{DataTypes, DecimalType, StructType}
+import org.apache.spark.sql.types._
 
-import java.util.{Map => JMap}
+import java.util.{Locale, Map => JMap}
 
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
@@ -69,7 +69,7 @@ case class OBKVRelation(
         val pks = broadcastPKs.value
         val fltrs = broadcastFilters.value
 
-        val client = OBKVClientUtils.createClient(cfg)
+        val client = OBKVClientUtils.createClient(cfg, pks)
         try {
           val query = client.query(cfg.getTableName)
           query.select(sch.fieldNames: _*)
@@ -117,65 +117,63 @@ case class OBKVRelation(
 
 object OBKVRelation extends Logging {
 
-  def convertToRow(value: Object, dataType: org.apache.spark.sql.types.DataType): Any = {
-    if (dataType == DataTypes.StringType) {
-      value.toString
-    } else if (dataType == DataTypes.IntegerType) {
-      value match {
-        case n: Number => n.intValue()
-        case _ => value.toString.toInt
-      }
-    } else if (dataType == DataTypes.LongType) {
-      value match {
-        case n: Number => n.longValue()
-        case _ => value.toString.toLong
-      }
-    } else if (dataType == DataTypes.DoubleType) {
-      value match {
-        case n: Number => n.doubleValue()
-        case _ => value.toString.toDouble
-      }
-    } else if (dataType == DataTypes.FloatType) {
-      value match {
-        case n: Number => n.floatValue()
-        case _ => value.toString.toFloat
-      }
-    } else if (dataType == DataTypes.BooleanType) {
-      value match {
-        case b: java.lang.Boolean => b.booleanValue()
-        case n: Number => n.intValue() != 0
-        case _ => value.toString.toBoolean
-      }
-    } else if (dataType == DataTypes.ShortType) {
-      value match {
-        case n: Number => n.shortValue()
-        case _ => value.toString.toShort
-      }
-    } else if (dataType == DataTypes.ByteType) {
-      value match {
-        case n: Number => n.byteValue()
-        case _ => value.toString.toByte
-      }
-    } else if (dataType.isInstanceOf[DecimalType]) {
-      value match {
-        case bd: java.math.BigDecimal => bd
-        case bi: java.math.BigInteger => new java.math.BigDecimal(bi)
-        case _ => new java.math.BigDecimal(value.toString)
-      }
-    } else if (dataType == DataTypes.DateType) {
-      value match {
-        case d: java.sql.Date => d
-        case _ => java.sql.Date.valueOf(value.toString)
-      }
-    } else if (dataType == DataTypes.TimestampType) {
-      value match {
-        case t: java.sql.Timestamp => t
-        case _ => java.sql.Timestamp.valueOf(value.toString)
-      }
-    } else if (dataType == DataTypes.BinaryType) {
-      value.asInstanceOf[Array[Byte]]
-    } else {
-      value.toString
+  def convertToRow(value: Object, dataType: DataType): Any = {
+    dataType match {
+      case StringType => value.toString
+      case IntegerType =>
+        value match {
+          case n: Number => n.intValue()
+          case _ => value.toString.toInt
+        }
+      case LongType =>
+        value match {
+          case n: Number => n.longValue()
+          case _ => value.toString.toLong
+        }
+      case DoubleType =>
+        value match {
+          case n: Number => n.doubleValue()
+          case _ => value.toString.toDouble
+        }
+      case FloatType =>
+        value match {
+          case n: Number => n.floatValue()
+          case _ => value.toString.toFloat
+        }
+      case BooleanType =>
+        value match {
+          case b: java.lang.Boolean => b.booleanValue()
+          case n: Number => n.intValue() != 0
+          case _ => value.toString.toBoolean
+        }
+      case ShortType =>
+        value match {
+          case n: Number => n.shortValue()
+          case _ => value.toString.toShort
+        }
+      case ByteType =>
+        value match {
+          case n: Number => n.byteValue()
+          case _ => value.toString.toByte
+        }
+      case _: DecimalType =>
+        value match {
+          case bd: java.math.BigDecimal => bd
+          case bi: java.math.BigInteger => new java.math.BigDecimal(bi)
+          case _ => new java.math.BigDecimal(value.toString)
+        }
+      case DateType =>
+        value match {
+          case d: java.sql.Date => d
+          case _ => java.sql.Date.valueOf(value.toString)
+        }
+      case TimestampType =>
+        value match {
+          case t: java.sql.Timestamp => t
+          case _ => java.sql.Timestamp.valueOf(value.toString)
+        }
+      case BinaryType => value.asInstanceOf[Array[Byte]]
+      case _ => value.toString
     }
   }
 
@@ -183,7 +181,7 @@ object OBKVRelation extends Logging {
    * Converts a value to an OBKV-compatible type. The OBKV client does not support BigDecimal, so
    * DecimalType values are converted to Double.
    */
-  def convertForObkv(value: Any, dataType: org.apache.spark.sql.types.DataType): Object = {
+  def convertForObkv(value: Any, dataType: DataType): Object = {
     if (value == null) return null
     dataType match {
       case _: DecimalType =>
@@ -204,7 +202,7 @@ object OBKVRelation extends Logging {
       else Array.empty[String]
     }
     val batchSize = config.getObkvBatchSize
-    val dupAction = config.getObkvDupAction
+    val dupAction = config.getObkvDupAction.toUpperCase(Locale.ROOT)
     val tableName = config.getTableName
 
     dataFrame.foreachPartition {
@@ -213,6 +211,13 @@ object OBKVRelation extends Logging {
         try {
           val pkSet = primaryKeys.toSet
           val batchOps = client.batch(tableName)
+          val appendOperation: (Array[Object], Array[String], Array[Object]) => Any =
+            dupAction match {
+              case "INSERT" => batchOps.insert
+              case "REPLACE" => batchOps.replace
+              case "PUT" => batchOps.put
+              case _ => batchOps.insertOrUpdate
+            }
           var count = 0
 
           iter.foreach {
@@ -238,18 +243,7 @@ object OBKVRelation extends Logging {
                   }
               }
 
-              val rk = rowKeyValues.toArray
-              val cols = columnNames.toArray
-              val vals = columnValues.toArray
-
-              dupAction match {
-                case "INSERT_OR_UPDATE" =>
-                  batchOps.insertOrUpdate(rk, cols, vals)
-                case "INSERT" => batchOps.insert(rk, cols, vals)
-                case "REPLACE" => batchOps.replace(rk, cols, vals)
-                case "PUT" => batchOps.put(rk, cols, vals)
-                case _ => batchOps.insertOrUpdate(rk, cols, vals)
-              }
+              appendOperation(rowKeyValues.toArray, columnNames.toArray, columnValues.toArray)
 
               count += 1
               if (count >= batchSize) {

@@ -24,6 +24,8 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
 import org.apache.spark.sql.types.StructType
 
+import java.util.Locale
+
 import scala.collection.mutable.ArrayBuffer
 
 class OBKVWriter(
@@ -36,7 +38,7 @@ class OBKVWriter(
   private val batchSize = config.getObkvBatchSize
   private val buffer: ArrayBuffer[InternalRow] = ArrayBuffer[InternalRow]()
   private var client: ObTableClient = _
-  private val dupAction: String = config.getObkvDupAction
+  private val dupAction: String = config.getObkvDupAction.toUpperCase(Locale.ROOT)
   private val tableName: String = config.getTableName
 
   private val primaryKeys: Array[String] = {
@@ -51,6 +53,8 @@ class OBKVWriter(
       }
     }
   }
+
+  private lazy val primaryKeySet: Set[String] = primaryKeys.toSet
 
   private def ensureClient(): ObTableClient = {
     if (client == null) {
@@ -69,22 +73,18 @@ class OBKVWriter(
 
     try {
       val batchOps = ensureClient().batch(tableName)
+      val appendOperation: (Array[Object], Array[String], Array[Object]) => Any =
+        dupAction match {
+          case "INSERT" => batchOps.insert
+          case "REPLACE" => batchOps.replace
+          case "PUT" => batchOps.put
+          case _ => batchOps.insertOrUpdate
+        }
 
       buffer.foreach {
         row =>
           val (rowKeys, columns, values) = extractRowData(row)
-          dupAction match {
-            case "INSERT_OR_UPDATE" =>
-              batchOps.insertOrUpdate(rowKeys, columns, values)
-            case "INSERT" =>
-              batchOps.insert(rowKeys, columns, values)
-            case "REPLACE" =>
-              batchOps.replace(rowKeys, columns, values)
-            case "PUT" =>
-              batchOps.put(rowKeys, columns, values)
-            case _ =>
-              batchOps.insertOrUpdate(rowKeys, columns, values)
-          }
+          appendOperation(rowKeys, columns, values)
       }
 
       batchOps.execute()
@@ -96,7 +96,6 @@ class OBKVWriter(
   }
 
   private def extractRowData(row: InternalRow): (Array[Object], Array[String], Array[Object]) = {
-    val pkSet = primaryKeys.toSet
     val allFields = schema.fields
     val rowKeyValues = new ArrayBuffer[Object]()
     val columnNames = new ArrayBuffer[String]()
@@ -105,7 +104,7 @@ class OBKVWriter(
     allFields.zipWithIndex.foreach {
       case (field, idx) =>
         val value = OBKVTypeConverter.toObkvValue(row, idx, field.dataType)
-        if (pkSet.contains(field.name)) {
+        if (primaryKeySet.contains(field.name)) {
           rowKeyValues += value.asInstanceOf[Object]
         } else {
           columnNames += field.name

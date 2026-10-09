@@ -70,7 +70,7 @@ public abstract class OceanBaseMySQLTestBase extends OceanBaseTestBase {
                     .withEnv("OB_SYS_PASSWORD", SYS_PASSWORD)
                     .withEnv("OB_DATAFILE_SIZE", "2G")
                     .withEnv("OB_LOG_DISK_SIZE", "4G")
-                    .withStartupTimeout(Duration.ofMinutes(4))
+                    .withStartupTimeout(Duration.ofMinutes(10))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public static final OceanBaseProxyContainer ODP =

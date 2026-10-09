@@ -543,7 +543,10 @@ object OBJdbcReader extends SQLConfHelper {
 
     val convertedElements = elements.map {
       elem =>
-        if (elem == "null" || elem.isEmpty) {
+        // OceanBase normalizes null array elements to upper-case NULL, while quoted
+        // string elements keep their quotes at this stage, so a case-insensitive match
+        // cannot mistake a quoted 'null' string for a real null.
+        if (elem.trim.equalsIgnoreCase("null") || elem.isEmpty) {
           null
         } else {
           elementType match {
@@ -566,7 +569,7 @@ object OBJdbcReader extends SQLConfHelper {
   private def parseStringArrayElement(elem: String): String = {
     val trimmed = elem.trim
     if (trimmed.length >= 2 && trimmed.head == '"' && trimmed.last == '"') {
-      unescapeJsonString(trimmed.substring(1, trimmed.length - 1))
+      unescapeArrayElement(trimmed.substring(1, trimmed.length - 1))
     } else if (trimmed.length >= 2 && trimmed.head == '\'' && trimmed.last == '\'') {
       trimmed.substring(1, trimmed.length - 1)
     } else {
@@ -574,45 +577,20 @@ object OBJdbcReader extends SQLConfHelper {
     }
   }
 
-  private def unescapeJsonString(value: String): String = {
+  /**
+   * Unescape an element of OceanBase's ARRAY text form. OceanBase only escapes double quotes as \"
+   * in this format; every other character (including backslashes and raw control characters) is
+   * emitted verbatim, so sequences like \n must be preserved instead of being treated as JSON
+   * escape sequences.
+   */
+  private def unescapeArrayElement(value: String): String = {
     val sb = new StringBuilder(value.length)
     var i = 0
     while (i < value.length) {
       val c = value.charAt(i)
-      if (c == '\\' && i + 1 < value.length) {
-        value.charAt(i + 1) match {
-          case '"' =>
-            sb.append('"')
-            i += 2
-          case '\\' =>
-            sb.append('\\')
-            i += 2
-          case '/' =>
-            sb.append('/')
-            i += 2
-          case 'b' =>
-            sb.append('\b')
-            i += 2
-          case 'f' =>
-            sb.append('\f')
-            i += 2
-          case 'n' =>
-            sb.append('\n')
-            i += 2
-          case 'r' =>
-            sb.append('\r')
-            i += 2
-          case 't' =>
-            sb.append('\t')
-            i += 2
-          case 'u' if i + 5 < value.length =>
-            val codePoint = Integer.parseInt(value.substring(i + 2, i + 6), 16)
-            sb.append(codePoint.toChar)
-            i += 6
-          case other =>
-            sb.append(other)
-            i += 2
-        }
+      if (c == '\\' && i + 1 < value.length && value.charAt(i + 1) == '"') {
+        sb.append('"')
+        i += 2
       } else {
         sb.append(c)
         i += 1

@@ -38,11 +38,9 @@ class OBKVFilterCompiler(primaryKeys: Array[String]) {
     val unhandled = mutable.ArrayBuffer[Filter]()
 
     for (filter <- filters) {
-      val compiled = compileFilter(filter)
-      if (compiled != null) {
-        compiledFilters += compiled
-      } else {
-        unhandled += filter
+      compileFilter(filter) match {
+        case Some(compiled) => compiledFilters += compiled
+        case None => unhandled += filter
       }
     }
 
@@ -57,42 +55,36 @@ class OBKVFilterCompiler(primaryKeys: Array[String]) {
     OBKVFilterCompiler.CompileResult(serverFilter, unhandled.toArray)
   }
 
-  private def compileFilter(filter: Filter): ObTableFilter = {
+  private def compileFilter(filter: Filter): Option[ObTableFilter] = {
     filter match {
       case EqualTo(attr, value) =>
-        new ObTableValueFilter(ObCompareOp.EQ, attr, value)
+        Some(new ObTableValueFilter(ObCompareOp.EQ, attr, value))
       case GreaterThan(attr, value) =>
-        new ObTableValueFilter(ObCompareOp.GT, attr, value)
+        Some(new ObTableValueFilter(ObCompareOp.GT, attr, value))
       case GreaterThanOrEqual(attr, value) =>
-        new ObTableValueFilter(ObCompareOp.GE, attr, value)
+        Some(new ObTableValueFilter(ObCompareOp.GE, attr, value))
       case LessThan(attr, value) =>
-        new ObTableValueFilter(ObCompareOp.LT, attr, value)
+        Some(new ObTableValueFilter(ObCompareOp.LT, attr, value))
       case LessThanOrEqual(attr, value) =>
-        new ObTableValueFilter(ObCompareOp.LE, attr, value)
+        Some(new ObTableValueFilter(ObCompareOp.LE, attr, value))
       case IsNull(attr) =>
-        new ObTableValueFilter(ObCompareOp.IS, attr, null)
+        Some(new ObTableValueFilter(ObCompareOp.IS, attr, null))
       case IsNotNull(attr) =>
-        new ObTableValueFilter(ObCompareOp.IS_NOT, attr, null)
+        Some(new ObTableValueFilter(ObCompareOp.IS_NOT, attr, null))
       case And(left, right) =>
-        val l = compileFilter(left)
-        val r = compileFilter(right)
-        if (l != null && r != null) {
-          new ObTableFilterList(ObTableFilterList.operator.AND, l, r)
-        } else {
-          null
-        }
+        for {
+          l <- compileFilter(left)
+          r <- compileFilter(right)
+        } yield new ObTableFilterList(ObTableFilterList.operator.AND, l, r)
       case Or(left, right) =>
-        val l = compileFilter(left)
-        val r = compileFilter(right)
-        if (l != null && r != null) {
-          new ObTableFilterList(ObTableFilterList.operator.OR, l, r)
-        } else {
-          null
-        }
+        for {
+          l <- compileFilter(left)
+          r <- compileFilter(right)
+        } yield new ObTableFilterList(ObTableFilterList.operator.OR, l, r)
       case _: Not =>
         // OBKV does not natively support NOT, skip it
-        null
-      case _ => null
+        None
+      case _ => None
     }
   }
 

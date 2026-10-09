@@ -35,6 +35,9 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
 
   @AfterEach
   def afterEach(): Unit = {
+    SparkSession.getActiveSession.foreach(_.stop())
+    SparkSession.clearActiveSession()
+    SparkSession.clearDefaultSession()
     dropTables(
       "products",
       "products_no_pri_key",
@@ -210,6 +213,7 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
       "[test,products_no_pri_key,false]",
       "[test,products_full_pri_key,false]",
       "[test,products_no_int_pri_key,false]",
+      "[test,products_reserved_word_pri_key,false]",
       "[test,products_unique_key,false]",
       "[test,products_full_unique_key,false]",
       "[test,products_pri_and_unique_key,false]",
@@ -1178,11 +1182,13 @@ class OBCatalogMySQLITCase extends OceanBaseMySQLTestBase {
                       |""".stripMargin)
 
       session.sql("use ob;")
+      // The s-interpolator consumes one escape layer. Four backslashes are required here so
+      // Spark receives a literal `\n` and the test exercises backslash preservation.
       session.sql(s"""
                      |INSERT INTO $getSchemaName.products_string_arrays VALUES
                      |(1, array('阅读', '摄影')),
                      |(2, array('a\"b', 'x,y')),
-                     |(3, array(null, '换行\\n值'))
+                     |(3, array(null, '换行\\\\n值'))
                      |""".stripMargin)
 
       import scala.collection.JavaConverters._

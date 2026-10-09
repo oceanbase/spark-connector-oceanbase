@@ -16,12 +16,14 @@
 package org.apache.spark.sql
 
 import com.oceanbase.spark.OBKVRelation
+import com.oceanbase.spark.catalog.OceanBaseTable
 import com.oceanbase.spark.config.OceanBaseConfig
 import com.oceanbase.spark.utils.{OBJdbcUtils, OceanBaseSourceUtils}
 import com.oceanbase.spark.utils.OBJdbcUtils.{getCompatibleMode, getDbTable}
 import com.oceanbase.spark.writer.DirectLoadWriter
 
-import OceanBaseSparkDataSource.{writeDataViaDirectLoad, writeDataViaObkv, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import OceanBaseSparkDataSource.{buildJDBCOptions, isQueryRead, writeDataViaDirectLoad, writeDataViaObkv, JDBC_TXN_ISOLATION_LEVEL, JDBC_URL, JDBC_USER, OCEANBASE_DEFAULT_ISOLATION_LEVEL, SHORT_NAME}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql
 import org.apache.spark.sql.connector.catalog.{SupportsRead, Table => ConnectorTable, TableCapability, TableProvider}
 import org.apache.spark.sql.connector.expressions.Transform
@@ -30,10 +32,16 @@ import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JDBCRelatio
 import org.apache.spark.sql.jdbc.{JdbcDialects, OceanBaseMySQLDialect, OceanBaseOracleDialect}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 import java.util.{EnumSet, Map => JMap, Set => JSet}
 
-class OceanBaseSparkDataSource extends JdbcRelationProvider with SchemaRelationProvider {
+import scala.collection.JavaConverters._
+
+class OceanBaseSparkDataSource
+  extends JdbcRelationProvider
+  with SchemaRelationProvider
+  with TableProvider {
 
   override def shortName(): String = SHORT_NAME
 

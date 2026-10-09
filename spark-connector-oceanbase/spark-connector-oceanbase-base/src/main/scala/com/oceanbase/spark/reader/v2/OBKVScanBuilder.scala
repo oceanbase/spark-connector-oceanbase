@@ -52,7 +52,7 @@ case class OBKVScanBuilder(schema: StructType, config: OceanBaseConfig, primaryK
   override def pushedFilters(): Array[Filter] = pushedFilter
 
   override def pruneColumns(requiredSchema: StructType): Unit = {
-    val requiredCols = requiredSchema.map(_.name)
+    val requiredCols = requiredSchema.map(_.name).toSet
     this.finalSchema = StructType(finalSchema.filter(field => requiredCols.contains(field.name)))
   }
 
@@ -157,7 +157,7 @@ class OBKVReader(
 
   private def initialize(): Unit = {
     if (initialized) return
-    client = OBKVClientUtils.createClient(config)
+    client = OBKVClientUtils.createClient(config, primaryKeys)
 
     val tableName = config.getTableName
     val query = client.query(tableName)
@@ -210,6 +210,15 @@ class OBKVReader(
   }
 
   override def close(): Unit = {
+    if (resultSet != null) {
+      try {
+        resultSet.close()
+      } catch {
+        case e: Exception => logWarning(s"Failed to close OBKV result set: ${e.getMessage}")
+      } finally {
+        resultSet = null
+      }
+    }
     OBKVClientUtils.closeClient(client)
   }
 }
